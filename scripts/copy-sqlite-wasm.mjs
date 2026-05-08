@@ -8,7 +8,10 @@ const repoRoot = join(here, '..');
 const srcDir = join(repoRoot, 'node_modules', '@sqlite.org', 'sqlite-wasm', 'dist');
 const dstDir = join(repoRoot, 'static', 'sqlite');
 
-const FILES = ['sqlite3-worker1.mjs', 'sqlite3-opfs-async-proxy.js', 'sqlite3.wasm'];
+// Only the WASM binary is staged in /static. The JS module is bundled by Vite
+// via `import sqlite3InitModule from '@sqlite.org/sqlite-wasm'` and uses
+// `locateFile` to find the binary at runtime under `static/sqlite/`.
+const FILES = ['sqlite3.wasm'];
 
 try {
 	await access(srcDir);
