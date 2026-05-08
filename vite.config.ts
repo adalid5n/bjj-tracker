@@ -41,7 +41,7 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,svg,png,ico,webp}'],
+				globPatterns: ['**/*.{js,css,html,svg,png,ico,webp,wasm}'],
 				navigateFallback: '/bjj-tracker/',
 				navigateFallbackDenylist: [/^\/api\//]
 			},
