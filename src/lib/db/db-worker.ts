@@ -9,9 +9,7 @@ type InMessage =
 	| { id: number; type: 'run'; sql: string; params?: SqlValue[] }
 	| { id: number; type: 'query'; sql: string; params?: SqlValue[] };
 
-type OutMessage =
-	| { id: number; ok: true; rows?: Row[] }
-	| { id: number; ok: false; error: string };
+type OutMessage = { id: number; ok: true; rows?: Row[] } | { id: number; ok: false; error: string };
 
 let dbPromise: Promise<{ exec: (...a: unknown[]) => unknown }> | null = null;
 

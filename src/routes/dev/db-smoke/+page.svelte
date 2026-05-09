@@ -61,12 +61,12 @@
 	{#if status === 'loading'}
 		<p class="text-blue-600">Inicializando BD…</p>
 	{:else if status === 'error'}
-		<div class="rounded border border-red-300 bg-red-50 p-3 space-y-3">
+		<div class="space-y-3 rounded border border-red-300 bg-red-50 p-3">
 			{#if isContentionError}
 				<p class="font-semibold text-red-800">La BD ya está abierta en otro sitio</p>
 				<p class="text-sm text-red-700">
-					Otra pestaña, ventana o instancia de BJJ Tracker tiene la base de datos abierta.
-					Ciérrala y recarga esta página.
+					Otra pestaña, ventana o instancia de BJJ Tracker tiene la base de datos abierta. Ciérrala
+					y recarga esta página.
 				</p>
 				<details class="text-xs text-red-700">
 					<summary class="cursor-pointer">Detalle técnico</summary>

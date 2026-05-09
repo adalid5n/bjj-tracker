@@ -45,7 +45,23 @@ function send<T extends Row[] | undefined>(payload: object): Promise<T> {
 	});
 }
 
-/** Idempotent. Spawns the worker, opens the DB and applies SCHEMA_V1 if missing. */
+/**
+ * Initializes the DB. Idempotent — second and later calls return the same
+ * promise and do not re-spawn the worker.
+ *
+ * On first call: dynamic-imports the worker module, instantiates it,
+ * registers message and error listeners, and tells it to open the OPFS
+ * SAH-Pool VFS and apply SCHEMA_V1 if the schema_meta table is missing.
+ *
+ * **SSR-safe:** throws synchronously if invoked outside a browser context.
+ * Callers must invoke from `onMount` or after a `browser` guard.
+ *
+ * Throws if the DB cannot be opened, e.g. when another live instance
+ * (another tab or PWA window on the same origin) is holding the OPFS
+ * sync access handles. The error message contains
+ * "Access Handles cannot be created" — UI may detect that pattern to
+ * show an actionable contention message.
+ */
 export async function init(): Promise<void> {
 	assertBrowser();
 	if (initPromise) return initPromise;
@@ -74,12 +90,25 @@ export async function init(): Promise<void> {
 	return initPromise;
 }
 
-/** Executes a statement that returns no rows (INSERT, UPDATE, DELETE, DDL). Throws on error. */
+/**
+ * Executes a statement that returns no rows (INSERT, UPDATE, DELETE, DDL).
+ * `params` are bound positionally to `?` placeholders in `sql`.
+ * Rejects with the SQLite error message on failure.
+ *
+ * Requires `init()` to have completed; throws synchronously otherwise.
+ */
 export async function run(sql: string, params?: SqlValue[]): Promise<void> {
 	await send({ type: 'run', sql, params });
 }
 
-/** Executes a SELECT and returns rows as objects. Caller casts to its row shape. */
+/**
+ * Executes a SELECT and returns the rows as objects keyed by column name.
+ * `params` are bound positionally to `?` placeholders in `sql`.
+ * The caller passes the type parameter to assert the row shape — no
+ * runtime validation, columns must match the SELECT projection.
+ *
+ * Requires `init()` to have completed; throws synchronously otherwise.
+ */
 export async function query<T = Row>(sql: string, params?: SqlValue[]): Promise<T[]> {
 	const rows = await send<Row[]>({ type: 'query', sql, params });
 	return (rows ?? []) as T[];
