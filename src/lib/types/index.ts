@@ -10,7 +10,6 @@ export interface Companero {
 	id: string;
 	nombre: string;
 	cinturon?: Cinturon;
-	experiencia_anos?: number;
 	peso_relativo?: PesoRelativo;
 	notas?: string;
 	created_at: string;

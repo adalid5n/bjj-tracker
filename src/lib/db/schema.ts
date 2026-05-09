@@ -9,7 +9,6 @@ CREATE TABLE companeros (
   id TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,
   cinturon TEXT,
-  experiencia_anos REAL,
   peso_relativo TEXT,
   notas TEXT,
   created_at TEXT NOT NULL,
