@@ -4,14 +4,71 @@
  */
 
 import { init, query, run } from '$lib/db';
-import type { Roll } from '$lib/types';
+import type { ResultadoRoll, Roll, TipoSesion } from '$lib/types';
 
 export type NewRoll = Omit<Roll, 'id' | 'orden' | 'created_at' | 'updated_at'>;
 export type RollUpdate = Omit<Roll, 'orden' | 'created_at' | 'updated_at'>;
 
+export type RollWithContext = Roll & {
+	companero_nombre: string | null;
+	sesion_fecha: string;
+	sesion_tipo: TipoSesion;
+};
+
+export type RollFilters = {
+	from?: string;
+	to?: string;
+	companero_id?: string;
+	resultado?: ResultadoRoll;
+	tipo_sesion?: TipoSesion;
+};
+
 export async function listRolls(sesionId: string): Promise<Roll[]> {
 	await init();
 	return query<Roll>('SELECT * FROM rolls WHERE sesion_id = ? ORDER BY orden DESC', [sesionId]);
+}
+
+export async function listAllRolls(filters: RollFilters = {}): Promise<RollWithContext[]> {
+	await init();
+	const where: string[] = [];
+	const params: (string | number)[] = [];
+
+	if (filters.from) {
+		where.push('s.fecha >= ?');
+		params.push(filters.from);
+	}
+	if (filters.to) {
+		where.push('s.fecha <= ?');
+		params.push(filters.to);
+	}
+	if (filters.companero_id) {
+		where.push('r.companero_id = ?');
+		params.push(filters.companero_id);
+	}
+	if (filters.resultado) {
+		where.push('r.resultado = ?');
+		params.push(filters.resultado);
+	}
+	if (filters.tipo_sesion) {
+		where.push('s.tipo = ?');
+		params.push(filters.tipo_sesion);
+	}
+
+	const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+	return query<RollWithContext>(
+		`SELECT
+			r.*,
+			c.nombre AS companero_nombre,
+			s.fecha AS sesion_fecha,
+			s.tipo AS sesion_tipo
+		 FROM rolls r
+		 LEFT JOIN companeros c ON r.companero_id = c.id
+		 LEFT JOIN sesiones s ON r.sesion_id = s.id
+		 ${whereSql}
+		 ORDER BY s.fecha DESC, r.orden DESC`,
+		params
+	);
 }
 
 export async function createRoll(data: NewRoll): Promise<Roll> {

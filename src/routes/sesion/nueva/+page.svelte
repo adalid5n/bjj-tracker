@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import SesionForm from '$lib/components/SesionForm.svelte';
+	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { NewSesion } from '$lib/sesiones';
 
@@ -16,7 +17,7 @@
 	<title>Nueva sesión · BJJ Tracker</title>
 </svelte:head>
 
-<main class="mx-auto max-w-2xl space-y-4 p-4">
+<main class="mx-auto max-w-2xl space-y-4 p-4 pb-28">
 	<header class="flex items-center gap-3">
 		<Button variant="outline" size="sm" href={resolve('/')}>← Volver</Button>
 		<h1 class="text-xl font-bold">Nueva sesión</h1>
@@ -24,3 +25,5 @@
 
 	<SesionForm submitLabel="Crear sesión" onSubmit={handleSubmit} />
 </main>
+
+<BottomNav />

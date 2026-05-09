@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import Fab from '$lib/components/Fab.svelte';
+	import BottomNav from '$lib/components/BottomNav.svelte';
 	import type { SesionWithCount } from '$lib/sesiones';
 
 	const TIPO_LABEL = {
@@ -37,7 +38,7 @@
 	<title>BJJ Tracker</title>
 </svelte:head>
 
-<main class="mx-auto max-w-2xl space-y-4 p-4 pb-24">
+<main class="mx-auto max-w-2xl space-y-4 p-4 pb-32">
 	<header>
 		<h1 class="text-2xl font-bold">BJJ Tracker</h1>
 	</header>
@@ -80,3 +81,5 @@
 {#if status === 'ready'}
 	<Fab href={resolve('/sesion/nueva')} label="Nueva sesión" />
 {/if}
+
+<BottomNav />

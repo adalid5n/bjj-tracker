@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import SesionForm from '$lib/components/SesionForm.svelte';
 	import RollEditor from '$lib/components/RollEditor.svelte';
+	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { Companero, Roll, Sesion, TipoSesion } from '$lib/types';
 
@@ -130,7 +131,7 @@
 	<title>Sesión · BJJ Tracker</title>
 </svelte:head>
 
-<main class="mx-auto max-w-2xl space-y-4 p-4 pb-24">
+<main class="mx-auto max-w-2xl space-y-4 p-4 pb-28">
 	<header class="flex items-center gap-3">
 		<Button variant="outline" size="sm" href={resolve('/')}>← Volver</Button>
 		<h1 class="text-xl font-bold">Editar sesión</h1>
@@ -215,3 +216,5 @@
 		/>
 	{/if}
 </main>
+
+<BottomNav />
