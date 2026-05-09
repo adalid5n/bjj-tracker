@@ -9,6 +9,8 @@
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
 
+	const isContentionError = $derived(errorMessage.includes('Access Handles cannot be created'));
+
 	onMount(async () => {
 		try {
 			db = await import('$lib/db');
@@ -59,9 +61,28 @@
 	{#if status === 'loading'}
 		<p class="text-blue-600">Inicializando BD…</p>
 	{:else if status === 'error'}
-		<div class="rounded border border-red-300 bg-red-50 p-3">
-			<p class="font-semibold text-red-800">Error inicializando BD</p>
-			<pre class="mt-2 text-sm whitespace-pre-wrap text-red-700">{errorMessage}</pre>
+		<div class="rounded border border-red-300 bg-red-50 p-3 space-y-3">
+			{#if isContentionError}
+				<p class="font-semibold text-red-800">La BD ya está abierta en otro sitio</p>
+				<p class="text-sm text-red-700">
+					Otra pestaña, ventana o instancia de BJJ Tracker tiene la base de datos abierta.
+					Ciérrala y recarga esta página.
+				</p>
+				<details class="text-xs text-red-700">
+					<summary class="cursor-pointer">Detalle técnico</summary>
+					<pre class="mt-1 whitespace-pre-wrap">{errorMessage}</pre>
+				</details>
+			{:else}
+				<p class="font-semibold text-red-800">Error inicializando BD</p>
+				<pre class="text-sm whitespace-pre-wrap text-red-700">{errorMessage}</pre>
+			{/if}
+			<button
+				type="button"
+				onclick={() => window.location.reload()}
+				class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+			>
+				Recargar página
+			</button>
 		</div>
 	{:else}
 		<div class="flex gap-2">

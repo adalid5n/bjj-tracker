@@ -24,12 +24,32 @@ async function openDb(wasmBaseUrl: string) {
 		locateFile: (file: string) => `${wasmBaseUrl}/${file}`
 	});
 
-	const poolUtil = await sqlite3.installOpfsSAHPoolVfs({
-		name: 'opfs-sahpool',
-		initialCapacity: 6
-	});
+	// Retry installOpfsSAHPoolVfs to recover from the transient race where a
+	// previous worker just terminated but the OS hasn't released the OPFS
+	// sync access handles yet (~50-300ms window). On real contention (another
+	// live instance holding the handles), all retries fail and the original
+	// error propagates so the caller can show a meaningful UI.
+	const RETRY_ATTEMPTS = 5;
+	const RETRY_BASE_DELAY_MS = 200;
+	let poolUtil: Awaited<ReturnType<typeof sqlite3.installOpfsSAHPoolVfs>> | null = null;
+	let lastError: unknown;
+	for (let i = 0; i < RETRY_ATTEMPTS; i++) {
+		try {
+			poolUtil = await sqlite3.installOpfsSAHPoolVfs({
+				name: 'opfs-sahpool',
+				initialCapacity: 6
+			});
+			break;
+		} catch (err) {
+			lastError = err;
+			const msg = err instanceof Error ? err.message : String(err);
+			if (!msg.includes('Access Handles cannot be created')) throw err;
+			if (i === RETRY_ATTEMPTS - 1) throw lastError;
+			await new Promise((r) => setTimeout(r, RETRY_BASE_DELAY_MS * (i + 1)));
+		}
+	}
 
-	const db = new poolUtil.OpfsSAHPoolDb('/bjj-tracker.sqlite3');
+	const db = new poolUtil!.OpfsSAHPoolDb('/bjj-tracker.sqlite3');
 
 	const needsSchema =
 		db.exec({
