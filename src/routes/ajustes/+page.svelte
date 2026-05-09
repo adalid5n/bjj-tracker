@@ -51,8 +51,42 @@
 		}
 	}
 
-	function pickFile() {
+	type ShowOpenFilePicker = (opts?: {
+		types?: { description?: string; accept: Record<string, string[]> }[];
+		multiple?: boolean;
+		excludeAcceptAllOption?: boolean;
+	}) => Promise<{ getFile: () => Promise<File> }[]>;
+
+	async function pickFile() {
 		message = null;
+		// Preferred path: FileSystem Access API (Chromium incl. Edge mobile)
+		// abre el explorador de Archivos nativo del SO. El input type=file en
+		// Android tiende a abrir Cámara/Fotos primero por cómo los intents
+		// matchean MIME types.
+		const fsApi = (window as unknown as { showOpenFilePicker?: ShowOpenFilePicker })
+			.showOpenFilePicker;
+		if (fsApi) {
+			try {
+				const handles = await fsApi({
+					types: [
+						{
+							description: 'BJJ Tracker export',
+							accept: { 'application/json': ['.json'] }
+						}
+					],
+					multiple: false,
+					excludeAcceptAllOption: false
+				});
+				const file = await handles[0].getFile();
+				await processFile(file);
+			} catch (err) {
+				// El usuario canceló (AbortError) — silencio. Otros errores: reportar.
+				if (err instanceof Error && err.name === 'AbortError') return;
+				message = { kind: 'err', text: err instanceof Error ? err.message : String(err) };
+			}
+			return;
+		}
+		// Fallback: input type=file (Safari iOS, Firefox)
 		fileInput?.click();
 	}
 
@@ -61,7 +95,10 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
+		await processFile(file);
+	}
 
+	async function processFile(file: File) {
 		const ok = confirm(
 			`¿Importar "${file.name}"?\n\nESTO REEMPLAZA TODOS LOS DATOS ACTUALES (compañeros, sesiones y rolls). No se puede deshacer.`
 		);
@@ -122,12 +159,7 @@
 		     app que lo maneje" y abre Fotos/Vídeos por defecto. Sin accept muestra
 		     el selector de Archivos genérico. La validación de JSON se hace al
 		     leer el contenido, no al filtrar el picker. -->
-		<input
-			bind:this={fileInput}
-			type="file"
-			class="hidden"
-			onchange={handleFileChange}
-		/>
+		<input bind:this={fileInput} type="file" class="hidden" onchange={handleFileChange} />
 		<Button variant="outline" onclick={pickFile} disabled={busy !== null} class="w-full">
 			{busy === 'import' ? 'Importando…' : 'Importar JSON'}
 		</Button>
