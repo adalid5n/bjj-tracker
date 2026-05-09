@@ -85,6 +85,22 @@ export async function init(): Promise<void> {
 
 		const wasmBaseUrl = `${window.location.origin}${base}/sqlite`;
 		await send({ type: 'init', wasmBaseUrl });
+
+		// When this tab/PWA goes to background, release OPFS sync access
+		// handles so another instance on the same origin (typical case:
+		// Edge tab + installed PWA) can grab them. The next run/query
+		// after returning to foreground auto-resumes (worker handles it).
+		// Without this, switching between Edge and PWA on Android requires
+		// force-close because they share the same Chromium process and OPFS.
+		if (typeof document !== 'undefined') {
+			document.addEventListener('visibilitychange', () => {
+				if (document.hidden) {
+					send({ type: 'pause' }).catch(() => {
+						// pause is best-effort; ignore failures
+					});
+				}
+			});
+		}
 	})();
 
 	return initPromise;
