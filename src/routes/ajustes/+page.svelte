@@ -118,10 +118,13 @@
 				>Reemplaza TODOS los datos actuales</strong
 			>; no hay merge en esta versión.
 		</p>
+		<!-- Sin accept: Android Chrome interpreta "application/json" como "no hay
+		     app que lo maneje" y abre Fotos/Vídeos por defecto. Sin accept muestra
+		     el selector de Archivos genérico. La validación de JSON se hace al
+		     leer el contenido, no al filtrar el picker. -->
 		<input
 			bind:this={fileInput}
 			type="file"
-			accept="application/json,.json"
 			class="hidden"
 			onchange={handleFileChange}
 		/>
