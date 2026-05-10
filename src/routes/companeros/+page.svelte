@@ -94,25 +94,25 @@
 	</header>
 
 	{#if status === 'loading'}
-		<p class="text-blue-600">Cargando…</p>
+		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
-		<div class="rounded border border-red-300 bg-red-50 p-3">
-			<p class="font-semibold text-red-800">Error</p>
-			<pre class="mt-2 text-sm whitespace-pre-wrap text-red-700">{errorMessage}</pre>
+		<div class="rounded border border-destructive/30 bg-destructive/10 p-3">
+			<p class="font-semibold text-destructive">Error</p>
+			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else if companeros.length === 0}
-		<div class="rounded border border-dashed border-gray-300 p-8 text-center">
-			<p class="text-gray-600">Aún no hay compañeros.</p>
-			<p class="text-sm text-gray-500">Pulsa el botón de abajo para añadir el primero.</p>
+		<div class="rounded border border-dashed border-border p-8 text-center">
+			<p class="text-muted-foreground">Aún no hay compañeros.</p>
+			<p class="text-sm text-muted-foreground">Pulsa el botón de abajo para añadir el primero.</p>
 		</div>
 	{:else}
-		<p class="text-xs text-gray-500">{companeros.length} compañero(s)</p>
-		<ul class="divide-y divide-gray-200 rounded border border-gray-200">
+		<p class="text-xs text-muted-foreground">{companeros.length} compañero(s)</p>
+		<ul class="divide-y divide-border rounded border border-border">
 			{#each companeros as c (c.id)}
 				<li class="flex items-center justify-between gap-3 p-3">
 					<button type="button" class="flex-1 text-left" onclick={() => openEdit(c)}>
 						<div class="font-medium">{c.nombre}</div>
-						<div class="mt-0.5 text-xs text-gray-500">
+						<div class="mt-0.5 text-xs text-muted-foreground">
 							{#if c.cinturon}<span>cinturón {CINTURON_LABEL[c.cinturon]}</span>{/if}
 							{#if c.cinturon && c.peso_relativo}<span> · </span>{/if}
 							{#if c.peso_relativo}<span>{PESO_LABEL[c.peso_relativo]}</span>{/if}

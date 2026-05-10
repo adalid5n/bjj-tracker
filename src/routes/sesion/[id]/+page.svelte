@@ -16,9 +16,9 @@
 	} as const;
 
 	const RESULTADO_BADGE = {
-		domine: 'bg-green-100 text-green-800',
-		equilibrado: 'bg-gray-100 text-gray-800',
-		me_dominaron: 'bg-red-100 text-red-800'
+		domine: 'bg-success/15 text-success',
+		equilibrado: 'bg-muted text-muted-foreground',
+		me_dominaron: 'bg-destructive/15 text-destructive'
 	} as const;
 
 	let sesion = $state<Sesion | null>(null);
@@ -138,51 +138,51 @@
 	</header>
 
 	{#if status === 'loading'}
-		<p class="text-blue-600">Cargando…</p>
+		<p class="text-primary">Cargando…</p>
 	{:else if status === 'notfound'}
-		<div class="rounded border border-yellow-300 bg-yellow-50 p-3">
-			<p class="text-yellow-800">Esta sesión no existe (ID: {id}).</p>
+		<div class="rounded border border-warning/40 bg-warning/15 p-3">
+			<p class="text-warning">Esta sesión no existe (ID: {id}).</p>
 		</div>
 	{:else if status === 'error'}
-		<div class="rounded border border-red-300 bg-red-50 p-3">
-			<p class="font-semibold text-red-800">Error</p>
-			<pre class="mt-2 text-sm whitespace-pre-wrap text-red-700">{errorMessage}</pre>
+		<div class="rounded border border-destructive/30 bg-destructive/10 p-3">
+			<p class="font-semibold text-destructive">Error</p>
+			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else if sesion}
 		<SesionForm initial={sesion} submitLabel="Guardar cambios" onSubmit={handleSubmitSesion} />
 
 		{#if savedFlash}
-			<p class="text-sm text-green-600">✓ Guardado</p>
+			<p class="text-sm text-success">✓ Guardado</p>
 		{/if}
 
-		<section class="space-y-3 border-t border-gray-200 pt-4">
+		<section class="space-y-3 border-t border-border pt-4">
 			<div class="flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-gray-700">
+				<h2 class="text-sm font-semibold text-foreground">
 					Rolls ({rolls.length})
 				</h2>
 				<Button size="sm" onclick={openNewRoll}>+ Añadir roll</Button>
 			</div>
 
 			{#if rolls.length === 0}
-				<p class="text-sm text-gray-500 italic">
+				<p class="text-sm text-muted-foreground italic">
 					Aún no hay rolls en esta sesión. Pulsa "Añadir roll".
 				</p>
 			{:else}
-				<ul class="divide-y divide-gray-200 rounded border border-gray-200">
+				<ul class="divide-y divide-border rounded border border-border">
 					{#each rolls as r (r.id)}
 						<li>
 							<button
 								type="button"
-								class="w-full p-3 text-left transition-colors hover:bg-gray-50"
+								class="w-full p-3 text-left transition-colors hover:bg-accent"
 								onclick={() => openEditRoll(r)}
 							>
 								<div class="flex items-baseline justify-between gap-2">
 									<div class="flex items-baseline gap-2">
-										<span class="text-xs font-semibold text-gray-500">#{r.orden}</span>
+										<span class="text-xs font-semibold text-muted-foreground">#{r.orden}</span>
 										{#if r.companero_id && companerosById.has(r.companero_id)}
 											<span class="font-medium">{companerosById.get(r.companero_id)?.nombre}</span>
 										{:else}
-											<span class="text-sm text-gray-400 italic">Sin compañero</span>
+											<span class="text-sm text-muted-foreground italic">Sin compañero</span>
 										{/if}
 									</div>
 									{#if r.resultado}
@@ -192,7 +192,7 @@
 									{/if}
 								</div>
 								{#if r.que_fallo}
-									<div class="mt-1 truncate text-sm text-gray-600">{r.que_fallo}</div>
+									<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
 								{/if}
 							</button>
 						</li>
@@ -201,7 +201,7 @@
 			{/if}
 		</section>
 
-		<section class="border-t border-gray-200 pt-4">
+		<section class="border-t border-border pt-4">
 			<Button variant="destructive" onclick={handleDeleteSesion} class="w-full">
 				Eliminar sesión
 			</Button>

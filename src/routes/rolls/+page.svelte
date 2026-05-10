@@ -21,9 +21,9 @@
 		me_dominaron: 'Me dominaron'
 	};
 	const RESULTADO_BADGE: Record<ResultadoRoll, string> = {
-		domine: 'bg-green-100 text-green-800',
-		equilibrado: 'bg-gray-100 text-gray-800',
-		me_dominaron: 'bg-red-100 text-red-800'
+		domine: 'bg-success/15 text-success',
+		equilibrado: 'bg-muted text-muted-foreground',
+		me_dominaron: 'bg-destructive/15 text-destructive'
 	};
 
 	let rolls = $state<RollWithContext[]>([]);
@@ -122,11 +122,11 @@
 		<h1 class="text-2xl font-bold">Rolls</h1>
 	</header>
 
-	<details class="rounded border border-gray-200 bg-gray-50">
-		<summary class="cursor-pointer px-3 py-2 text-sm font-medium text-gray-700">
+	<details class="rounded border border-border bg-muted">
+		<summary class="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
 			Filtros {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
 		</summary>
-		<div class="space-y-3 border-t border-gray-200 p-3">
+		<div class="space-y-3 border-t border-border p-3">
 			<div class="grid grid-cols-2 gap-2">
 				<div class="space-y-1">
 					<Label for="from" class="text-xs">Desde</Label>
@@ -202,37 +202,37 @@
 	</details>
 
 	{#if status === 'loading'}
-		<p class="text-blue-600">Cargando…</p>
+		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
-		<div class="rounded border border-red-300 bg-red-50 p-3">
-			<p class="font-semibold text-red-800">Error</p>
-			<pre class="mt-2 text-sm whitespace-pre-wrap text-red-700">{errorMessage}</pre>
+		<div class="rounded border border-destructive/30 bg-destructive/10 p-3">
+			<p class="font-semibold text-destructive">Error</p>
+			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else if rolls.length === 0}
-		<p class="rounded border border-dashed border-gray-300 p-8 text-center text-gray-500">
+		<p class="rounded border border-dashed border-border p-8 text-center text-muted-foreground">
 			{activeFilterCount > 0
 				? 'No hay rolls que coincidan con los filtros.'
 				: 'Aún no has registrado ningún roll.'}
 		</p>
 	{:else}
-		<p class="text-xs text-gray-500">{rolls.length} roll(s)</p>
-		<ul class="divide-y divide-gray-200 rounded border border-gray-200">
+		<p class="text-xs text-muted-foreground">{rolls.length} roll(s)</p>
+		<ul class="divide-y divide-border rounded border border-border">
 			{#each rolls as r (r.id)}
 				<li>
 					<button
 						type="button"
-						class="w-full p-3 text-left transition-colors hover:bg-gray-50"
+						class="w-full p-3 text-left transition-colors hover:bg-accent"
 						onclick={() => openEdit(r)}
 					>
 						<div class="flex items-baseline justify-between gap-2">
 							<div class="flex items-baseline gap-2">
-								<span class="text-xs font-semibold text-gray-500">
+								<span class="text-xs font-semibold text-muted-foreground">
 									{formatFecha(r.sesion_fecha)}
 								</span>
 								{#if r.companero_nombre}
 									<span class="font-medium">{r.companero_nombre}</span>
 								{:else}
-									<span class="text-sm text-gray-400 italic">Sin compañero</span>
+									<span class="text-sm text-muted-foreground italic">Sin compañero</span>
 								{/if}
 							</div>
 							{#if r.resultado}
@@ -241,18 +241,18 @@
 								</span>
 							{/if}
 						</div>
-						<div class="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+						<div class="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
 							<span>{TIPO_LABEL[r.sesion_tipo]}</span>
 							<a
 								href={resolve(`/sesion/${r.sesion_id}`)}
-								class="text-blue-600 underline hover:text-blue-700"
+								class="text-primary underline hover:opacity-80"
 								onclick={(e) => e.stopPropagation()}
 							>
 								Ver sesión →
 							</a>
 						</div>
 						{#if r.que_fallo}
-							<div class="mt-1 truncate text-sm text-gray-600">{r.que_fallo}</div>
+							<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
 						{/if}
 					</button>
 				</li>

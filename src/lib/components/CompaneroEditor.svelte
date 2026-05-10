@@ -127,7 +127,7 @@
 			</div>
 
 			{#if errorMsg}
-				<p class="text-sm text-red-600">{errorMsg}</p>
+				<p class="text-sm text-destructive">{errorMsg}</p>
 			{/if}
 		</div>
 

@@ -230,11 +230,11 @@
 			</div>
 
 			{#if errorMsg}
-				<p class="text-sm text-red-600">{errorMsg}</p>
+				<p class="text-sm text-destructive">{errorMsg}</p>
 			{/if}
 
 			{#if !resultado}
-				<p class="text-xs text-gray-500 italic">El resultado es obligatorio.</p>
+				<p class="text-xs text-muted-foreground italic">El resultado es obligatorio.</p>
 			{/if}
 		</div>
 

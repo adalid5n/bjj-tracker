@@ -37,6 +37,21 @@ La nueva ruta `/companeros` usa FAB consistente con `/`. La página dev `/dev/co
 
 ---
 
+### Modo oscuro con toggle en Ajustes
+
+- **Origen:** Adalid, 2026-05-11 (durante planificación de it.0.5)
+- **Idea:** soportar tema claro/oscuro y exponer un toggle en `/ajustes`.
+  Los tokens shadcn ya están preparados para esto (CSS vars con
+  variantes `:root` y `.dark`), así que el grueso del trabajo es:
+  (1) tener todos los componentes propios pasando por tokens
+  (cubierto por it.0.5), (2) añadir el switch + persistencia de la
+  preferencia en localStorage o BD, (3) respetar `prefers-color-scheme`
+  como default si no hay preferencia guardada.
+- **Por qué:** uso real (la app se abre tras entrenar, a menudo de
+  noche). También accesibilidad.
+- **Cuándo:** post-it.0.5, cuando los tokens ya estén coherentes. Es un
+  añadido pequeño una vez la base de tokens está limpia.
+
 ### Sistema de diseño coherente — usar design tokens en lugar de Tailwind raw
 
 - **Origen:** T-6, feedback Adalid 2026-05-09

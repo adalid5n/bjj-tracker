@@ -44,32 +44,32 @@
 	</header>
 
 	{#if status === 'loading'}
-		<p class="text-blue-600">Cargando…</p>
+		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
-		<div class="rounded border border-red-300 bg-red-50 p-3">
-			<p class="font-semibold text-red-800">Error cargando sesiones</p>
-			<pre class="mt-2 text-sm whitespace-pre-wrap text-red-700">{errorMessage}</pre>
+		<div class="rounded border border-destructive/30 bg-destructive/10 p-3">
+			<p class="font-semibold text-destructive">Error cargando sesiones</p>
+			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else if sesiones.length === 0}
-		<div class="rounded border border-dashed border-gray-300 p-8 text-center">
-			<p class="text-gray-600">Aún no hay sesiones.</p>
-			<p class="text-sm text-gray-500">Empieza creando una con el botón de abajo.</p>
+		<div class="rounded border border-dashed border-border p-8 text-center">
+			<p class="text-muted-foreground">Aún no hay sesiones.</p>
+			<p class="text-sm text-muted-foreground">Empieza creando una con el botón de abajo.</p>
 		</div>
 	{:else}
-		<ul class="divide-y divide-gray-200 rounded border border-gray-200">
+		<ul class="divide-y divide-border rounded border border-border">
 			{#each sesiones as s (s.id)}
 				<li>
-					<a href={resolve(`/sesion/${s.id}`)} class="block p-3 transition-colors hover:bg-gray-50">
+					<a href={resolve(`/sesion/${s.id}`)} class="block p-3 transition-colors hover:bg-accent">
 						<div class="flex items-baseline justify-between">
 							<span class="font-medium">{formatFecha(s.fecha)}</span>
-							<span class="text-xs text-gray-500">
+							<span class="text-xs text-muted-foreground">
 								{s.rolls_count}
 								{s.rolls_count === 1 ? 'roll' : 'rolls'}
 							</span>
 						</div>
-						<div class="mt-0.5 text-xs text-gray-500">{TIPO_LABEL[s.tipo]}</div>
+						<div class="mt-0.5 text-xs text-muted-foreground">{TIPO_LABEL[s.tipo]}</div>
 						{#if s.foco}
-							<div class="mt-1 truncate text-sm text-gray-700">{s.foco}</div>
+							<div class="mt-1 truncate text-sm text-foreground">{s.foco}</div>
 						{/if}
 					</a>
 				</li>

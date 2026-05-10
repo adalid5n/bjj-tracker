@@ -33,6 +33,15 @@
 - No añadir dependencias no acordadas. Sin Drizzle, Prisma, Dexie, Kysely.
 - SQL crudo. API mínima de DB: `init`, `run`, `query`.
 - SQLite-WASM solo en cliente, nunca durante SSR/prerender.
+- **Sin colores Tailwind crudos en componentes propios.** Prohibido
+  `bg-blue-500`, `text-red-700`, `border-gray-200`, etc. en cualquier
+  fichero de `src/`. Usar siempre tokens semánticos:
+  `bg-primary`, `text-destructive`, `bg-muted`, `text-muted-foreground`,
+  `border-border`, `bg-success`, `bg-warning`, etc. Los tokens están
+  definidos en `src/routes/layout.css` (vars CSS `:root` y `.dark`) y
+  expuestos como utilidades Tailwind vía `@theme inline`. Si hace falta
+  una variante semántica nueva, se añade el token en `layout.css`, no se
+  vuelve a Tailwind crudo.
 
 ## Continuidad entre sesiones
 

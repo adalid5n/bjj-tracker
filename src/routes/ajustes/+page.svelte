@@ -137,9 +137,9 @@
 		<h1 class="text-2xl font-bold">Ajustes</h1>
 	</header>
 
-	<section class="space-y-3 rounded border border-gray-200 p-4">
-		<h2 class="text-sm font-semibold text-gray-700">Exportar datos</h2>
-		<p class="text-sm text-gray-600">
+	<section class="space-y-3 rounded border border-border p-4">
+		<h2 class="text-sm font-semibold text-foreground">Exportar datos</h2>
+		<p class="text-sm text-muted-foreground">
 			Descarga un fichero JSON con TODA la BD (compañeros, sesiones y rolls). Útil como backup
 			manual y para mover datos entre dispositivos.
 		</p>
@@ -148,10 +148,10 @@
 		</Button>
 	</section>
 
-	<section class="space-y-3 rounded border border-gray-200 p-4">
-		<h2 class="text-sm font-semibold text-gray-700">Importar datos</h2>
-		<p class="text-sm text-gray-600">
-			Selecciona un fichero JSON exportado previamente. <strong class="text-red-700"
+	<section class="space-y-3 rounded border border-border p-4">
+		<h2 class="text-sm font-semibold text-foreground">Importar datos</h2>
+		<p class="text-sm text-muted-foreground">
+			Selecciona un fichero JSON exportado previamente. <strong class="text-destructive"
 				>Reemplaza TODOS los datos actuales</strong
 			>; no hay merge en esta versión.
 		</p>
@@ -168,14 +168,14 @@
 	{#if message}
 		<div
 			class="rounded border p-3 text-sm {message.kind === 'ok'
-				? 'border-green-300 bg-green-50 text-green-800'
-				: 'border-red-300 bg-red-50 text-red-800'}"
+				? 'border-success/30 bg-success/10 text-success'
+				: 'border-destructive/30 bg-destructive/10 text-destructive'}"
 		>
 			{message.text}
 		</div>
 	{/if}
 
-	<section class="text-xs text-gray-500">
+	<section class="text-xs text-muted-foreground">
 		<p>Versión BD: {schemaVersion ?? '…'}</p>
 	</section>
 </main>

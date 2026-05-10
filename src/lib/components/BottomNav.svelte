@@ -32,7 +32,7 @@
 </script>
 
 <nav
-	class="fixed right-0 bottom-0 left-0 z-20 border-t border-gray-200 bg-white shadow-[0_-2px_4px_rgba(0,0,0,0.04)]"
+	class="fixed right-0 bottom-0 left-0 z-20 border-t border-border bg-background shadow-[0_-2px_4px_rgba(0,0,0,0.04)]"
 >
 	<ul class="mx-auto flex max-w-md justify-around">
 		{#each items as item (item.href)}
@@ -41,8 +41,8 @@
 				<a
 					href={item.href}
 					class="flex flex-col items-center gap-0.5 px-2 py-2 text-xs transition-colors {active
-						? 'text-blue-600'
-						: 'text-gray-500 hover:text-gray-800'}"
+						? 'text-primary'
+						: 'text-muted-foreground hover:text-foreground'}"
 				>
 					<item.icon class="size-5" />
 					<span>{item.label}</span>
