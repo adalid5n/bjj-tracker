@@ -6,6 +6,7 @@
 	import SesionForm from '$lib/components/SesionForm.svelte';
 	import RollEditor from '$lib/components/RollEditor.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import Fab from '$lib/components/Fab.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { Companero, Roll, Sesion, TipoSesion } from '$lib/types';
 
@@ -131,7 +132,7 @@
 	<title>Sesión · BJJ Tracker</title>
 </svelte:head>
 
-<main class="mx-auto max-w-2xl space-y-4 p-4 pb-28">
+<main class="mx-auto max-w-2xl space-y-4 p-4 pb-32">
 	<header class="flex items-center gap-3">
 		<Button variant="outline" size="sm" href={resolve('/')}>← Volver</Button>
 		<h1 class="text-xl font-bold">Editar sesión</h1>
@@ -156,16 +157,13 @@
 		{/if}
 
 		<section class="space-y-3 border-t border-border pt-4">
-			<div class="flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-foreground">
-					Rolls ({rolls.length})
-				</h2>
-				<Button size="sm" onclick={openNewRoll}>+ Añadir roll</Button>
-			</div>
+			<h2 class="text-sm font-semibold text-foreground">
+				Rolls ({rolls.length})
+			</h2>
 
 			{#if rolls.length === 0}
 				<p class="text-sm text-muted-foreground italic">
-					Aún no hay rolls en esta sesión. Pulsa "Añadir roll".
+					Aún no hay rolls en esta sesión. Pulsa el botón de abajo para añadir el primero.
 				</p>
 			{:else}
 				<ul class="divide-y divide-border rounded border border-border">
@@ -216,5 +214,9 @@
 		/>
 	{/if}
 </main>
+
+{#if status === 'ready'}
+	<Fab onclick={openNewRoll} label="Nuevo roll" />
+{/if}
 
 <BottomNav />
