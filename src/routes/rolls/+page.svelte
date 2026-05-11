@@ -3,9 +3,9 @@
 	import { resolve } from '$app/paths';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import DateInput from '$lib/components/DateInput.svelte';
 	import RollEditor from '$lib/components/RollEditor.svelte';
 	import type { Companero, PesoRelativo, ResultadoRoll, Roll, TipoSesion } from '$lib/types';
 	import type { RollWithContext } from '$lib/rolls';
@@ -111,6 +111,16 @@
 	const activeFilterCount = $derived(
 		[from, to, companeroId, resultado, tipoSesion].filter(Boolean).length
 	);
+
+	// `from` y `to` ya no exponen un `onchange` directo (lo hacían los
+	// <Input type="date">). Con `DateInput`, el ISO se propaga sólo cuando
+	// la fecha es válida o queda vacía, así que disparamos refresh aquí.
+	$effect(() => {
+		// Tracking explícito.
+		from;
+		to;
+		if (status === 'ready') void refresh();
+	});
 </script>
 
 <svelte:head>
@@ -130,11 +140,11 @@
 			<div class="grid grid-cols-2 gap-2">
 				<div class="space-y-1">
 					<Label for="from" class="text-xs">Desde</Label>
-					<Input id="from" type="date" bind:value={from} onchange={() => void refresh()} />
+					<DateInput id="from" bind:value={from} />
 				</div>
 				<div class="space-y-1">
 					<Label for="to" class="text-xs">Hasta</Label>
-					<Input id="to" type="date" bind:value={to} onchange={() => void refresh()} />
+					<DateInput id="to" bind:value={to} />
 				</div>
 			</div>
 

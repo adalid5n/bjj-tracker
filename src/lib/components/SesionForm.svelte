@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import DateInput from '$lib/components/DateInput.svelte';
 	import type { Sesion, TipoSesion } from '$lib/types';
 
 	const TIPOS: { value: TipoSesion; label: string }[] = [
@@ -62,7 +63,7 @@
 <form onsubmit={handleSubmit} class="space-y-4">
 	<div class="space-y-1.5">
 		<Label for="fecha">Fecha *</Label>
-		<Input id="fecha" type="date" bind:value={fecha} required />
+		<DateInput id="fecha" bind:value={fecha} required />
 	</div>
 
 	<div class="space-y-1.5">
