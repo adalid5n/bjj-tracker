@@ -9,7 +9,7 @@ export default defineConfig({
 		tailwindcss(),
 		sveltekit(),
 		SvelteKitPWA({
-			registerType: 'autoUpdate',
+			registerType: 'prompt',
 			strategies: 'generateSW',
 			manifest: {
 				name: 'BJJ Tracker',
