@@ -1,25 +1,30 @@
-let needRefreshState = $state(false);
-let dismissedInSession = $state(false);
-let updateFn: ((reloadPage?: boolean) => Promise<void>) | null = null;
+class PwaState {
+	#needRefresh = $state(false);
+	#dismissed = $state(false);
+	#updateFn: ((reloadPage?: boolean) => Promise<void>) | null = null;
 
-export const pwa = {
 	get needRefresh() {
-		return needRefreshState && !dismissedInSession;
-	},
-	async update() {
-		await updateFn?.(true);
-	},
-	dismiss() {
-		dismissedInSession = true;
+		return this.#needRefresh && !this.#dismissed;
 	}
-};
 
-export async function initPWA() {
-	const { registerSW } = await import('virtual:pwa-register');
-	updateFn = registerSW({
-		immediate: true,
-		onNeedRefresh: () => {
-			needRefreshState = true;
-		}
-	});
+	async update() {
+		await this.#updateFn?.(true);
+	}
+
+	dismiss() {
+		this.#dismissed = true;
+	}
+
+	async init() {
+		const { registerSW } = await import('virtual:pwa-register');
+		this.#updateFn = registerSW({
+			immediate: true,
+			onNeedRefresh: () => {
+				this.#needRefresh = true;
+			}
+		});
+	}
 }
+
+export const pwa = new PwaState();
+export const initPWA = () => pwa.init();
