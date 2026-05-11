@@ -8,10 +8,12 @@ const repoRoot = join(here, '..');
 const srcDir = join(repoRoot, 'node_modules', '@sqlite.org', 'sqlite-wasm', 'dist');
 const dstDir = join(repoRoot, 'static', 'sqlite');
 
-// Only the WASM binary is staged in /static. The JS module is bundled by Vite
-// via `import sqlite3InitModule from '@sqlite.org/sqlite-wasm'` and uses
-// `locateFile` to find the binary at runtime under `static/sqlite/`.
-const FILES = ['sqlite3.wasm'];
+// El SDK JS (`sqlite3InitModule`) se bundlea por Vite vía import. Pero el
+// runtime de SQLite-WASM resuelve también assets adicionales con `locateFile`
+// — el proxy async de OPFS se carga dinámicamente desde la URL base del wasm
+// en algunos caminos de inicialización (Chrome móvil ha mostrado pantalla en
+// blanco al refresh cuando el proxy 404eaba).
+const FILES = ['sqlite3.wasm', 'sqlite3-opfs-async-proxy.js', 'sqlite3-worker1.mjs'];
 
 try {
 	await access(srcDir);
