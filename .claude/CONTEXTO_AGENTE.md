@@ -43,6 +43,20 @@
   una variante semántica nueva, se añade el token en `layout.css`, no se
   vuelve a Tailwind crudo.
 
+## Criterios técnicos
+
+- **Antes de construir un primitive de UI (input, date picker,
+  combobox, popover, calendar, etc.) desde cero, revisar qué hay
+  disponible en los paquetes UI ya instalados (bits-ui,
+  shadcn-svelte, etc.). Solo construir custom cuando no haya nada
+  que cubra el caso.** Al proponer cambios de UI, plantear primero
+  opciones del framework. Referencia: `bits-ui` expone Accordion,
+  AlertDialog, Calendar, Checkbox, Combobox, Command, DateField,
+  DatePicker, DateRangeField, Dialog, DropdownMenu, Menubar,
+  NavigationMenu, Pagination, PinInput, Popover, RadioGroup,
+  RangeCalendar, ScrollArea, Select, Separator, Slider, Switch,
+  Tabs, TimeField, Toggle, ToggleGroup, Toolbar, Tooltip y más.
+
 ## Continuidad entre sesiones
 
 - Existe `ESTADO_ACTUAL.md` con el estado vivo del proyecto.
