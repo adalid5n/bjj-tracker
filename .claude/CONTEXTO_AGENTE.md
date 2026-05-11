@@ -26,6 +26,16 @@
   `ITERACION_0_5.md` (pendiente de crear).
 - Para el estado de detalle día a día, ver `ESTADO_ACTUAL.md`.
 
+## Entorno y herramientas
+
+- **Node 22 obligatorio** (declarado en `.nvmrc`). Algunas dependencias
+  (SQLite-WASM 3.53+) lo requieren explícitamente y fallan con `EBADENGINE`
+  en Node 20. Usar `nvm use 22` antes de cualquier `install`/`build`/`dev`.
+- **Gestor de paquetes: pnpm**, no npm. El lockfile autoritativo es
+  `pnpm-lock.yaml`; CI ejecuta `pnpm install --frozen-lockfile`. **No
+  crear ni comitear `package-lock.json`** — está duplicado y solo sirve
+  para confundir. Si necesitas cambiar deps: `pnpm install`/`pnpm add`.
+
 ## Restricciones que respetar
 
 - No tocar `vite.config.ts`, `svelte.config.js`, `+layout.svelte`,
@@ -56,6 +66,42 @@
   NavigationMenu, Pagination, PinInput, Popover, RadioGroup,
   RangeCalendar, ScrollArea, Select, Separator, Slider, Switch,
   Tabs, TimeField, Toggle, ToggleGroup, Toolbar, Tooltip y más.
+
+- **`$state` (y demás runas) solo dentro de class fields o
+  componentes `.svelte`, nunca a nivel de módulo en `.svelte.ts`.**
+  Patrón canónico para state compartido:
+
+  ```ts
+  class FooState {
+    #value = $state(initial);
+    get value() { return this.#value; }
+    setValue(v) { this.#value = v; }
+  }
+  export const foo = new FooState();
+  ```
+
+  Lo que NO funciona (rompe el bundle minificado en prod):
+
+  ```ts
+  let value = $state(initial); // ← TypeError en prod
+  ```
+
+  Histórico: T-8 (commit `0a68351` → fix `066321e`).
+
+- **Antes de pushear cambios que toquen Service Worker, PWA, bundle
+  config (`vite.config.ts`) o el layout raíz, verificar con
+  `pnpm run preview` Y hacer al menos un refresh** — no basta con
+  `pnpm run check` + `pnpm run build`. Algunos bugs (runtime del
+  framework, runas en module-level, SW cacheando assets stale) solo
+  se manifiestan en build de producción y/o tras un reload. El check
+  y el build solo validan tipos y que el bundler termine.
+
+- **Si la app funciona en `pnpm dev` pero casca solo en `pnpm preview`/
+  prod, antes de bisectar el código probar `pnpm install` para subir
+  a versiones patch recientes de svelte/sveltekit/vite.** Bugs del
+  framework en patches específicas son frecuentes y un patch upgrade
+  los resuelve. Histórico: bug de refresh resuelto con kit 2.57→2.59.1
+  + vite 8.0.7→8.0.12 (commit `8c7c62c`, ADR `decisiones/001-...`).
 
 ## Continuidad entre sesiones
 
