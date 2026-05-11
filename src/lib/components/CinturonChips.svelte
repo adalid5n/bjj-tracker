@@ -11,12 +11,12 @@
 		ariaLabel?: string;
 	} = $props();
 
-	const cinturones: { value: Cinturon; label: string; color: string; tipBlack: boolean }[] = [
-		{ value: 'blanco', label: 'Cinturón blanco', color: 'var(--cinturon-blanco)', tipBlack: false },
-		{ value: 'azul', label: 'Cinturón azul', color: 'var(--cinturon-azul)', tipBlack: true },
-		{ value: 'morado', label: 'Cinturón morado', color: 'var(--cinturon-morado)', tipBlack: true },
-		{ value: 'marron', label: 'Cinturón marrón', color: 'var(--cinturon-marron)', tipBlack: true },
-		{ value: 'negro', label: 'Cinturón negro', color: 'var(--cinturon-negro)', tipBlack: false }
+	const cinturones: { value: Cinturon; label: string; color: string; tipColor: string }[] = [
+		{ value: 'blanco', label: 'Cinturón blanco', color: 'var(--cinturon-blanco)', tipColor: 'var(--cinturon-negro)' },
+		{ value: 'azul', label: 'Cinturón azul', color: 'var(--cinturon-azul)', tipColor: 'var(--cinturon-negro)' },
+		{ value: 'morado', label: 'Cinturón morado', color: 'var(--cinturon-morado)', tipColor: 'var(--cinturon-negro)' },
+		{ value: 'marron', label: 'Cinturón marrón', color: 'var(--cinturon-marron)', tipColor: 'var(--cinturon-negro)' },
+		{ value: 'negro', label: 'Cinturón negro', color: 'var(--cinturon-negro)', tipColor: 'var(--cinturon-tip-rojo)' }
 	];
 </script>
 
@@ -35,12 +35,7 @@
 			onclick={() => onChange(c.value)}
 		>
 			<span class="absolute inset-0" style:background-color={c.color}></span>
-			{#if c.tipBlack}
-				<span
-					class="absolute inset-y-0 left-0 w-1/4"
-					style:background-color="var(--cinturon-negro)"
-				></span>
-			{/if}
+			<span class="absolute inset-y-0 left-0 w-1/4" style:background-color={c.tipColor}></span>
 		</button>
 	{/each}
 </div>
