@@ -37,6 +37,37 @@ La nueva ruta `/companeros` usa FAB consistente con `/`. La página dev `/dev/co
 
 ---
 
+### Orden de la tabla `/rolls` — más reciente arriba
+
+- **Origen:** Adalid, 2026-05-11
+- **Estado actual:** se ordena por `sesion.fecha DESC`, y dentro de la
+  misma sesión por `rolls.orden ASC` (1, 2, 3…). Eso significa que un
+  roll nuevo añadido a una sesión existente aparece *después* de los
+  rolls anteriores de la misma sesión, no arriba del todo.
+- **Idea:** ordenar primero por `created_at DESC` (o `updated_at DESC`)
+  para que el último capturado aparezca siempre el primero — esa es la
+  expectativa del usuario al revisar "qué acabo de meter".
+- **Por qué:** captura post-clase típica: añades 3 rolls a una sesión
+  de hoy y quieres ver el último que metiste en el tope, no enterrado
+  bajo el primero.
+- **Cuándo:** post-it.0.5, sin urgencia.
+
+### Botón "Forzar actualización" en `/ajustes`
+
+- **Origen:** Adalid, 2026-05-11 — tras incidente del service worker
+  atascado sirviendo HTML viejo que apuntaba a chunks JS borrados
+  (página en blanco).
+- **Idea:** botón en `/ajustes` que ejecute en orden:
+  1. `navigator.serviceWorker.getRegistrations()` → `unregister()` en cada uno.
+  2. `caches.keys()` → `caches.delete()` en cada uno.
+  3. `window.location.reload()`.
+- **Por qué:** el toast "nueva versión disponible" de T-8 cubre el caso
+  normal. Pero si el SW está atascado de verdad (no detecta que hay
+  versión nueva), el toast nunca aparece y el usuario se queda colgado.
+  Un botón "salida de emergencia" en Ajustes evita que el usuario tenga
+  que ir a Ajustes del sistema Android → Borrar almacenamiento de Chrome.
+- **Cuándo:** junto con T-8 (auto-update PWA) o inmediatamente después.
+
 ### Modo oscuro con toggle en Ajustes
 
 - **Origen:** Adalid, 2026-05-11 (durante planificación de it.0.5)
