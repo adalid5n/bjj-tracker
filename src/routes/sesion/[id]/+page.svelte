@@ -216,7 +216,7 @@
 </main>
 
 {#if status === 'ready'}
-	<Fab onclick={openNewRoll} label="Nuevo roll" />
+	<Fab onclick={openNewRoll} label="Nuevo roll" extended />
 {/if}
 
 <BottomNav />
