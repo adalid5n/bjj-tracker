@@ -9,9 +9,13 @@
 	}: {
 		options: Option[];
 		value: string | null;
-		onChange: (v: string) => void;
+		onChange: (v: string | null) => void;
 		ariaLabel?: string;
 	} = $props();
+
+	function handleClick(optValue: string) {
+		onChange(value === optValue ? null : optValue);
+	}
 </script>
 
 <div role="radiogroup" aria-label={ariaLabel} class="flex flex-wrap gap-2">
@@ -24,7 +28,7 @@
 			class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {selected
 				? 'border-primary bg-primary text-primary-foreground'
 				: 'border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-			onclick={() => onChange(opt.value)}
+			onclick={() => handleClick(opt.value)}
 		>
 			{#if opt.dotColor}
 				<span

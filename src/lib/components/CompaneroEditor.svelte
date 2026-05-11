@@ -132,8 +132,10 @@
 		</div>
 
 		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (open = false)} disabled={saving}>Cancelar</Button>
-			<Button onclick={handleSave} disabled={!canSave}>
+			<Button variant="outline" size="sm" onclick={() => (open = false)} disabled={saving}>
+				Cancelar
+			</Button>
+			<Button size="sm" onclick={handleSave} disabled={!canSave}>
 				{saving ? 'Guardando…' : 'Guardar'}
 			</Button>
 		</Dialog.Footer>

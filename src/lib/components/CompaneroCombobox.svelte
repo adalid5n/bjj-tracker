@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
+	import { Combobox } from 'bits-ui';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import type { Companero } from '$lib/types';
 
 	let {
@@ -17,19 +18,13 @@
 	} = $props();
 
 	let query = $state('');
-	let isOpen = $state(false);
-	let inputEl = $state<HTMLInputElement | null>(null);
 	let lastSyncedValue: string | null = null;
 
 	$effect(() => {
 		if (value !== lastSyncedValue) {
 			lastSyncedValue = value;
-			if (value) {
-				const sel = companeros.find((c) => c.id === value);
-				query = sel?.nombre ?? '';
-			} else {
-				query = '';
-			}
+			const sel = value ? companeros.find((c) => c.id === value) : null;
+			query = sel?.nombre ?? '';
 		}
 	});
 
@@ -45,103 +40,67 @@
 		return companeros.find((c) => c.nombre.toLowerCase() === q) ?? null;
 	});
 
-	function handleInput(e: Event) {
-		const newQuery = (e.target as HTMLInputElement).value;
-		query = newQuery;
-		isOpen = true;
-		if (value) {
-			const sel = companeros.find((c) => c.id === value);
-			if (sel && sel.nombre !== newQuery) {
-				lastSyncedValue = null;
-				onChange(null);
-			}
+	const showCreate = $derived(query.trim().length > 0 && !exactMatch);
+
+	function handleValueChange(v: string) {
+		if (v.startsWith('__create__:')) {
+			const nombre = v.slice('__create__:'.length);
+			void onCreate(nombre);
+			return;
 		}
-	}
-
-	function selectCompanero(c: Companero) {
-		query = c.nombre;
-		lastSyncedValue = c.id;
-		isOpen = false;
-		onChange(c.id);
-	}
-
-	async function createNew() {
-		const nombre = query.trim();
-		if (!nombre) return;
-		await onCreate(nombre);
-		isOpen = false;
-	}
-
-	function clearSelection() {
-		query = '';
-		lastSyncedValue = null;
-		onChange(null);
-		isOpen = true;
-		inputEl?.focus();
-	}
-
-	function handleBlur() {
-		setTimeout(() => (isOpen = false), 150);
+		onChange(v || null);
 	}
 </script>
 
-<div class="relative">
-	<Input
-		bind:ref={inputEl}
-		value={query}
-		oninput={handleInput}
-		onfocus={() => (isOpen = true)}
-		onblur={handleBlur}
+<Combobox.Root
+	type="single"
+	value={value ?? ''}
+	onValueChange={handleValueChange}
+	inputValue={query}
+>
+	<Combobox.Input
 		{placeholder}
-		class="pr-8"
+		oninput={(e) => (query = e.currentTarget.value)}
+		class="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 	/>
-	{#if value}
-		<button
-			type="button"
-			class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-			onmousedown={(e) => e.preventDefault()}
-			onclick={clearSelection}
-			aria-label="Limpiar selección"
-		>
-			✕
-		</button>
-	{/if}
 
-	{#if isOpen}
-		<ul
-			class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-background shadow-md"
+	<Combobox.Portal>
+		<Combobox.Content
+			sideOffset={4}
+			class="bg-popover text-popover-foreground ring-foreground/10 z-50 max-h-60 min-w-(--bits-combobox-anchor-width) overflow-x-hidden overflow-y-auto rounded-lg shadow-md ring-1"
 		>
-			{#each filtered as c (c.id)}
-				<li>
-					<button
-						type="button"
-						class="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
-						onmousedown={(e) => e.preventDefault()}
-						onclick={() => selectCompanero(c)}
+			<Combobox.Viewport class="p-1">
+				{#each filtered as c (c.id)}
+					<Combobox.Item
+						value={c.id}
+						label={c.nombre}
+						class="data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center rounded-md py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
 					>
-						{c.nombre}
-					</button>
-				</li>
-			{/each}
+						{#snippet children({ selected })}
+							<span class="absolute end-2 flex size-3.5 items-center justify-center">
+								{#if selected}<CheckIcon class="size-4" />{/if}
+							</span>
+							{c.nombre}
+						{/snippet}
+					</Combobox.Item>
+				{/each}
 
-			{#if query.trim() && !exactMatch}
-				<li>
-					<button
-						type="button"
-						class="block w-full px-3 py-2 text-left text-sm text-primary hover:bg-accent"
-						onmousedown={(e) => e.preventDefault()}
-						onclick={createNew}
+				{#if showCreate}
+					<Combobox.Item
+						value={`__create__:${query.trim()}`}
+						label={`Crear "${query.trim()}"`}
+						class="data-highlighted:bg-accent data-highlighted:text-accent-foreground text-primary relative flex w-full cursor-default items-center rounded-md py-1.5 pl-2 text-sm outline-hidden select-none"
 					>
 						+ Crear nuevo: "{query.trim()}"
-					</button>
-				</li>
-			{/if}
+					</Combobox.Item>
+				{/if}
 
-			{#if companeros.length === 0 && !query.trim()}
-				<li class="px-3 py-2 text-sm text-muted-foreground italic">
-					Sin compañeros aún. Escribe un nombre para crear el primero.
-				</li>
-			{/if}
-		</ul>
-	{/if}
-</div>
+				{#if filtered.length === 0 && !showCreate}
+					<p class="px-2 py-1.5 text-sm text-muted-foreground italic">
+						Sin compañeros aún. Escribe un nombre para crear el primero.
+					</p>
+				{/if}
+			</Combobox.Viewport>
+		</Combobox.Content>
+	</Combobox.Portal>
+</Combobox.Root>
