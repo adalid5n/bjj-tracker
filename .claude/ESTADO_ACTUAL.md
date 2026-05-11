@@ -1,6 +1,6 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-11 (cierre sesión 2)
+**Última actualización:** 2026-05-12 (cierre sesión 3)
 **Fase activa:** Iteración 0.5 — pulido pre-iteración 1
 **Iteración en curso:** it.0.5 (8/9 tareas cerradas; falta verificación en uso real)
 
@@ -10,7 +10,8 @@
 
 Iteración 0 ✅ cerrada en `v0.1-it0` (2026-05-10). La app permite capturar
 sesiones, rolls, compañeros, ver tabla filtrable y exportar/importar JSON.
-Desplegada en https://adalid5n.github.io/bjj-tracker/
+Desplegada en https://adalid5n.github.io/bjj-tracker/ — versión publicada
+**v0.0.2** con auto-update PWA funcional.
 
 Estamos al final de **iteración 0.5** — fase de pulido. Plan completo en
 `ITERACION_0_5.md`. T-1 a T-8 cerradas + cleanup de T-9 hecho. Falta
@@ -19,7 +20,50 @@ y anotar fricción residual si aparece) para cerrar iteración.
 
 ---
 
-## Última sesión (2026-05-11 sesión 2)
+## Última sesión (2026-05-11 → 12, sesión 3)
+
+**Hecho:**
+- **Bug `pwa.svelte.ts` con `$state` module-level** rompía el bundle prod
+  (TypeError al cargar la app, "Cargando…" eterno). Refactor a class
+  fields, patrón canónico Svelte 5. Commit `066321e`.
+- **Bug `sqlite3-opfs-async-proxy.js` no se copiaba** al deploy (el script
+  `copy-sqlite-wasm.mjs` solo copiaba el `.wasm`). Causaba 404 en runtime
+  y pantalla en blanco en Chrome móvil al refrescar la PWA. Añadidos
+  proxy y `sqlite3-worker1.mjs` al script. Commit `b923766`.
+- **Bug pre-existente del refresh** (no introducido por it.0.5):
+  TypeError dentro del initializer de la clase `Page` interna de SvelteKit
+  al re-evaluarse el módulo. Reproducido con Playwright que la app
+  funcionaba en `pnpm dev` y siempre cascaba en `pnpm preview` tras el
+  primer goto. Diagnóstico de ~2h descartó: SW, minify, modo prompt vs
+  autoUpdate, sessionStorage, dual package. **Fix: `pnpm install` con
+  patches recientes** (kit `2.57→2.59.1`, vite `8.0.7→8.0.12`,
+  svelte `5.55.2→5.55.5`). Eliminado `package-lock.json` del repo (el
+  CI usa `pnpm-lock.yaml`, ese es el único lockfile autoritativo).
+  Commit `8c7c62c`. ADR completo en `decisiones/001-bump-deps-fix-refresh.md`.
+- **Indicador de versión** `v0.0.2` añadido como footer discreto de la
+  home. Sirve para confirmar qué versión está activa tras un update y
+  como cambio mínimo para disparar el toast en el segundo deploy.
+  Commit `0815106`.
+- **Documentación de criterios técnicos** ampliada en `CONTEXTO_AGENTE.md`:
+  sección nueva "Entorno y herramientas" (Node 22 + pnpm),
+  `$state` solo dentro de class fields, regla de verificar con
+  `pnpm preview` + refresh antes de pushear cambios a SW/PWA/bundle,
+  y el truco de `pnpm install` para bugs solo-en-prod. Commit `1eb9784`.
+
+**Decisiones tomadas:**
+- Subir patches de svelte/kit/vite en lugar de bisectar código para el
+  bug pre-existente del refresh. Razón: bug claramente del framework,
+  los patches resuelven sin tocar nuestro código. ADR-001 documenta.
+- `package-lock.json` no se versiona; el lockfile autoritativo es
+  `pnpm-lock.yaml`. CI usa `pnpm install --frozen-lockfile`.
+- `$state` solo dentro de class fields, nunca en module-level. Patrón
+  canónico documentado en `CONTEXTO_AGENTE.md`.
+- Antes de pushear cambios que toquen SW/PWA/bundle config, verificar
+  con `pnpm preview` + refresh (no solo `check` + `build`).
+
+---
+
+## Sesión previa (2026-05-11 sesión 2)
 
 **Hecho:**
 - **T-6** ✅ Wizard de `CompaneroEditor.svelte` (4 pasos: nombre →
@@ -81,8 +125,10 @@ y anotar fricción residual si aparece) para cerrar iteración.
 1. Capturar 1 sesión real con el flujo nuevo (FAB → wizard sesión →
    detalle → FAB extended → wizard roll → guardar).
 2. Anotar fricción residual en `MEJORAS_FUTURAS.md` si aparece.
-3. Probar el toast de auto-update tras un segundo deploy posterior al
-   actual (este deploy mete `prompt`; el siguiente disparará el toast).
+3. Toast de auto-update ya verificado funcional en sesión 3 (apareció
+   tras el segundo deploy y la recarga limpia la app sin pantalla
+   blanca). Subir `version` en `package.json` antes de cada deploy
+   permitirá ver con claridad qué versión está activa.
 4. Cerrar iteración con tag `v0.1-it0.5` y actualización macro del
    estado.
 
@@ -90,6 +136,18 @@ y anotar fricción residual si aparece) para cerrar iteración.
 
 ## Decisiones recientes con peso
 
+- **2026-05-12 (s3) — Bump de patches svelte/kit/vite** para resolver
+  bug pre-existente del refresh en prod (TypeError en clase Page de
+  SvelteKit). ADR completo en `decisiones/001-bump-deps-fix-refresh.md`.
+- **2026-05-12 (s3) — `pnpm-lock.yaml` es el único lockfile autoritativo**;
+  `package-lock.json` no se versiona y se eliminó del repo. CI usa
+  `pnpm install --frozen-lockfile`.
+- **2026-05-12 (s3) — `$state` solo dentro de class fields**, nunca a
+  nivel de módulo en `.svelte.ts`. Patrón canónico documentado en
+  `CONTEXTO_AGENTE.md`. Reventó la PWA en prod por module-level.
+- **2026-05-12 (s3) — Verificación con `pnpm preview` + refresh** antes
+  de pushear cambios que toquen SW/PWA/bundle config. `check` + `build`
+  no detectan bugs de runtime ni de bundle minificado.
 - **2026-05-11 (s2) — `bits-ui DateField` para inputs de fecha.** Razón:
   la regla recién documentada de "framework primitives antes de custom".
   El DateField hereda toda la UX de validación/navegación/locale.
@@ -122,17 +180,17 @@ y anotar fricción residual si aparece) para cerrar iteración.
 
 ## Notas internas para próxima sesión
 
-- Dev server: cuando se retome, levantar con `npm run dev -- --host` (sin
-  `--host`, el localhost del WSL no es accesible desde el navegador del
-  host Windows).
-- Push: usa SSH con la clave `id_ed25519_personal` (alias `github-personal`).
+- **Node 22 obligatorio** (`.nvmrc`). Si entras a una shell fresca:
+  `nvm use 22` antes de cualquier comando.
+- **Usar pnpm, no npm.** Dev: `pnpm dev -- --host`. Preview: `pnpm preview
+  -- --host`. Install: `pnpm install`. El `--host` es necesario para
+  acceder desde el navegador de Windows al server de WSL.
+- Push: SSH con `id_ed25519_personal` (alias `github-personal`).
   Si falla con "ssh_askpass", `ssh-add ~/.ssh/id_ed25519_personal` antes
   de intentar.
-- Toast de update: la versión recién deployada (con `prompt`) reemplaza
-  a la `autoUpdate` instalada en clientes existentes vía recarga
-  silenciosa. **Para ver el toast en acción hace falta un SEGUNDO deploy
-  posterior** — el commit que cierra esta sesión actualizando
-  `ESTADO_ACTUAL.md` sirve a este propósito.
+- Auto-update PWA confirmado funcional en sesión 3. Para verificar update
+  en futuros deploys: subir `version` en `package.json`, push, y al abrir
+  la app debe aparecer el snackbar.
 - Falta crear `docs/diseño.md` con la guía del sistema de tokens.
   Decidido posponerlo: toda la info está en `layout.css`,
   `CONTEXTO_AGENTE.md`, `ITERACION_0_5.md` y `MEJORAS_FUTURAS.md`.
