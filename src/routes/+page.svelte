@@ -5,6 +5,7 @@
 	import Fab from '$lib/components/Fab.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import SesionEditor from '$lib/components/SesionEditor.svelte';
+	import { VERSION } from '$lib/version';
 	import type { SesionWithCount } from '$lib/sesiones';
 	import type { TipoSesion } from '$lib/types';
 
@@ -97,6 +98,8 @@
 			{/each}
 		</ul>
 	{/if}
+
+	<p class="pt-4 text-center text-xs text-muted-foreground/60">v{VERSION}</p>
 </main>
 
 {#if status === 'ready'}
