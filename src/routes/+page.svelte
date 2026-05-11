@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Fab from '$lib/components/Fab.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import SesionEditor from '$lib/components/SesionEditor.svelte';
 	import type { SesionWithCount } from '$lib/sesiones';
+	import type { TipoSesion } from '$lib/types';
 
 	const TIPO_LABEL = {
 		bjj: 'BJJ',
@@ -15,6 +18,7 @@
 	let sesiones: SesionWithCount[] = $state([]);
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
+	let editorOpen = $state(false);
 
 	onMount(async () => {
 		try {
@@ -31,6 +35,23 @@
 	function formatFecha(iso: string): string {
 		const d = new Date(iso + 'T00:00:00');
 		return d.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short' });
+	}
+
+	function openCreate() {
+		editorOpen = true;
+	}
+
+	async function handleSesionSave(data: {
+		fecha: string;
+		tipo: TipoSesion;
+		foco?: string;
+		tecnica_clase?: string;
+		obs_profesor?: string;
+	}) {
+		const { createSesion, listSesiones } = await import('$lib/sesiones');
+		const sesion = await createSesion(data);
+		sesiones = await listSesiones();
+		await goto(resolve(`/sesion/${sesion.id}`));
 	}
 </script>
 
@@ -79,7 +100,9 @@
 </main>
 
 {#if status === 'ready'}
-	<Fab href={resolve('/sesion/nueva')} label="Nueva sesión" />
+	<Fab onclick={openCreate} label="Nueva sesión" />
 {/if}
 
 <BottomNav />
+
+<SesionEditor bind:open={editorOpen} onSave={handleSesionSave} />

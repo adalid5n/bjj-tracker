@@ -95,20 +95,22 @@ es obligatorio; el resto skipeable.
 un campo).
 
 ### F-4 — Rediseño del editor de sesión (P2)
-**Alta nueva** pasa a wizard con auto-avance. **Edición** sigue como
-form inline (como hoy).
+**Alta nueva** pasa a wizard con auto-avance (inline en la página
+`/sesion/nueva`, no modal). **Edición** sigue como form inline en
+`/sesion/[id]` (como hoy).
 
 Pasos al crear sesión nueva:
 
 | Paso | Decisión | UI | Avance |
 |---|---|---|---|
-| 1 | Fecha | Date picker (default hoy) | al confirmar |
-| 2 | Tipo | Chips (bjj / grappling / open mat) | al click |
-| 3 | Foco | Input texto | Enter / "Continuar" / "Saltar" |
-| 4 | Técnica clase | Input texto | Enter / "Continuar" / "Saltar" |
+| 1 | Fecha (obligatoria) | Date picker (default hoy) | botón "Continuar" |
+| 2 | Tipo (obligatorio) | Chips (bjj / grappling / open mat), sin preselección | al click |
+| 3 | Foco | Input texto | Enter o "Continuar" |
+| 4 | Técnica clase | Textarea | botón "Continuar" |
 | 5 | Observaciones profesor | Textarea + "Guardar" | manual |
 
-Solo el paso 1 (fecha) es obligatorio. Los demás skipeables.
+Pasos 1 y 2 obligatorios. Pasos 3-5 skipeables (avanzan vacíos con
+"Continuar"). No hay link "Saltar" — patrón alineado con T-5/T-6.
 
 ### F-5 — Auto-update PWA
 - Cambiar `registerType: 'autoUpdate'` → `'prompt'` en `vite.config.ts`.
@@ -194,7 +196,9 @@ Ordenadas por dependencias. Cada tarea = 1 commit (o pocos commits).
 - [ ] "Saltar" en pasos 2-5; paso 1 (nombre) obligatorio.
 
 ### T-7 — Wizard de sesión nueva (P2)
-- [ ] Modal de alta nueva = wizard 5 pasos con auto-avance.
+- [ ] Refactor de `/sesion/nueva` a wizard inline de 5 pasos (no
+  modal — sigue siendo página).
+- [ ] Pasos 1 (fecha) y 2 (tipo) obligatorios. Resto skipeables.
 - [ ] Edición de sesión existente sigue inline (como hoy).
 
 ### T-8 — Auto-update PWA
