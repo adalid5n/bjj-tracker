@@ -109,27 +109,50 @@ Cada posición tiene:
 
 Cada técnica tiene:
 - Nombre (ej: "Hip bump sweep", "Cross choke", "Upa")
+- Variante (opcional, texto corto): distingue versiones del mismo nombre con el mismo origen (ej. "clásica", "del profe X", "propia"). Cuando el mismo nombre se ejecuta desde distintos orígenes, son técnicas distintas que comparten nombre; la UI las agrupa por nombre.
 - Posición de origen (referencia obligatoria a una Posición)
-- Posición de destino (referencia opcional — las sumisiones no llevan a posición)
-- Tipo: ataque / defensa / escape / transición / sumisión
+- Posición de destino (referencia a Posición o a nodo terminal de sumisión — ver §3.5)
+- Tipo: ataque / sweep / escape / transición / sumisión
+  - Las "defensas" se modelan como contras de otra técnica, no como técnicas independientes — ver "contras conocidas" al final de esta sección.
 - Estado: probando / funciona / descartada
 - Detalles / setup / ejecución (texto libre estructurado)
 - Errores comunes (texto libre)
-- Contras conocidas (referencias a otras Técnicas que la responden)
+- Contras conocidas (referencias a otras Técnicas que la responden — pueden ser defensas del rival, escapes a ese ataque, o cualquier respuesta navegable desde el modal de detalle)
 
 ### 3.5 Visualización del mapa técnico
 
-**Vista lista (MVP):**
-- Lista de posiciones agrupadas por categoría
-- Al seleccionar una posición: ver técnicas asociadas agrupadas por tipo (ataques / defensas / escapes / sumisiones)
-- Por cada técnica: nombre, estado, posición de destino, contras
+**Vista lista (MVP, it.1):**
+- Lista de posiciones agrupadas por categoría.
+- Al seleccionar una posición, modal con tabs por tipo: Ataques / Sweeps / Escapes / Transiciones / Sumisiones (solo aparecen los tabs con contenido).
+- Por cada técnica: nombre, variante (si aplica), destino, número de contras.
 
-**Vista grafo (objetivo, posiblemente iteración 2):**
-- Cada posición es un nodo
-- Cada técnica es una arista dirigida
-- Color/estilo de arista según tipo (ataque, defensa, etc)
-- Click en arista → detalle de la técnica con sus contras
-- Filtros: por tipo de técnica, por estado, por categoría de posición
+**Vista grafo (it.3):**
+- **Nodos:** posiciones + sumisiones. Las sumisiones son **nodos terminales** — no salen aristas de ellos, solo entran.
+- **Aristas:** cada técnica es una arista dirigida origen→destino. Estilo visual por tipo:
+  - Línea sólida para ataques y sumisiones.
+  - **Línea punteada para transiciones.**
+  - Color/grosor distinto para escapes y sweeps (decisión visual fina al implementar).
+- **Las contras NO se dibujan en el mapa** (sería ilegible — aristas conectando aristas). Solo viven dentro de los modales como hipervínculos navegables.
+
+**Navegación encadenada por modales (aplica a vista lista y vista grafo):**
+
+Cada cosa que se pulsa abre un modal flotante con detalle y "salidas" navegables a otras entidades. El recorrido es potencialmente infinito mientras la información esté poblada.
+
+| Pulsas… | Modal muestra… |
+|---|---|
+| Nodo posición | Notas + tabs por tipo (Ataques / Sweeps / Escapes / Transiciones / Sumisiones). Cada item del tab abre el modal de esa técnica. |
+| Arista (técnica) | Setup, errores, estado, variante. Salidas: nodo origen, nodo destino, contras conocidas, "ver otras variantes de [nombre]". |
+| Nodo sumisión | Lista de variaciones agrupadas por posición de origen. |
+| Una contra dentro del modal | Modal de la técnica que responde, que a su vez tiene sus propias contras → continúa el recorrido. |
+
+Recorrido típico ejemplo: nodo guardia cerrada bottom → ataque "hip bump sweep" → contra "rival posta brazo" → respuesta "kimura desde guardia cerrada" → destino "nodo sumisión kimura" o nueva posición → continúa.
+
+**Cuando un campo está vacío** (ej. "Contras: ninguna registrada"), el modal lo muestra explícito con acceso rápido a editar desde desktop. La app enseña los huecos del catálogo para irlos poblando.
+
+**Filtros (it.3):**
+- Por tipo de técnica.
+- Por estado (probando / funciona / descartada).
+- Por categoría de posición.
 
 ### 3.6 Análisis y consultas
 
@@ -212,9 +235,10 @@ POSICIÓN
 TÉCNICA
 ├── id
 ├── nombre
+├── variante (texto corto, nullable)
 ├── posición_origen_id (FK → POSICIÓN)
-├── posición_destino_id (FK → POSICIÓN, nullable)
-├── tipo (ataque/defensa/escape/transición/sumisión)
+├── posición_destino_id (FK → POSICIÓN o nodo terminal sumisión, nullable)
+├── tipo (ataque/sweep/escape/transición/sumisión)
 ├── estado (probando/funciona/descartada)
 ├── detalles
 └── errores_comunes
@@ -252,8 +276,10 @@ ROLL_TÉCNICA (relación N:N)
 
 **Notas del modelo:**
 - Las relaciones N:N permiten flexibilidad. Un roll puede tener múltiples posiciones problema, una técnica puede tener múltiples contras.
-- `posición_destino_id` es nullable porque las sumisiones no llevan a posición.
+- `posición_destino_id` apunta a Posición o a nodo terminal de sumisión. Modelo concreto del "nodo terminal" (tabla SUMISIÓN separada vs flag en POSICIÓN) se decide al diseñar it.1.
 - `TÉCNICA_CONTRA` es asimétrica: A es contra de B no implica B es contra de A.
+- `variante` permite múltiples filas en TÉCNICA con mismo nombre + mismo origen pero distinta versión (ej. "armbar desde guardia cerrada — clásica" y "armbar desde guardia cerrada — del profe X" son dos filas).
+- Aristas con mismo `nombre` pero distinto `posición_origen_id` son técnicas distintas en BD; la UI las agrupa por nombre cuando aplica ("ver otras variaciones de armbar").
 
 ---
 
@@ -308,9 +334,9 @@ Estas no son bloqueantes para empezar pero hay que cerrarlas en algún momento:
 
 1. **¿Cifrado local de la BD?** Decisión post-stack.
 2. **¿Borrado de datos?** Lógica de soft-delete vs hard-delete (importante si en futuro hay sync).
-3. **¿Vista del mapa técnico cuando se "baja" desde una posición?** Ej: desde guardia cerrada bottom puedo ir a sumisión X. ¿La sumisión es nodo terminal o atributo de la arista? — decisión de diseño cuando llegue iteración 1.
-4. **¿Cómo manejar técnicas que vienen de múltiples posiciones?** Ej: armbar desde guardia cerrada y desde mount son técnicas distintas o variantes de la misma. — decisión cuando llegue iteración 1.
-5. **¿Plantilla de técnica vs instancia?** Una "estrangulación" genérica vs "la cross choke desde guardia cerrada de mi profesor". — decisión cuando crezca el mapa.
+3. ~~**¿Vista del mapa técnico cuando se "baja" desde una posición?**~~ **Cerrada (2026-05-12):** las sumisiones son **nodos terminales** del grafo. No salen aristas de ellas, solo entran. Las aristas que llegan a un nodo sumisión son las variaciones de esa sumisión desde distintos orígenes. Ver §3.5.
+4. ~~**¿Cómo manejar técnicas que vienen de múltiples posiciones?**~~ **Cerrada (2026-05-12):** son aristas distintas que comparten el `nombre` técnico. La UI las agrupa por nombre ("ver otras variantes de armbar"). En BD son filas independientes en TÉCNICA con distinto `posición_origen_id`.
+5. ~~**¿Plantilla de técnica vs instancia?**~~ **Cerrada (2026-05-12):** no hay plantilla separada. Las versiones personalizadas ("la cross choke de mi profe") son aristas paralelas con el mismo origen + nombre pero distinto campo `variante`. Si el grafo se llena de aristas paralelas en el mismo par origen-destino-nombre, se evaluará refactor a "una arista con sub-variantes" más adelante.
 
 ---
 
