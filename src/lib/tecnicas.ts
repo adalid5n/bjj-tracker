@@ -168,3 +168,20 @@ export async function getTecnicasQueLleganASumision(sumisionId: string): Promise
 		[sumisionId]
 	);
 }
+
+/**
+ * Cuenta cuántas técnicas tienen una sumisión como destino. Se usa para
+ * decidir si se puede borrar la sumisión sin orfanizar referencias
+ * (análogo a `countRollsByPosicionProblema` en `rolls.ts`).
+ *
+ * Convención del proyecto: alias en lowercase (el worker preserva el
+ * case del alias tal cual).
+ */
+export async function countTecnicasBySumisionDestino(sumisionId: string): Promise<number> {
+	await init();
+	const rows = await query<{ n: number }>(
+		'SELECT COUNT(*) AS n FROM tecnicas WHERE sumision_destino_id = ?',
+		[sumisionId]
+	);
+	return rows[0]?.n ?? 0;
+}

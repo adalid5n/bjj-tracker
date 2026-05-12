@@ -19,7 +19,9 @@ export type MapaModalEntry =
 	| { kind: 'tecnica'; id: string; nombre: string }
 	| { kind: 'sumision'; id: string; nombre: string }
 	| { kind: 'wizard-posicion'; modo: 'crear'; nombre: string }
-	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string };
+	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string }
+	| { kind: 'wizard-sumision'; modo: 'crear'; nombre: string }
+	| { kind: 'wizard-sumision'; modo: 'editar'; id: string; nombre: string };
 
 /**
  * Dirty-handler API (T-8 fixes E):

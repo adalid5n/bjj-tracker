@@ -19,6 +19,7 @@
 	 *   - tecnica  → <TecnicaModalContent />
 	 *   - sumision → <SumisionModalContent />
 	 *   - wizard-posicion → <PosicionWizard />
+	 *   - wizard-sumision → <SumisionWizard />
 	 *
 	 * T-8 fixes (E): si el top es un wizard con cambios sin guardar,
 	 * interceptamos Esc / click overlay / botón ✕ / botón ← / cancelar y
@@ -36,6 +37,7 @@
 	import TecnicaModalContent from './TecnicaModalContent.svelte';
 	import SumisionModalContent from './SumisionModalContent.svelte';
 	import PosicionWizard from './PosicionWizard.svelte';
+	import SumisionWizard from './SumisionWizard.svelte';
 
 	// Opcional: callback que el host (página) puede pasar para refrescar
 	// listas tras un cambio en el catálogo (crear/editar/borrar posición).
@@ -119,11 +121,14 @@
 	}
 
 	function handleOpenChange(value: boolean) {
-		// Si bits-ui pide cerrar (Esc, click overlay, botón ✕ de Dialog.Content),
-		// vaciamos el stack para que el estado lógico siga al estado del Dialog.
-		// Antes de cerrar comprobamos si el top tiene cambios sin guardar: en
-		// ese caso pedimos confirmación con AlertDialog y dejamos el Dialog
-		// abierto hasta que el usuario decida.
+		// Fallback para cierres legítimos de bits-ui que NO pasan por
+		// `onEscapeKeydown` / `onInteractOutside` (ej.: botón ✕ del
+		// Dialog.Content, que llama directo a `onOpenChange`).
+		//
+		// El caso "Esc con dirty" y "click overlay con dirty" se intercepta
+		// antes en `handleAttemptClose` con `preventDefault()`, así que aquí
+		// solo nos llega `value=false` cuando NO hay dirty o cuando el cierre
+		// viene del botón ✕. Si hay dirty (botón ✕), pedimos confirmación.
 		if (!value) {
 			if (mapaModalStack.isDirty()) {
 				accionPendiente = 'closeAll';
@@ -133,6 +138,33 @@
 				return;
 			}
 			mapaModalStack.closeAll();
+		}
+	}
+
+	function handleAttemptClose(e: Event) {
+		// Handler común para `onEscapeKeydown` y `onInteractOutside` de
+		// `Dialog.Content`. Estos eventos llegan ANTES de que bits-ui
+		// inicie su rutina interna de cierre (focus restore, animación,
+		// onOpenChange). Si el top está sucio, paramos el cierre con
+		// `preventDefault()` y abrimos el AlertDialog de descartar.
+		// Si no está sucio, dejamos pasar — bits-ui cerrará el Dialog y
+		// `handleOpenChange(false)` se ocupará de llamar a `closeAll()`.
+		if (mapaModalStack.isDirty()) {
+			e.preventDefault();
+			accionPendiente = 'closeAll';
+			mostrarConfirmDescartar = true;
+		}
+	}
+
+	function handleAlertOpenChange(value: boolean) {
+		// El AlertDialog se cierra por cualquier vía (Esc, click fuera,
+		// botón Cancelar). Limpiamos `accionPendiente` para que no quede
+		// colgado y el flag `mostrarConfirmDescartar` queda en sync.
+		// Si `value=true` (apertura), no tocamos nada — la apertura ya la
+		// dispara quien corresponda (handleAttemptClose / handleBack / etc.).
+		if (!value) {
+			accionPendiente = null;
+			mostrarConfirmDescartar = false;
 		}
 	}
 
@@ -159,29 +191,28 @@
 	}
 
 	function handleConfirmDescartar() {
-		// El usuario confirma descartar: ejecuta la acción pendiente y limpia
-		// el dirty handler para que la siguiente entrada del stack no
-	  // herede ese estado.
+		// El usuario confirma descartar: cerramos el AlertDialog explícitamente
+		// antes de tocar el stack. Si dejamos que bits-ui lo cierre vía el
+		// click de `<AlertDialog.Action>` y a la vez ejecutamos `closeAll()`,
+		// el Dialog principal se desmonta a la par y el AlertDialog se queda
+		// colgado sin propagar su `onOpenChange(false)`.
+		const accion = accionPendiente;
+		accionPendiente = null;
+		mostrarConfirmDescartar = false;
 		mapaModalStack.setDirtyHandler(null);
-		if (accionPendiente === 'closeAll') {
+		if (accion === 'closeAll') {
 			mapaModalStack.closeAll();
-		} else if (accionPendiente === 'pop') {
+		} else if (accion === 'pop') {
 			mapaModalStack.pop();
 		}
-		accionPendiente = null;
-		mostrarConfirmDescartar = false;
 	}
 
-	function handleCancelDescartar() {
-		accionPendiente = null;
-		mostrarConfirmDescartar = false;
-	}
-
-	// El wizard llama a esto tras crear/editar. Invalidamos la cache de la
-	// posición correspondiente para que la próxima vez que se muestre se
-	// recargue de BD con los datos frescos. Además notificamos al page
-	// para que refresque la lista de `/mapa` (creación, edición de nombre, etc.).
-	function handleWizardSaved(id: string) {
+	// Los wizards llaman a esto tras crear/editar. Invalidamos la cache de
+	// la entidad correspondiente para que la próxima vez que se muestre
+	// se recargue de BD con los datos frescos. Además notificamos al page
+	// para que refresque la lista de `/mapa` (creación, edición de nombre,
+	// etc.). Hay un handler por wizard para que cada uno toque su cache.
+	function handlePosicionWizardSaved(id: string) {
 		if (posicionesById[id]) {
 			const next = { ...posicionesById };
 			delete next[id];
@@ -190,7 +221,16 @@
 		onCatalogChanged?.();
 	}
 
-	// Idem cuando se borra desde el modal de posición.
+	function handleSumisionWizardSaved(id: string) {
+		if (sumisionesById[id]) {
+			const next = { ...sumisionesById };
+			delete next[id];
+			sumisionesById = next;
+		}
+		onCatalogChanged?.();
+	}
+
+	// Idem cuando se borra desde el modal de posición o sumisión.
 	function handleModalChanged() {
 		onCatalogChanged?.();
 	}
@@ -199,6 +239,7 @@
 	const topTitle = $derived.by(() => {
 		if (!top) return '';
 		if (top.kind === 'wizard-posicion' && top.modo === 'crear') return 'Nueva posición';
+		if (top.kind === 'wizard-sumision' && top.modo === 'crear') return 'Nueva sumisión';
 		return top.nombre;
 	});
 </script>
@@ -207,6 +248,8 @@
 	<Dialog.Content
 		class="max-h-[90vh] overflow-y-auto sm:max-w-md"
 		onOpenAutoFocus={(e) => e.preventDefault()}
+		onEscapeKeydown={handleAttemptClose}
+		onInteractOutside={handleAttemptClose}
 	>
 		{#if top}
 			<Dialog.Header>
@@ -263,7 +306,7 @@
 				{:else if top.kind === 'sumision'}
 					{@const sum = sumisionesById[top.id]}
 					{#if sum}
-						<SumisionModalContent sumision={sum} />
+						<SumisionModalContent sumision={sum} onChanged={handleModalChanged} />
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando sumisión…</p>
 					{/if}
@@ -271,7 +314,14 @@
 					<PosicionWizard
 						modo={top.modo}
 						posicionId={top.modo === 'editar' ? top.id : undefined}
-						onSaved={handleWizardSaved}
+						onSaved={handlePosicionWizardSaved}
+						onRequestClose={handleWizardRequestClose}
+					/>
+				{:else if top.kind === 'wizard-sumision'}
+					<SumisionWizard
+						modo={top.modo}
+						sumisionId={top.modo === 'editar' ? top.id : undefined}
+						onSaved={handleSumisionWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>
 				{/if}
@@ -285,16 +335,16 @@
   host, no del wizard, porque debe sobrevivir aunque el wizard se desmonte
   tras una acción. bits-ui soporta AlertDialog sobre Dialog sin chocar.
 -->
-<AlertDialog.Root bind:open={mostrarConfirmDescartar}>
+<AlertDialog.Root open={mostrarConfirmDescartar} onOpenChange={handleAlertOpenChange}>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
 			<AlertDialog.Title>¿Descartar cambios?</AlertDialog.Title>
 			<AlertDialog.Description>
-				Tienes cambios sin guardar en esta posición. Si cierras ahora, se perderán.
+				Tienes cambios sin guardar. Si cierras ahora, se perderán.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel onclick={handleCancelDescartar}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
 			<AlertDialog.Action
 				onclick={handleConfirmDescartar}
 				class={buttonVariants({ variant: 'destructive' })}

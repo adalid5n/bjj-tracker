@@ -6,6 +6,7 @@
 	import MapaModalHost from '$lib/components/MapaModalHost.svelte';
 	import { mapaModalStack } from '$lib/components/mapa-modal-stack.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import type {
 		CategoriaPosicion,
@@ -113,9 +114,16 @@
 
 	// Abre el wizard de creación de posición. El host renderiza el wizard
 	// como contenido del Dialog cuando el top del stack es `wizard-posicion`.
-	function openWizardCrear() {
+	function openWizardCrearPosicion() {
 		mapaModalStack.closeAll();
 		mapaModalStack.push({ kind: 'wizard-posicion', modo: 'crear', nombre: 'Nueva posición' });
+	}
+
+	// Análogo para sumisión terminal (T-9). El host renderiza el
+	// SumisionWizard cuando el top del stack es `wizard-sumision`.
+	function openWizardCrearSumision() {
+		mapaModalStack.closeAll();
+		mapaModalStack.push({ kind: 'wizard-sumision', modo: 'crear', nombre: 'Nueva sumisión' });
 	}
 </script>
 
@@ -139,7 +147,7 @@
 		<div class="rounded border border-dashed border-border p-8 text-center">
 			<p class="text-muted-foreground">Catálogo vacío.</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Pulsa "+ Nueva posición" para empezar.
+				Pulsa "+ Nuevo" para empezar.
 			</p>
 		</div>
 	{:else}
@@ -221,21 +229,33 @@
 <BottomNav />
 
 <!--
-  FAB "+ Nueva posición" visible en cualquier anchura (cambio T-8 fixes D:
-  el stakeholder captura técnicas desde móvil). La BottomNav del proyecto
-  se mantiene siempre, por lo que dejamos hueco con `bottom-24` para no
-  chocar con ella.
+  FAB con dropdown (T-9): un solo botón "+ Nuevo" que despliega dos opciones
+  ("Nueva posición" / "Nueva sumisión"). Visible en cualquier anchura. La
+  BottomNav del proyecto se mantiene siempre, por lo que dejamos hueco con
+  `bottom-24` para no chocar con ella. El `z-30` mantiene el botón por
+  encima del BottomNav, y el Content del DropdownMenu se monta vía Portal
+  (bits-ui) por lo que se renderiza fuera de cualquier overflow.
 -->
 {#if status === 'ready'}
-	<Button
-		onclick={openWizardCrear}
-		class="fixed right-6 bottom-24 z-30 inline-flex shadow-lg"
-		size="lg"
-		aria-label="Nueva posición"
-	>
-		<PlusIcon />
-		Nueva posición
-	</Button>
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger>
+			{#snippet child({ props })}
+				<Button
+					{...props}
+					class="fixed right-6 bottom-24 z-30 inline-flex shadow-lg"
+					size="lg"
+					aria-label="Crear nuevo elemento del mapa"
+				>
+					<PlusIcon />
+					Nuevo
+				</Button>
+			{/snippet}
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Content align="end" side="top" sideOffset={8}>
+			<DropdownMenu.Item onSelect={openWizardCrearPosicion}>Nueva posición</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={openWizardCrearSumision}>Nueva sumisión</DropdownMenu.Item>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
 {/if}
 
 <MapaModalHost onCatalogChanged={refresh} />

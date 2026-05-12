@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-13 (cierre sesión 6)
+**Última actualización:** 2026-05-13 (cierre sesión 7)
 **Fase activa:** Iteración 1 — Mapa técnico básico
-**Iteración en curso:** it.1 (8.5/15 tareas cerradas: T-1 a T-8, T-2.5 intercalada)
+**Iteración en curso:** it.1 (9.5/15 tareas cerradas: T-1 a T-9, T-2.5 intercalada)
 
 ---
 
@@ -16,16 +16,91 @@ Iteración 0.5 ✅ funcionalmente cerrada (auto-update PWA + wizards + chips
 capturada con el flujo nuevo) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
 Estamos en **iteración 1** — base estructural del mapa técnico. Plan
-completo en `ITERACION_1.md`. 8 tareas y media cerradas (T-1 a T-8,
+completo en `ITERACION_1.md`. 9 tareas y media cerradas (T-1 a T-9,
 T-2.5 intercalada). El recorrido encadenado de modales funciona
-end-to-end y ya se pueden crear / editar / borrar posiciones desde
-móvil y desktop. Quedan los wizards de sumisión y técnica (T-9, T-10),
+end-to-end y ya se pueden crear / editar / borrar posiciones **y
+sumisiones** desde móvil y desktop. Queda el wizard de técnica (T-10),
 la UI de contras (T-11), la captura inline en roll (T-12) y el cierre
 (T-13 a T-15).
 
 ---
 
-## Última sesión (2026-05-13, sesión 6)
+## Última sesión (2026-05-13, sesión 7)
+
+**Hecho:**
+- **T-9** ✅ Editor de SUMISION (wizard) + dropdown del FAB + acciones
+  editar/borrar. Replica del patrón T-8 con 2 pasos (nombre obligatorio
+  + notas opcionales). Wizard integrado en el stack como
+  `kind: 'wizard-sumision'`. Reutilizable crear/editar.
+- **FAB de `/mapa` migrado a dropdown** (shadcn-svelte `dropdown-menu`,
+  instalado sin tocar `package.json`/`pnpm-lock.yaml`). Un solo botón
+  "+ Nuevo" que despliega hacia arriba (`side="top" align="end"`,
+  evita chocar con BottomNav) dos items: "Nueva posición" / "Nueva
+  sumisión". Empty state actualizado a "Pulsa '+ Nuevo' para empezar."
+- **Botones Editar / Borrar en `SumisionModalContent`**: Tooltip que
+  envuelve span+Button-disabled si la sumisión es destino de alguna
+  técnica (mensaje "Esta sumisión es destino de N técnica(s). Borra
+  esas referencias antes."); AlertDialog de confirmación si no hay
+  bloqueo. `onChanged` cableado en `MapaModalHost` para refrescar la
+  lista tras borrar.
+- **Helper nuevo** `countTecnicasBySumisionDestino(id)` en
+  `tecnicas.ts` (`SELECT COUNT(*) WHERE sumision_destino_id = ?`).
+- **Validación inline de nombre duplicado**: el wizard carga
+  `listSumisiones()` en `onMount` y bloquea el avance del paso 1 si el
+  nombre ya existe (case-insensitive, excluye el id propio en modo
+  editar). Mensaje "Ya existe una sumisión con ese nombre." en el
+  paso 1 vía estado dedicado `nombreError`, limpiado reactivamente al
+  editar. El catch del UNIQUE en `handleSave` se conserva como
+  defensa frente a carreras entre pestañas.
+- **Fix crítico del Esc**: la combinación Dialog + AlertDialog dejaba
+  un overlay residual bloqueando clicks tras cerrar el AlertDialog con
+  Esc. Causa: bits-ui iniciaba el cierre del Dialog principal cuando
+  abríamos el AlertDialog desde `onOpenChange`, y la cancelación tardía
+  lo dejaba inconsistente. Solución: interceptar antes con
+  `onEscapeKeydown` / `onInteractOutside` en `Dialog.Content` y hacer
+  `preventDefault()` si dirty — bits-ui ni siquiera empieza a cerrarse.
+  El `handleOpenChange` se mantiene como fallback para el botón ✕.
+- **Fix del descarte que dejaba el AlertDialog abierto**: tras pulsar
+  "Descartar", el AlertDialog se quedaba colgado porque
+  `handleConfirmDescartar` solo tocaba el stack y confiaba en que
+  bits-ui cerrara el AlertDialog al pulsar `<AlertDialog.Action>`; al
+  cerrarse el Dialog principal en el mismo tick el cierre del
+  AlertDialog se perdía. Solución: bajar `mostrarConfirmDescartar` y
+  limpiar `accionPendiente` **antes** de tocar el stack.
+- **AlertDialog ahora controlado**: `open` + `onOpenChange` en lugar
+  de `bind:open`, para que cualquier vía de cierre (Esc, click fuera,
+  Cancelar) limpie `accionPendiente` y nunca dispare descartar
+  implícito. La acción destructiva solo se ejecuta vía el botón rojo.
+
+**Decisiones tomadas (con peso):**
+- **Validación de duplicado contra lista pre-cargada en memoria** vs
+  query dedicada. Catálogo es pequeño (decenas de sumisiones máximo).
+  Sin función nueva en `sumisiones.ts`. Patrón aplicable también al
+  wizard de técnica (T-10) cuando valide nombre+origen+variante únicos.
+- **`onEscapeKeydown` + `onInteractOutside` con `preventDefault()`**
+  como patrón de intercepción de cierre de Dialog cuando hay dirty.
+  Más limpio que abortar en `onOpenChange` (bits-ui ya inició el
+  cierre interno cuando llega ahí, lo que deja estado inconsistente).
+  Aplicar también en T-10.
+- **AlertDialog controlado (no `bind:open`)** para que el cierre por
+  cualquier vía limpie estado explícitamente. El botón rojo de
+  Descartar baja el flag **antes** de tocar el stack, para evitar que
+  el cierre simultáneo del Dialog padre se trague el `onOpenChange`
+  del AlertDialog.
+- **Esc en el AlertDialog ≠ descartar**: solo el botón rojo descarta.
+  Esc / click-fuera / Cancelar vuelven al wizard con los cambios
+  intactos. Confirmado por stakeholder.
+- **Dropdown del FAB hacia arriba** (`side="top" align="end"`):
+  abrir hacia abajo lo metería detrás del BottomNav. `align="end"`
+  alinea con el borde derecho del trigger para no salir de viewport.
+- **Detección del UNIQUE de SQLite** vía regex
+  `/UNIQUE constraint failed/i` sobre el `message` del Error.
+  Robusto a variantes de formato. Sigue usándose como red defensiva
+  aunque el caso normal ya no llega ahí.
+
+---
+
+## Sesión previa (2026-05-13, sesión 6)
 
 **Hecho:**
 - **T-8** ✅ Editor de POSICION (wizard) + FAB + acciones editar/borrar.
@@ -217,31 +292,60 @@ la UI de contras (T-11), la captura inline en roll (T-12) y el cierre
 
 ## Próximo paso
 
-**T-9 — Editor de SUMISION (wizard).** El más sencillo de los tres
-wizards: 1 paso real (nombre obligatorio) + notas opcionales. Mismo
-patrón que el de posición (kind nuevo en el stack, integrado en
-`MapaModalHost`). Botones Editar / Borrar en `SumisionModalContent` y
-FAB toggle (o segundo FAB) en `/mapa` para "+ Nueva sumisión".
+**T-10 — Editor de TECNICA (wizard).** El más complejo de los tres:
+7 pasos con lógica condicional en el paso de destino (si tipo = sumision
+combobox de sumisiones + "+ crear nueva sumisión" inline; si no,
+combobox de posiciones + "+ crear nueva posición" inline). Mismo
+patrón que T-8/T-9 (kind nuevo, dirty handler, AlertDialog,
+intercepción Esc/interact con preventDefault).
 
-**Notas para T-9:**
-- Reutilizar todo el patrón establecido en T-8: `kind: 'wizard-sumision'`,
-  dirty handler, AlertDialog "¿Descartar cambios?", Tooltip si el botón
-  Borrar queda deshabilitado por aristas de técnicas que terminan en la
-  sumisión.
-- Borrado: prohibir si hay técnicas con `sumision_destino_id = this.id`.
-- FAB: o un segundo botón al lado del de posición, o un menú/toggle.
-  Decisión de UX al empezar T-9.
+**Notas para T-10:**
+- Reutilizar todo el patrón consolidado: `kind: 'wizard-tecnica'`,
+  snapshot/dirty, `class:hidden` para pasos, `setDirtyHandler`,
+  validación inline contra lista pre-cargada, AlertDialog controlado.
+- Validación de unicidad: UNIQUE `(nombre, posicion_origen_id,
+  variante)` en BD. Pre-cargar `listTecnicas()` y validar antes de
+  guardar. Probablemente mejor al final del wizard (no es practicable
+  validar al avanzar del paso 1 porque depende también de origen +
+  variante, que vienen en pasos posteriores).
+- "+ Crear nueva posición" / "+ Crear nueva sumisión" inline desde el
+  paso destino: push al stack del wizard correspondiente y volver al
+  wizard de técnica al guardar. Estudiar si el patrón `kind` actual
+  basta o hace falta un `returnTo` en el entry del stack.
+- Borrado prohibido si la técnica es referenciada por alguna contra o
+  por algún roll (ambos linkeos futuros — la primera vía
+  `tecnica_contras`, la segunda no aplica todavía en it.1).
+- Decidir si el wizard de técnica entra también en el dropdown de
+  `/mapa` ("Nueva técnica") o solo se abre desde dentro de un modal de
+  posición. La 2ª es la canónica (técnica = arista, necesita origen).
 
-Después de T-9: T-10 (editor de técnica, wizard de 7 pasos con
-condicional en destino), T-11 (UI de contras), T-12 (captura inline en
-wizard de roll), T-13 (chips en detalle de sesión + filtro nuevo en
-/rolls), T-14 (semilla real con catálogo BJJ realista + uso real),
-T-15 (cierre con tag `v0.2-it1`).
+Después de T-10: T-11 (UI de contras), T-12 (captura inline en wizard
+de roll), T-13 (chips en detalle de sesión + filtro nuevo en /rolls),
+T-14 (semilla real con catálogo BJJ realista + uso real), T-15
+(cierre con tag `v0.2-it1`).
 
 ---
 
 ## Decisiones recientes con peso
 
+- **2026-05-13 (s7) — `onEscapeKeydown` + `onInteractOutside` con
+  `preventDefault()` en `Dialog.Content`** como patrón de intercepción
+  de cierre cuando hay dirty. Más limpio que abortar tarde en
+  `onOpenChange` (bits-ui ya inició el cierre interno cuando llega
+  ahí). Aplicar también en el wizard de técnica (T-10).
+- **2026-05-13 (s7) — AlertDialog controlado (no `bind:open`)**: el
+  cierre por cualquier vía limpia `accionPendiente` y baja el flag.
+  El botón rojo "Descartar" baja el flag **antes** de tocar el stack
+  para evitar que el cierre simultáneo del Dialog padre se trague el
+  `onOpenChange` del AlertDialog.
+- **2026-05-13 (s7) — Esc en AlertDialog ≠ descartar.** Solo el botón
+  rojo descarta. Esc / click-fuera / Cancelar vuelven al wizard con
+  los cambios intactos.
+- **2026-05-13 (s7) — Validación de unicidad contra lista pre-cargada
+  en memoria** vs query dedicada. Catálogo pequeño. Sin función nueva
+  en el módulo de datos. Aplicable a T-10.
+- **2026-05-13 (s7) — Dropdown del FAB hacia arriba**
+  (`side="top" align="end"`) para no chocar con `BottomNav`.
 - **2026-05-13 (s6) — Wizard como `kind` del stack de modales.** No
   Dialog independiente. UN solo Dialog en toda la app. Patrón reusable
   para wizards de sumisión (T-9) y técnica (T-10).
@@ -325,14 +429,25 @@ T-15 (cierre con tag `v0.2-it1`).
   T-6/T-7. Se elimina en T-15.
 - **Smoke de migración vigente en `/dev/db-migration-smoke`** — útil
   para sanidad de schema. Se evalúa mantener o eliminar al cerrar it.1.
-- **Tareas que faltan de it.1:** T-9, T-10, T-11, T-12, T-13, T-14,
-  T-15. T-8 cerrada esta sesión.
-- **Wrappers shadcn nuevos** disponibles: `alert-dialog` y `tooltip`.
-  Usar en T-9 / T-10 sin reinstalar.
-- **Patrones reusables establecidos en T-8** (aplicar tal cual en T-9 /
-  T-10): wizard como `kind` del stack, dirty handler, AlertDialog para
-  descartar cambios, Tooltip sobre botón disabled, `class:hidden` para
-  pasos del wizard, defaults `undefined` para enums skippables.
+- **Tareas que faltan de it.1:** T-10, T-11, T-12, T-13, T-14, T-15.
+  T-9 cerrada esta sesión.
+- **Wrappers shadcn disponibles**: `alert-dialog`, `tooltip` (de T-8) y
+  `dropdown-menu` (de T-9). Usar en T-10 sin reinstalar.
+- **Patrones reusables establecidos en T-8 + T-9** (aplicar tal cual
+  en T-10):
+  - Wizard como `kind` del stack (no Dialog independiente).
+  - `class:hidden` para pasos del wizard (no `{#if}`).
+  - Snapshot + `$derived isDirty` + `setDirtyHandler` en
+    `onMount`/`onDestroy`.
+  - Validación inline contra lista pre-cargada en memoria.
+  - `onEscapeKeydown` + `onInteractOutside` en `Dialog.Content` con
+    `preventDefault()` si dirty.
+  - AlertDialog controlado (`open`+`onOpenChange`, no `bind:open`).
+  - Botón "Descartar" baja el flag **antes** de tocar el stack.
+  - Tooltip sobre `<span><Button disabled></span>` para botón Borrar
+    bloqueado por referencias.
+  - Defaults `undefined` para enums skippables (materializar al
+    guardar).
 - **Bug pendiente de cerrar de it.0.5:** falta T-9 (captura de 1 sesión
   real con el flujo nuevo) + tag `v0.1-it0.5`. No bloquea it.1.
 - Push: SSH con `id_ed25519_personal` (alias `github-personal`). Si
