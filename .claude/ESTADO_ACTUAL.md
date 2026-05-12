@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-12 (cierre sesión 4)
+**Última actualización:** 2026-05-12 (cierre sesión 5)
 **Fase activa:** Iteración 1 — Mapa técnico básico
-**Iteración en curso:** it.1 (5.5/15 tareas cerradas: T-1, T-2, T-2.5, T-3, T-4, T-5)
+**Iteración en curso:** it.1 (7.5/15 tareas cerradas: T-1, T-2, T-2.5, T-3, T-4, T-5, T-6, T-7)
 
 ---
 
@@ -16,13 +16,63 @@ Iteración 0.5 ✅ funcionalmente cerrada (auto-update PWA + wizards + chips
 capturada con el flujo nuevo) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
 Estamos en **iteración 1** — base estructural del mapa técnico. Plan
-completo en `ITERACION_1.md`. 5 tareas y media cerradas (T-1 a T-5,
-T-2.5 intercalada). Queda toda la mitad visible (modales de técnica y
-sumisión, editores wizard, contras, captura inline en roll).
+completo en `ITERACION_1.md`. 7 tareas y media cerradas (T-1 a T-7,
+T-2.5 intercalada). El recorrido encadenado de modales (posición →
+técnica → contra → ...) funciona end-to-end. Queda toda la mitad de
+edición (editores wizard, UI de contras, captura inline en roll).
 
 ---
 
-## Última sesión (2026-05-12, sesión 4)
+## Última sesión (2026-05-12, sesión 5)
+
+**Hecho:**
+- **T-6** ✅ `TecnicaModalContent.svelte` (288 líneas) — chips de tipo +
+  estado (+ variante si la hay), Origen y Destino como botones que
+  pushean al stack, secciones de Setup / Errores comunes (ocultas si
+  vacías), Contras conocidas (lista clickable con "desde {origen}" en
+  segunda línea), Otras variantes de [nombre] (oculto si no hay
+  hermanas). Estados loading/error/ready idénticos al patrón de T-5.
+- **T-7** ✅ `SumisionModalContent.svelte` (139 líneas) — sin chips de
+  header, Notas (oculta si vacía), Variaciones agrupadas por posición
+  de origen (alfabético), cada item clickable → push de la técnica.
+- **MapaModalHost actualizado** — caches `tecnicasById` y `sumisionesById`
+  análogos al de posición, dispatch correcto según `top.kind`,
+  placeholders fuera. El recorrido nodo → técnica → contra → respuesta
+  funciona sin bucles.
+- **Seed ampliado para validar T-6/T-7** — las dos armbar unificadas a
+  mismo `nombre="Armbar"` con variantes `"desde guardia"` / `"desde mount"`
+  (ahora son hermanas reales que disparan "Otras variantes"). Añadido
+  `CONTRAS_SEED` con 2 contras forzadas (Upa contra Armbar desde mount,
+  Hip bump sweep contra Armbar desde guardia) — relaciones forzadas
+  para tener data de UI; las contras realistas se construyen en T-14.
+- **CONTEXTO_AGENTE.md** — línea de Node 22 neutralizada para no asumir
+  `nvm` (la máquina usa `fnm`).
+
+**Decisiones tomadas (con peso):**
+- **Colores del chip de tipo de técnica**: ataque=primary/15,
+  sweep=success/15, escape=warning/15, transicion=muted,
+  sumision=destructive/15. Lenguaje visual: sumisión "cierra" la
+  partida, escape sale de mal sitio (alerta resuelta), sweep cambia
+  control (positivo), transición es movimiento neutro.
+- **Colores del chip de estado de técnica**: probando=warning,
+  funciona=success, descartada=muted.
+- **Sin chip "Sumisión terminal" en el modal de sumisión** — el título
+  y la sección "Variaciones que terminan aquí" ya dejan claro el rol.
+  Se evita ruido visual.
+- **Segunda línea "desde {origen}" en contras y otras variantes
+  siempre activa** — resuelve homónimas sin coste.
+- **Huérfanos (relacionada eliminada) se muestran sin link** con texto
+  gris "(posición/sumisión eliminada)". Defensivo aunque con FK ON
+  CASCADE no debería pasar.
+- **Etiqueta "Contras conocidas" se mantiene** — confusión potencial
+  (¿contras DE o A?), pero con catálogo real (T-14) se reevalúa.
+- **CONTRAS_SEED en seed-mapa**: las relaciones del seed son forzadas
+  para validar UI, no representan BJJ realista. T-14 introduce el
+  catálogo real con contras canónicas.
+
+---
+
+## Sesión previa (2026-05-12, sesión 4)
 
 **Hecho:**
 - **Discusión de diseño del mapa** con stakeholder. Cerradas las 3
@@ -101,64 +151,49 @@ sumisión, editores wizard, contras, captura inline en roll).
 
 ---
 
-## Sesión previa (2026-05-11 → 12, sesión 3)
-
-Fix de bugs introducidos por it.0.5 + cierre de la fase de pulido.
-
-**Hecho (resumen):**
-- Bug `pwa.svelte.ts` con `$state` module-level → refactor a class fields.
-- Bug `sqlite3-opfs-async-proxy.js` no copiado al deploy → ampliado
-  `copy-sqlite-wasm.mjs`.
-- Bug pre-existente del refresh resuelto con bump de patches svelte/
-  kit/vite. ADR-001 documenta. Eliminado `package-lock.json` (lockfile
-  autoritativo es `pnpm-lock.yaml`).
-- Indicador de versión en home, criterios técnicos ampliados en
-  `CONTEXTO_AGENTE.md`.
-
-**Decisiones con peso (vigentes):**
-- `$state` solo dentro de class fields, nunca module-level.
-- Verificar con `pnpm preview` + refresh antes de pushear cambios a
-  SW/PWA/bundle.
-- `pnpm-lock.yaml` es el único lockfile autoritativo.
-
----
-
 ## Próximo paso
 
-**T-6 + T-7 — Modales de técnica y sumisión.** Son placeholders hoy en
-`MapaModalHost.svelte` (líneas que dicen "Modal de técnica llega en T-6"
-y "Modal de sumisión llega en T-7"). T-5 ya hace el push correcto al
-stack al hacer click, así que solo hay que rellenar el contenido.
+**T-8 — Editor de POSICION (wizard desktop).** Toca abrir la fase de
+edición. ITERACION_1.md §F-4 define el wizard de 4 pasos (solo el primero
+obligatorio): Nombre → Categoría (chips, skippable, default `otro`) →
+Tipo (chips, skippable) → Notas (textarea opcional). Patrón
+auto-avance como en it.0.5.
 
-**Modal de técnica (T-6) — REQUISITOS §3.5:**
-- Header: nombre [+ variante] + chip de tipo + chip de estado.
-- Origen → link al nodo de posición (push).
-- Destino → link al nodo (posición o sumisión, push).
-- Setup / detalles.
-- Errores comunes.
-- Contras conocidas (lista clickable de técnicas que la responden, push).
-- "Otras variantes de [nombre]" si hay aristas hermanas (push).
+**T-8 también requiere:**
+- FAB extended "+ Nueva posición" solo en desktop (en `/mapa`).
+- Acciones editar / borrar desde el modal de posición (botones en
+  desktop, ausentes en móvil).
+- Borrado con confirmación si la posición tiene técnicas asociadas
+  (decisión pendiente: cascade vs prohibir — propuesta: confirmar +
+  cascade).
 
-**Modal de sumisión (T-7):**
-- Header: nombre.
-- Notas.
-- Variaciones agrupadas por posición de origen (lista clickable, push).
-
-Ambos siguen el patrón de `PosicionModalContent.svelte`: componente que
-recibe la entidad como prop, carga lo necesario en `onMount`, render con
-tokens semánticos. Cuando estén ambos, el recorrido encadenado completo
-(nodo → técnica → contra → respuesta → ...) funciona end-to-end.
-
-Después de T-6/T-7: T-8 a T-10 (editores wizard de posición/sumisión/
-técnica desktop), T-11 (UI de contras), T-12 (captura inline en wizard
-de roll), T-13 (chips en detalle de sesión + filtro nuevo en /rolls),
-T-14 (semilla real con guardia cerrada bottom + mount bottom + uso real),
-T-15 (cierre con tag `v0.2-it1`).
+Después de T-8: T-9 (editor de sumisión, wizard mínimo), T-10 (editor
+de técnica, wizard de 7 pasos con condicional en destino), T-11 (UI de
+contras), T-12 (captura inline en wizard de roll), T-13 (chips en
+detalle de sesión + filtro nuevo en /rolls), T-14 (semilla real con
+catálogo BJJ realista + uso real), T-15 (cierre con tag `v0.2-it1`).
 
 ---
 
 ## Decisiones recientes con peso
 
+- **2026-05-12 (s5) — Colores semánticos del chip de tipo de técnica.**
+  ataque=primary/15, sweep=success/15, escape=warning/15,
+  transicion=muted, sumision=destructive/15. Patrón: éxito tonal (sweep
+  positivo), alerta resuelta (escape), neutro (transición), cierre
+  (sumisión).
+- **2026-05-12 (s5) — Colores semánticos del chip de estado.**
+  probando=warning, funciona=success, descartada=muted.
+- **2026-05-12 (s5) — Sin chip "Sumisión terminal"** en header del modal
+  de sumisión (redundante con título + sección de variaciones).
+- **2026-05-12 (s5) — Etiqueta "Contras conocidas" se mantiene** pese
+  a ambigüedad potencial (¿contras DE o A?). Se reevalúa cuando T-14
+  pueble el catálogo real.
+- **2026-05-12 (s5) — Seed temporal con relaciones forzadas.** Las
+  contras del seed (`/dev/seed-mapa`) son artificiales (Upa↔Armbar
+  desde mount, Hip bump sweep↔Armbar desde guardia) — sirven para
+  validar UI, no representan BJJ realista. T-14 introduce el catálogo
+  realista.
 - **2026-05-12 (s4) — REQUISITOS §7 cerrado.** Sumisiones nodos
   terminales, variantes como aristas paralelas con campo `variante`,
   mismo nombre técnico desde distintos orígenes = aristas hermanas.
@@ -191,8 +226,8 @@ T-15 (cierre con tag `v0.2-it1`).
 
 ## Notas internas para próxima sesión
 
-- **Node 22 obligatorio** (`.nvmrc`). `nvm use 22` antes de cualquier
-  comando.
+- **Node 22 obligatorio** (`.nvmrc`). Asegurar Node 22 activo antes de
+  cualquier comando (la máquina usa `fnm`, no `nvm`: `fnm use 22`).
 - **pnpm, no npm.** Dev: `pnpm dev -- --host`. Preview: `pnpm preview
   -- --host`. Install: `pnpm install`.
 - **Path quirk de dev:** en `pnpm dev` la app sirve en `/`, no en
@@ -200,11 +235,13 @@ T-15 (cierre con tag `v0.2-it1`).
   Las URLs de smoke/seed durante dev son `/dev/db-migration-smoke` y
   `/dev/seed-mapa` (sin prefijo).
 - **Seed temporal vigente en `/dev/seed-mapa`** — botones "sembrar" y
-  "limpiar". Útil para validar T-6/T-7. Se elimina en T-15.
+  "limpiar". Ahora siembra también 2 contras + 2 armbars hermanas
+  ("Armbar" con variantes "desde guardia" / "desde mount") para validar
+  T-6/T-7. Se elimina en T-15.
 - **Smoke de migración vigente en `/dev/db-migration-smoke`** — útil
   para sanidad de schema. Se evalúa mantener o eliminar al cerrar it.1.
-- **Tareas que faltan de it.1:** T-6, T-7, T-8, T-9, T-10, T-11, T-12,
-  T-13, T-14, T-15. La mitad visible aún por hacer.
+- **Tareas que faltan de it.1:** T-8, T-9, T-10, T-11, T-12, T-13,
+  T-14, T-15. Empieza la fase de edición (FAB + wizards).
 - **Bug pendiente de cerrar de it.0.5:** falta T-9 (captura de 1 sesión
   real con el flujo nuevo) + tag `v0.1-it0.5`. No bloquea it.1.
 - Push: SSH con `id_ed25519_personal` (alias `github-personal`). Si

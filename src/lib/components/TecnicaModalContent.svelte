@@ -1,0 +1,288 @@
+<script lang="ts">
+	/**
+	 * Contenido interno del modal de TECNICA (T-6).
+	 *
+	 * NO es un Dialog en sí — el Dialog lo provee `MapaModalHost`. Aquí
+	 * solo renderizamos: chips (tipo + estado + variante), origen, destino,
+	 * setup, errores comunes, contras conocidas y otras variantes.
+	 *
+	 * Cada navegación (origen, destino, contra, otra variante) hace push
+	 * al `mapaModalStack` para que el host renderice el siguiente nivel.
+	 *
+	 * Patrón idéntico al de `PosicionModalContent`: carga en paralelo en
+	 * `onMount`, estados loading/ready/error.
+	 */
+	import { onMount } from 'svelte';
+	import type {
+		EstadoTecnica,
+		Posicion,
+		SumisionTerminal,
+		Tecnica,
+		TipoTecnica
+	} from '$lib/types';
+	import { mapaModalStack } from './mapa-modal-stack.svelte';
+
+	let { tecnica }: { tecnica: Tecnica } = $props();
+
+	const TIPO_TECNICA_LABEL: Record<TipoTecnica, string> = {
+		ataque: 'Ataque',
+		sweep: 'Sweep',
+		escape: 'Escape',
+		transicion: 'Transición',
+		sumision: 'Sumisión'
+	};
+
+	// Tokens semánticos del proyecto. Decisión:
+	//   ataque → primary  (la acción ofensiva por defecto del mapa)
+	//   sweep → success   (cambia el control a tu favor → positivo)
+	//   escape → warning  (resuelves un mal sitio → señal de alerta)
+	//   transicion → muted (movimiento neutro entre nodos)
+	//   sumision → destructive (acaba la partida; mismo lenguaje que un
+	//                           "kill" en otros UIs)
+	const TIPO_TECNICA_BADGE: Record<TipoTecnica, string> = {
+		ataque: 'bg-primary/15 text-primary',
+		sweep: 'bg-success/15 text-success',
+		escape: 'bg-warning/15 text-warning',
+		transicion: 'bg-muted text-muted-foreground',
+		sumision: 'bg-destructive/15 text-destructive'
+	};
+
+	const ESTADO_LABEL: Record<EstadoTecnica, string> = {
+		probando: 'Probando',
+		funciona: 'Funciona',
+		descartada: 'Descartada'
+	};
+
+	const ESTADO_BADGE: Record<EstadoTecnica, string> = {
+		probando: 'bg-warning/15 text-warning',
+		funciona: 'bg-success/15 text-success',
+		descartada: 'bg-muted text-muted-foreground'
+	};
+
+	// Origen siempre es Posicion. Destino puede ser Posicion o SumisionTerminal.
+	let origen = $state<Posicion | null>(null);
+	let destinoPosicion = $state<Posicion | null>(null);
+	let destinoSumision = $state<SumisionTerminal | null>(null);
+	let contras = $state<Tecnica[]>([]);
+	let otrasVariantes = $state<Tecnica[]>([]);
+	// Cache id → nombre para mostrar el origen de cada contra / variante.
+	let posicionesById = $state<Record<string, string>>({});
+	let status: 'loading' | 'ready' | 'error' = $state('loading');
+	let errorMessage = $state('');
+
+	onMount(async () => {
+		try {
+			const [
+				{ getPosicion, listPosiciones },
+				{ getSumision },
+				{ getContras },
+				{ getOtrasVariantes }
+			] = await Promise.all([
+				import('$lib/posiciones'),
+				import('$lib/sumisiones'),
+				import('$lib/contras'),
+				import('$lib/tecnicas')
+			]);
+
+			const destinoPromise: Promise<Posicion | SumisionTerminal | null> =
+				tecnica.tipo === 'sumision' && tecnica.sumision_destino_id
+					? getSumision(tecnica.sumision_destino_id)
+					: tecnica.posicion_destino_id
+						? getPosicion(tecnica.posicion_destino_id)
+						: Promise.resolve(null);
+
+			const [origenRes, destinoRes, contrasRes, variantesRes, todasPos] = await Promise.all([
+				getPosicion(tecnica.posicion_origen_id),
+				destinoPromise,
+				getContras(tecnica.id),
+				getOtrasVariantes(tecnica.nombre, tecnica.id),
+				listPosiciones()
+			]);
+
+			origen = origenRes;
+			if (tecnica.tipo === 'sumision') {
+				destinoSumision = destinoRes as SumisionTerminal | null;
+			} else {
+				destinoPosicion = destinoRes as Posicion | null;
+			}
+			contras = contrasRes;
+			otrasVariantes = variantesRes;
+			posicionesById = Object.fromEntries(todasPos.map((p) => [p.id, p.nombre]));
+
+			status = 'ready';
+		} catch (err) {
+			errorMessage = err instanceof Error ? err.message : String(err);
+			status = 'error';
+			console.error('[TecnicaModalContent] init failed:', err);
+		}
+	});
+
+	function pushPosicion(p: Posicion) {
+		mapaModalStack.push({ kind: 'posicion', id: p.id, nombre: p.nombre });
+	}
+
+	function pushSumision(s: SumisionTerminal) {
+		mapaModalStack.push({ kind: 'sumision', id: s.id, nombre: s.nombre });
+	}
+
+	function pushTecnica(t: Tecnica) {
+		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+	}
+</script>
+
+<!--
+  Contenido del modal de técnica. Va dentro de Dialog.Content (provisto
+  por MapaModalHost). El Dialog.Title con tecnica.nombre lo renderiza
+  el host; aquí empezamos por la fila de chips.
+-->
+<div class="space-y-3">
+	<!-- Chips de tipo + estado + (opcional) variante -->
+	<div class="flex flex-wrap gap-1">
+		<span class="rounded px-2 py-0.5 text-xs {TIPO_TECNICA_BADGE[tecnica.tipo]}">
+			{TIPO_TECNICA_LABEL[tecnica.tipo]}
+		</span>
+		<span class="rounded px-2 py-0.5 text-xs {ESTADO_BADGE[tecnica.estado]}">
+			{ESTADO_LABEL[tecnica.estado]}
+		</span>
+		{#if tecnica.variante}
+			<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+				var: {tecnica.variante}
+			</span>
+		{/if}
+	</div>
+
+	{#if status === 'loading'}
+		<p class="text-sm text-muted-foreground">Cargando técnica…</p>
+	{:else if status === 'error'}
+		<div class="rounded border border-destructive/30 bg-destructive/10 p-3">
+			<p class="text-sm font-semibold text-destructive">Error</p>
+			<pre class="mt-1 text-xs whitespace-pre-wrap text-destructive">{errorMessage}</pre>
+		</div>
+	{:else}
+		<!-- Origen -->
+		<div class="text-sm">
+			<span class="text-muted-foreground">Origen:</span>
+			{#if origen}
+				<button
+					type="button"
+					class="ml-1 rounded font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+					onclick={() => pushPosicion(origen!)}
+				>
+					{origen.nombre}
+				</button>
+			{:else}
+				<span class="ml-1 text-muted-foreground">(posición eliminada)</span>
+			{/if}
+		</div>
+
+		<!-- Destino -->
+		<div class="text-sm">
+			<span class="text-muted-foreground">Destino:</span>
+			{#if tecnica.tipo === 'sumision'}
+				{#if destinoSumision}
+					<button
+						type="button"
+						class="ml-1 rounded font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+						onclick={() => pushSumision(destinoSumision!)}
+					>
+						{destinoSumision.nombre}<span class="text-muted-foreground"> (sumisión)</span>
+					</button>
+				{:else}
+					<span class="ml-1 text-muted-foreground">(sumisión eliminada)</span>
+				{/if}
+			{:else if destinoPosicion}
+				<button
+					type="button"
+					class="ml-1 rounded font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+					onclick={() => pushPosicion(destinoPosicion!)}
+				>
+					{destinoPosicion.nombre}
+				</button>
+			{:else}
+				<span class="ml-1 text-muted-foreground">(posición eliminada)</span>
+			{/if}
+		</div>
+
+		<!-- Setup / detalles -->
+		{#if tecnica.detalles.trim().length > 0}
+			<div>
+				<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Setup</h3>
+				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{tecnica.detalles}</p>
+			</div>
+		{/if}
+
+		<!-- Errores comunes -->
+		{#if tecnica.errores_comunes.trim().length > 0}
+			<div>
+				<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+					Errores comunes
+				</h3>
+				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
+					{tecnica.errores_comunes}
+				</p>
+			</div>
+		{/if}
+
+		<!-- Contras conocidas -->
+		<div>
+			<h3 class="text-sm font-semibold">
+				Contras conocidas <span class="text-muted-foreground">({contras.length})</span>
+			</h3>
+			{#if contras.length === 0}
+				<p class="mt-1 text-sm text-muted-foreground">Sin contras registradas.</p>
+			{:else}
+				<div class="mt-2 rounded border border-border">
+					<ul class="divide-y divide-border">
+						{#each contras as c (c.id)}
+							<li>
+								<button
+									type="button"
+									class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+									onclick={() => pushTecnica(c)}
+								>
+									<div class="font-medium">
+										{c.nombre}{#if c.variante}<span class="text-muted-foreground"
+												> ({c.variante})</span
+											>{/if}
+									</div>
+									<div class="mt-0.5 text-xs text-muted-foreground">
+										desde {posicionesById[c.posicion_origen_id] ?? '¿?'}
+									</div>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Otras variantes -->
+		{#if otrasVariantes.length > 0}
+			<div>
+				<h3 class="text-sm font-semibold">Otras variantes de {tecnica.nombre}</h3>
+				<div class="mt-2 rounded border border-border">
+					<ul class="divide-y divide-border">
+						{#each otrasVariantes as v (v.id)}
+							<li>
+								<button
+									type="button"
+									class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+									onclick={() => pushTecnica(v)}
+								>
+									<div class="font-medium">
+										{v.nombre}{#if v.variante}<span class="text-muted-foreground"
+												> (variante)</span
+											>{/if}
+									</div>
+									<div class="mt-0.5 text-xs text-muted-foreground">
+										desde {posicionesById[v.posicion_origen_id] ?? '¿?'}
+									</div>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			</div>
+		{/if}
+	{/if}
+</div>

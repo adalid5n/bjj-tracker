@@ -16,32 +16,44 @@
 	 *
 	 * El contenido se elige por `top.kind`:
 	 *   - posicion → <PosicionModalContent />
-	 *   - tecnica  → placeholder (T-6 lo reemplazará).
-	 *   - sumision → placeholder (T-7 lo reemplazará).
+	 *   - tecnica  → <TecnicaModalContent />
+	 *   - sumision → <SumisionModalContent />
 	 */
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
-	import type { Posicion } from '$lib/types';
+	import type { Posicion, SumisionTerminal, Tecnica } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 	import PosicionModalContent from './PosicionModalContent.svelte';
+	import TecnicaModalContent from './TecnicaModalContent.svelte';
+	import SumisionModalContent from './SumisionModalContent.svelte';
 
 	// Cache de detalles cargados bajo demanda (id → entidad).
-	// Por ahora solo posiciones, ya que tecnica/sumision son placeholders.
+	// Una entrada por kind, los tres se rellenan a medida que se navega.
 	let posicionesById = $state<Record<string, Posicion>>({});
+	let tecnicasById = $state<Record<string, Tecnica>>({});
+	let sumisionesById = $state<Record<string, SumisionTerminal>>({});
 	let loadingPosicion = $state<string | null>(null);
+	let loadingTecnica = $state<string | null>(null);
+	let loadingSumision = $state<string | null>(null);
 
 	const stack = $derived(mapaModalStack.stack);
 	const top = $derived(mapaModalStack.top);
 	const isOpen = $derived(mapaModalStack.isOpen);
 
-	// Si el top es una posición que aún no tenemos cacheada, la cargamos.
+	// Si el top es una entidad que aún no tenemos cacheada, la cargamos.
 	// $effect en module level no se permite — esto sí, va en componente.
 	$effect(() => {
 		if (!top) return;
 		if (top.kind === 'posicion' && !posicionesById[top.id] && loadingPosicion !== top.id) {
 			loadingPosicion = top.id;
 			loadPosicion(top.id);
+		} else if (top.kind === 'tecnica' && !tecnicasById[top.id] && loadingTecnica !== top.id) {
+			loadingTecnica = top.id;
+			loadTecnica(top.id);
+		} else if (top.kind === 'sumision' && !sumisionesById[top.id] && loadingSumision !== top.id) {
+			loadingSumision = top.id;
+			loadSumision(top.id);
 		}
 	});
 
@@ -56,6 +68,34 @@
 			console.error('[MapaModalHost] loadPosicion failed:', err);
 		} finally {
 			loadingPosicion = null;
+		}
+	}
+
+	async function loadTecnica(id: string) {
+		try {
+			const { getTecnica } = await import('$lib/tecnicas');
+			const t = await getTecnica(id);
+			if (t) {
+				tecnicasById = { ...tecnicasById, [id]: t };
+			}
+		} catch (err) {
+			console.error('[MapaModalHost] loadTecnica failed:', err);
+		} finally {
+			loadingTecnica = null;
+		}
+	}
+
+	async function loadSumision(id: string) {
+		try {
+			const { getSumision } = await import('$lib/sumisiones');
+			const s = await getSumision(id);
+			if (s) {
+				sumisionesById = { ...sumisionesById, [id]: s };
+			}
+		} catch (err) {
+			console.error('[MapaModalHost] loadSumision failed:', err);
+		} finally {
+			loadingSumision = null;
 		}
 	}
 
@@ -119,19 +159,19 @@
 						<p class="text-sm text-muted-foreground">Cargando posición…</p>
 					{/if}
 				{:else if top.kind === 'tecnica'}
-					<!-- Placeholder hasta T-6 -->
-					<p
-						class="rounded border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
-					>
-						Modal de técnica llega en T-6.
-					</p>
+					{@const tec = tecnicasById[top.id]}
+					{#if tec}
+						<TecnicaModalContent tecnica={tec} />
+					{:else}
+						<p class="text-sm text-muted-foreground">Cargando técnica…</p>
+					{/if}
 				{:else if top.kind === 'sumision'}
-					<!-- Placeholder hasta T-7 -->
-					<p
-						class="rounded border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
-					>
-						Modal de sumisión llega en T-7.
-					</p>
+					{@const sum = sumisionesById[top.id]}
+					{#if sum}
+						<SumisionModalContent sumision={sum} />
+					{:else}
+						<p class="text-sm text-muted-foreground">Cargando sumisión…</p>
+					{/if}
 				{/if}
 			</div>
 		{/if}

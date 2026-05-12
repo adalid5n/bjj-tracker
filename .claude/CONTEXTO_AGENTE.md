@@ -30,7 +30,9 @@
 
 - **Node 22 obligatorio** (declarado en `.nvmrc`). Algunas dependencias
   (SQLite-WASM 3.53+) lo requieren explícitamente y fallan con `EBADENGINE`
-  en Node 20. Usar `nvm use 22` antes de cualquier `install`/`build`/`dev`.
+  en Node 20. Asegurar Node 22 activo antes de cualquier
+  `install`/`build`/`dev` (con `nvm use 22`, `fnm use 22`, o el gestor que
+  uses).
 - **Gestor de paquetes: pnpm**, no npm. El lockfile autoritativo es
   `pnpm-lock.yaml`; CI ejecuta `pnpm install --frozen-lockfile`. **No
   crear ni comitear `package-lock.json`** — está duplicado y solo sirve

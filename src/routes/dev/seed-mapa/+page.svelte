@@ -66,7 +66,8 @@
 			destinoPosicionNombre: 'Mount top'
 		},
 		{
-			nombre: 'Armbar desde guardia',
+			nombre: 'Armbar',
+			variante: 'desde guardia',
 			tipo: 'sumision',
 			origenNombre: 'Guardia cerrada bottom',
 			destinoSumisionNombre: 'Armbar'
@@ -91,10 +92,41 @@
 			variante: 'clásica'
 		},
 		{
-			nombre: 'Armbar desde mount',
+			nombre: 'Armbar',
+			variante: 'desde mount',
 			tipo: 'sumision',
 			origenNombre: 'Mount top',
 			destinoSumisionNombre: 'Armbar'
+		}
+	];
+
+	type ContraSeed = {
+		// La técnica "víctima" (a la que se le aplica la contra).
+		tecnicaNombre: string;
+		tecnicaVariante?: string;
+		tecnicaOrigenNombre: string;
+		// La técnica que actúa como contra.
+		contraNombre: string;
+		contraVariante?: string;
+		contraOrigenNombre: string;
+	};
+
+	const CONTRAS_SEED: ContraSeed[] = [
+		// Upa es contra del Armbar desde mount.
+		{
+			tecnicaNombre: 'Armbar',
+			tecnicaVariante: 'desde mount',
+			tecnicaOrigenNombre: 'Mount top',
+			contraNombre: 'Upa',
+			contraOrigenNombre: 'Mount bottom'
+		},
+		// Hip bump sweep es contra del Armbar desde guardia.
+		{
+			tecnicaNombre: 'Armbar',
+			tecnicaVariante: 'desde guardia',
+			tecnicaOrigenNombre: 'Guardia cerrada bottom',
+			contraNombre: 'Hip bump sweep',
+			contraOrigenNombre: 'Guardia cerrada bottom'
 		}
 	];
 
@@ -223,7 +255,37 @@
 				tecCreadas += 1;
 			}
 
-			message = `Sembrado: ${posCreadas} posiciones, ${sumCreadas} sumisiones, ${tecCreadas} técnicas.`;
+			// Contras (idempotente vía INSERT OR IGNORE en addContra).
+			const { addContra, getContras } = await import('$lib/contras');
+			let conCreadas = 0;
+
+			function findTecnica(nombre: string, origenNombre: string, variante?: string) {
+				const origen = findByNombre(posiciones, origenNombre);
+				if (!origen) return undefined;
+				const target = nombre.trim().toLowerCase();
+				return tecnicas.find(
+					(t) =>
+						t.nombre.trim().toLowerCase() === target &&
+						t.posicion_origen_id === origen.id &&
+						(t.variante ?? '') === (variante ?? '')
+				);
+			}
+
+			for (const seed of CONTRAS_SEED) {
+				const tec = findTecnica(seed.tecnicaNombre, seed.tecnicaOrigenNombre, seed.tecnicaVariante);
+				const contra = findTecnica(seed.contraNombre, seed.contraOrigenNombre, seed.contraVariante);
+				if (!tec || !contra) {
+					throw new Error(
+						`No encuentro técnica/contra para seed: ${seed.tecnicaNombre} ← ${seed.contraNombre}`
+					);
+				}
+				const yaContras = await getContras(tec.id);
+				if (yaContras.some((c) => c.id === contra.id)) continue;
+				await addContra(tec.id, contra.id);
+				conCreadas += 1;
+			}
+
+			message = `Sembrado: ${posCreadas} posiciones, ${sumCreadas} sumisiones, ${tecCreadas} técnicas, ${conCreadas} contras.`;
 			status = 'done';
 			await refresh();
 		} catch (err) {
@@ -322,13 +384,14 @@
 			<li>3 posiciones: guardia cerrada bottom, mount top, mount bottom</li>
 			<li>2 sumisiones: Armbar, Cross choke</li>
 			<li>
-				6 técnicas: hip bump sweep, armbar desde guardia, cross choke desde guardia, upa, elbow
-				escape (variante "clásica"), armbar desde mount
+				6 técnicas: hip bump sweep, armbar (variantes "desde guardia" y "desde mount"), cross choke
+				desde guardia, upa, elbow escape (variante "clásica")
 			</li>
+			<li>2 contras: Upa contra Armbar (desde mount); Hip bump sweep contra Armbar (desde guardia)</li>
 		</ul>
 		<p>
 			Idempotente: si ya existen entidades con el mismo nombre (o, en técnicas, el mismo
-			nombre+origen+variante), no las duplica.
+			nombre+origen+variante), no las duplica. Las contras se insertan con OR IGNORE.
 		</p>
 	</section>
 </main>
