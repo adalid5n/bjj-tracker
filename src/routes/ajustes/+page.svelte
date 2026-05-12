@@ -25,6 +25,33 @@
 		return `${y}${m}${day}`;
 	}
 
+	// Resume el contenido de un payload de export / resultado de import.
+	// Acepta tanto el payload (arrays) como el resumen del importAll (números),
+	// gracias a que ambos exponen `.length` o número directo en las mismas keys.
+	type Countable =
+		| { companeros: unknown[]; sesiones: unknown[]; rolls: unknown[]; posiciones: unknown[]; sumisiones_terminales: unknown[]; tecnicas: unknown[]; tecnica_contras: unknown[] }
+		| { companeros: number; sesiones: number; rolls: number; posiciones: number; sumisiones_terminales: number; tecnicas: number; tecnica_contras: number };
+
+	function n(v: unknown[] | number): number {
+		return typeof v === 'number' ? v : v.length;
+	}
+
+	function pl(count: number, sing: string, plural: string): string {
+		return `${count} ${count === 1 ? sing : plural}`;
+	}
+
+	function countsLine(x: Countable): string {
+		return [
+			pl(n(x.sesiones), 'sesión', 'sesiones'),
+			`${n(x.rolls)} rolls`,
+			pl(n(x.companeros), 'compañero', 'compañeros'),
+			pl(n(x.posiciones), 'posición', 'posiciones'),
+			pl(n(x.sumisiones_terminales), 'sumisión', 'sumisiones'),
+			pl(n(x.tecnicas), 'técnica', 'técnicas'),
+			pl(n(x.tecnica_contras), 'contra', 'contras')
+		].join(' · ');
+	}
+
 	async function handleExport() {
 		busy = 'export';
 		message = null;
@@ -40,10 +67,7 @@
 			a.click();
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
-			message = {
-				kind: 'ok',
-				text: `Exportado: ${payload.companeros.length} compañeros · ${payload.sesiones.length} sesiones · ${payload.rolls.length} rolls.`
-			};
+			message = { kind: 'ok', text: `Exportado: ${countsLine(payload)}.` };
 		} catch (err) {
 			message = { kind: 'err', text: err instanceof Error ? err.message : String(err) };
 		} finally {
@@ -100,7 +124,7 @@
 
 	async function processFile(file: File) {
 		const ok = confirm(
-			`¿Importar "${file.name}"?\n\nESTO REEMPLAZA TODOS LOS DATOS ACTUALES (compañeros, sesiones y rolls). No se puede deshacer.`
+			`¿Importar "${file.name}"?\n\nESTO REEMPLAZA TODOS LOS DATOS ACTUALES (logbook + mapa técnico). No se puede deshacer.`
 		);
 		if (!ok) return;
 
@@ -116,10 +140,7 @@
 			}
 			const { importAll } = await import('$lib/sync');
 			const result = await importAll(payload);
-			message = {
-				kind: 'ok',
-				text: `Importado: ${result.companeros} compañeros · ${result.sesiones} sesiones · ${result.rolls} rolls.`
-			};
+			message = { kind: 'ok', text: `Importado: ${countsLine(result)}.` };
 		} catch (err) {
 			message = { kind: 'err', text: err instanceof Error ? err.message : String(err) };
 		} finally {
