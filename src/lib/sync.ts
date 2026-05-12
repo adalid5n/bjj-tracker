@@ -78,12 +78,54 @@ export async function importAll(payload: unknown): Promise<{
 
 	await init();
 
-	// Wipe en orden FK (hijos antes que padres).
-	await run('DELETE FROM rolls');
-	await run('DELETE FROM sesiones');
-	await run('DELETE FROM companeros');
+	// Desactivamos FK durante el bulk import. Patrón estándar (pg_dump,
+	// sqlite .dump): permite wipe+insert sin importar el orden y tolera
+	// referencias huérfanas heredadas de exports previos a v2 (cuando FK
+	// estaba OFF y no se detectaban inconsistencias). Tras el import,
+	// `PRAGMA foreign_key_check` audita la integridad y reporta huérfanos
+	// sin abortar — la app sigue funcional aunque haya datos inconsistentes.
+	await run('PRAGMA foreign_keys = OFF');
 
-	// Insert en orden inverso (padres antes que hijos).
+	try {
+		await run('BEGIN');
+		try {
+			// Wipe en orden FK (hijos antes que padres) — no estrictamente
+			// necesario con FK OFF, pero mantenemos el orden por claridad.
+			await run('DELETE FROM rolls');
+			await run('DELETE FROM sesiones');
+			await run('DELETE FROM companeros');
+
+			await insertAll(payload);
+
+			await run('COMMIT');
+		} catch (e) {
+			await run('ROLLBACK');
+			throw e;
+		}
+	} finally {
+		await run('PRAGMA foreign_keys = ON');
+	}
+
+	// Auditoría post-import: detecta filas huérfanas (rolls apuntando a
+	// sesiones/companeros que no están en el JSON). No aborta — solo log.
+	const violations = await query<{ table: string; rowid: number; parent: string; fkid: number }>(
+		'PRAGMA foreign_key_check'
+	);
+	if (violations.length > 0) {
+		console.warn(
+			`Import completado con ${violations.length} fila(s) con referencias huérfanas heredadas del JSON. Detalle:`,
+			violations
+		);
+	}
+
+	return {
+		companeros: payload.companeros.length,
+		sesiones: payload.sesiones.length,
+		rolls: payload.rolls.length
+	};
+}
+
+async function insertAll(payload: ExportPayload): Promise<void> {
 	for (const c of payload.companeros) {
 		await run(
 			`INSERT INTO companeros (id, nombre, cinturon, peso_relativo, notas, created_at, updated_at)
@@ -140,10 +182,4 @@ export async function importAll(payload: unknown): Promise<{
 			]
 		);
 	}
-
-	return {
-		companeros: payload.companeros.length,
-		sesiones: payload.sesiones.length,
-		rolls: payload.rolls.length
-	};
 }
