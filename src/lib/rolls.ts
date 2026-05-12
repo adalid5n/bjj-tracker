@@ -173,6 +173,22 @@ export async function setPosicionesProblema(
 }
 
 /**
+ * Cuenta cuántos rolls referencian una posición como "problema". Se usa
+ * para decidir si se puede borrar la posición sin orfanizar referencias.
+ *
+ * Convención del proyecto: alias en lowercase (como `rolls_count` en
+ * `sesiones.ts`) — el worker preserva el case del alias tal cual.
+ */
+export async function countRollsByPosicionProblema(posicionId: string): Promise<number> {
+	await init();
+	const rows = await query<{ count: number }>(
+		'SELECT COUNT(*) AS count FROM roll_posicion_problema WHERE posicion_id = ?',
+		[posicionId]
+	);
+	return rows[0]?.count ?? 0;
+}
+
+/**
  * Devuelve las posiciones de problema asociadas a un roll, ordenadas por
  * nombre. JOIN con `posiciones` para devolver el objeto completo y no
  * solo el id.

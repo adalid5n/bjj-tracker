@@ -18,15 +18,29 @@
 	 *   - posicion → <PosicionModalContent />
 	 *   - tecnica  → <TecnicaModalContent />
 	 *   - sumision → <SumisionModalContent />
+	 *   - wizard-posicion → <PosicionWizard />
+	 *
+	 * T-8 fixes (E): si el top es un wizard con cambios sin guardar,
+	 * interceptamos Esc / click overlay / botón ✕ / botón ← / cancelar y
+	 * mostramos un `AlertDialog` "¿Descartar cambios?" antes de cerrar.
+	 * El wizard registra/desregistra el dirty handler en `mapaModalStack`.
 	 */
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import type { Posicion, SumisionTerminal, Tecnica } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 	import PosicionModalContent from './PosicionModalContent.svelte';
 	import TecnicaModalContent from './TecnicaModalContent.svelte';
 	import SumisionModalContent from './SumisionModalContent.svelte';
+	import PosicionWizard from './PosicionWizard.svelte';
+
+	// Opcional: callback que el host (página) puede pasar para refrescar
+	// listas tras un cambio en el catálogo (crear/editar/borrar posición).
+	// Hoy lo usa `/mapa` para recargar la lista de posiciones.
+	let { onCatalogChanged }: { onCatalogChanged?: () => void } = $props();
 
 	// Cache de detalles cargados bajo demanda (id → entidad).
 	// Una entrada por kind, los tres se rellenan a medida que se navega.
@@ -36,6 +50,11 @@
 	let loadingPosicion = $state<string | null>(null);
 	let loadingTecnica = $state<string | null>(null);
 	let loadingSumision = $state<string | null>(null);
+
+	// AlertDialog "¿Descartar cambios?" — controla qué acción pendiente
+	// dispara: cerrar todo (closeAll) o pop una entrada.
+	let mostrarConfirmDescartar = $state(false);
+	let accionPendiente = $state<'closeAll' | 'pop' | null>(null);
 
 	const stack = $derived(mapaModalStack.stack);
 	const top = $derived(mapaModalStack.top);
@@ -102,10 +121,86 @@
 	function handleOpenChange(value: boolean) {
 		// Si bits-ui pide cerrar (Esc, click overlay, botón ✕ de Dialog.Content),
 		// vaciamos el stack para que el estado lógico siga al estado del Dialog.
+		// Antes de cerrar comprobamos si el top tiene cambios sin guardar: en
+		// ese caso pedimos confirmación con AlertDialog y dejamos el Dialog
+		// abierto hasta que el usuario decida.
 		if (!value) {
+			if (mapaModalStack.isDirty()) {
+				accionPendiente = 'closeAll';
+				mostrarConfirmDescartar = true;
+				// No cerramos el stack: el Dialog se reabre en el próximo render
+				// porque `isOpen` sigue true.
+				return;
+			}
 			mapaModalStack.closeAll();
 		}
 	}
+
+	function handleBack() {
+		// Botón "← Atrás" del header. Solo dispara confirm si el top tiene
+		// cambios sin guardar — pop a una entrada anterior los perdería.
+		if (mapaModalStack.isDirty()) {
+			accionPendiente = 'pop';
+			mostrarConfirmDescartar = true;
+			return;
+		}
+		mapaModalStack.pop();
+	}
+
+	function handleWizardRequestClose() {
+		// El wizard pidió cerrar (botón Cancelar). Mismo trato: si dirty,
+		// preguntamos; si no, pop directo.
+		if (mapaModalStack.isDirty()) {
+			accionPendiente = 'pop';
+			mostrarConfirmDescartar = true;
+			return;
+		}
+		mapaModalStack.pop();
+	}
+
+	function handleConfirmDescartar() {
+		// El usuario confirma descartar: ejecuta la acción pendiente y limpia
+		// el dirty handler para que la siguiente entrada del stack no
+	  // herede ese estado.
+		mapaModalStack.setDirtyHandler(null);
+		if (accionPendiente === 'closeAll') {
+			mapaModalStack.closeAll();
+		} else if (accionPendiente === 'pop') {
+			mapaModalStack.pop();
+		}
+		accionPendiente = null;
+		mostrarConfirmDescartar = false;
+	}
+
+	function handleCancelDescartar() {
+		accionPendiente = null;
+		mostrarConfirmDescartar = false;
+	}
+
+	// El wizard llama a esto tras crear/editar. Invalidamos la cache de la
+	// posición correspondiente para que la próxima vez que se muestre se
+	// recargue de BD con los datos frescos. Además notificamos al page
+	// para que refresque la lista de `/mapa` (creación, edición de nombre, etc.).
+	function handleWizardSaved(id: string) {
+		if (posicionesById[id]) {
+			const next = { ...posicionesById };
+			delete next[id];
+			posicionesById = next;
+		}
+		onCatalogChanged?.();
+	}
+
+	// Idem cuando se borra desde el modal de posición.
+	function handleModalChanged() {
+		onCatalogChanged?.();
+	}
+
+	// Helpers para el título y la rama de render del top.
+	const topTitle = $derived.by(() => {
+		if (!top) return '';
+		if (top.kind === 'wizard-posicion' && top.modo === 'crear') return 'Nueva posición';
+		return top.nombre;
+	});
 </script>
 
 <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
@@ -118,7 +213,7 @@
 				<!-- Breadcrumb solo si stack.length > 1 -->
 				{#if stack.length > 1}
 					<nav aria-label="Ruta navegada" class="text-xs text-muted-foreground">
-						{#each stack as entry, i (i + '-' + entry.id)}
+						{#each stack as entry, i (i + '-' + entry.kind + '-' + ('id' in entry ? entry.id : entry.modo))}
 							{#if i < stack.length - 1}
 								<button
 									type="button"
@@ -140,13 +235,13 @@
 						<Button
 							variant="ghost"
 							size="icon-sm"
-							onclick={() => mapaModalStack.pop()}
+							onclick={handleBack}
 							aria-label="Volver al modal anterior"
 						>
 							<ArrowLeftIcon />
 						</Button>
 					{/if}
-					<Dialog.Title>{top.nombre}</Dialog.Title>
+					<Dialog.Title>{topTitle}</Dialog.Title>
 				</div>
 			</Dialog.Header>
 
@@ -154,7 +249,7 @@
 				{#if top.kind === 'posicion'}
 					{@const pos = posicionesById[top.id]}
 					{#if pos}
-						<PosicionModalContent posicion={pos} />
+						<PosicionModalContent posicion={pos} onChanged={handleModalChanged} />
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando posición…</p>
 					{/if}
@@ -172,8 +267,40 @@
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando sumisión…</p>
 					{/if}
+				{:else if top.kind === 'wizard-posicion'}
+					<PosicionWizard
+						modo={top.modo}
+						posicionId={top.modo === 'editar' ? top.id : undefined}
+						onSaved={handleWizardSaved}
+						onRequestClose={handleWizardRequestClose}
+					/>
 				{/if}
 			</div>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>
+
+<!--
+  Confirm de descartar cambios (cambio E). El AlertDialog vive a nivel del
+  host, no del wizard, porque debe sobrevivir aunque el wizard se desmonte
+  tras una acción. bits-ui soporta AlertDialog sobre Dialog sin chocar.
+-->
+<AlertDialog.Root bind:open={mostrarConfirmDescartar}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>¿Descartar cambios?</AlertDialog.Title>
+			<AlertDialog.Description>
+				Tienes cambios sin guardar en esta posición. Si cierras ahora, se perderán.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={handleCancelDescartar}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={handleConfirmDescartar}
+				class={buttonVariants({ variant: 'destructive' })}
+			>
+				Descartar
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

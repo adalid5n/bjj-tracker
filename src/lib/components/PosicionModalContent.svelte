@@ -15,6 +15,9 @@
 	 * de técnica).
 	 */
 	import { onMount } from 'svelte';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type {
 		CategoriaPosicion,
 		Posicion,
@@ -24,7 +27,7 @@
 	} from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 
-	let { posicion }: { posicion: Posicion } = $props();
+	let { posicion, onChanged }: { posicion: Posicion; onChanged?: () => void } = $props();
 
 	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = {
 		guardia: 'Guardia',
@@ -68,26 +71,42 @@
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
 	let activeTipo = $state<TipoTecnica | null>(null);
+	// Rolls que referencian esta posición como "problema". Se usa para
+	// decidir si el botón Borrar está habilitado (desktop only).
+	let rollsProblemaCount = $state<number>(0);
+	let deleting = $state(false);
+	// AlertDialog de confirmación de borrado (sustituye al `confirm()`
+	// nativo del agente previo). bits-ui controla el overlay del
+	// AlertDialog sin chocar con el Dialog que monta `MapaModalHost`.
+	let mostrarConfirmBorrar = $state(false);
 
 	onMount(async () => {
 		try {
-			const [{ getTecnicasByPosicion }, { listPosiciones }, { listSumisiones }, { getContras }] =
-				await Promise.all([
-					import('$lib/tecnicas'),
-					import('$lib/posiciones'),
-					import('$lib/sumisiones'),
-					import('$lib/contras')
-				]);
+			const [
+				{ getTecnicasByPosicion },
+				{ listPosiciones },
+				{ listSumisiones },
+				{ getContras },
+				{ countRollsByPosicionProblema }
+			] = await Promise.all([
+				import('$lib/tecnicas'),
+				import('$lib/posiciones'),
+				import('$lib/sumisiones'),
+				import('$lib/contras'),
+				import('$lib/rolls')
+			]);
 
-			const [tecs, todasPos, todasSum] = await Promise.all([
+			const [tecs, todasPos, todasSum, rollsCount] = await Promise.all([
 				getTecnicasByPosicion(posicion.id),
 				listPosiciones(),
-				listSumisiones()
+				listSumisiones(),
+				countRollsByPosicionProblema(posicion.id)
 			]);
 
 			posicionesById = Object.fromEntries(todasPos.map((p) => [p.id, p.nombre]));
 			sumisionesById = Object.fromEntries(todasSum.map((s) => [s.id, s.nombre]));
 			tecnicas = tecs;
+			rollsProblemaCount = rollsCount;
 
 			// Contras por técnica en paralelo. Solo guardamos el count.
 			const counts = await Promise.all(tecs.map((t) => getContras(t.id).then((c) => c.length)));
@@ -133,6 +152,49 @@
 
 	function pushTecnica(t: Tecnica) {
 		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+	}
+
+	// Total de referencias que bloquean el borrado. Si > 0 → botón deshabilitado.
+	const refsBloqueantes = $derived(tecnicas.length + rollsProblemaCount);
+	const motivoBloqueoBorrado = $derived(
+		tecnicas.length > 0 && rollsProblemaCount > 0
+			? `Esta posición tiene ${tecnicas.length} técnica(s) y ${rollsProblemaCount} roll(s) asociados. Borra esas referencias antes.`
+			: tecnicas.length > 0
+				? `Esta posición tiene ${tecnicas.length} técnica(s) asociada(s). Borra esas referencias antes.`
+				: rollsProblemaCount > 0
+					? `Esta posición está referenciada por ${rollsProblemaCount} roll(s) como problema. Borra esas referencias antes.`
+					: ''
+	);
+
+	function handleEdit() {
+		mapaModalStack.push({
+			kind: 'wizard-posicion',
+			modo: 'editar',
+			id: posicion.id,
+			nombre: `Editar: ${posicion.nombre}`
+		});
+	}
+
+	function handleDeleteClick() {
+		if (refsBloqueantes > 0) return;
+		mostrarConfirmBorrar = true;
+	}
+
+	async function handleConfirmDelete() {
+		if (refsBloqueantes > 0) return;
+		deleting = true;
+		try {
+			const { deletePosicion } = await import('$lib/posiciones');
+			await deletePosicion(posicion.id);
+			onChanged?.();
+			mostrarConfirmBorrar = false;
+			mapaModalStack.closeAll();
+		} catch (err) {
+			errorMessage = err instanceof Error ? err.message : String(err);
+			status = 'error';
+		} finally {
+			deleting = false;
+		}
 	}
 </script>
 
@@ -216,4 +278,69 @@
 			</ul>
 		</div>
 	{/if}
+
+	<!--
+	  Acciones editar / borrar. Visibles también en móvil (cambio de
+	  scope T-8 fixes D: el stakeholder captura técnicas desde móvil).
+	  El botón Borrar se deshabilita si hay técnicas saliendo o rolls
+	  referenciando la posición como problema; en ese caso un Tooltip
+	  envuelve un `<span>` (los buttons disabled no emiten hover, el
+	  span sí) para mostrar el motivo del bloqueo de forma accesible.
+	-->
+	{#if status === 'ready'}
+		<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">
+			<Button variant="outline" size="sm" onclick={handleEdit} disabled={deleting}>
+				Editar
+			</Button>
+			{#if refsBloqueantes > 0}
+				<Tooltip.Provider>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<span {...props} class="inline-flex">
+									<Button variant="destructive" size="sm" disabled>Borrar</Button>
+								</span>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{motivoBloqueoBorrado}</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+			{:else}
+				<Button
+					variant="destructive"
+					size="sm"
+					onclick={handleDeleteClick}
+					disabled={deleting}
+				>
+					{deleting ? 'Borrando…' : 'Borrar'}
+				</Button>
+			{/if}
+		</div>
+	{/if}
 </div>
+
+<!--
+  AlertDialog para confirmar borrado (cambio F1). Sustituye al `confirm()`
+  nativo. bits-ui maneja correctamente su propio overlay sobre el Dialog
+  principal del host.
+-->
+<AlertDialog.Root bind:open={mostrarConfirmBorrar}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Borrar posición</AlertDialog.Title>
+			<AlertDialog.Description>
+				¿Borrar definitivamente «{posicion.nombre}»? No se puede deshacer.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={deleting}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={handleConfirmDelete}
+				disabled={deleting}
+				class={buttonVariants({ variant: 'destructive' })}
+			>
+				{deleting ? 'Borrando…' : 'Borrar'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

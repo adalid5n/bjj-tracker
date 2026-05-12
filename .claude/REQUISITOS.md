@@ -31,17 +31,15 @@ Ambas partes están relacionadas: un roll puede referenciar posiciones y técnic
 4. Al guardar, ver resumen automático con análisis (ver CU-3)
 **Tiempo objetivo:** ≤10 min para sesión con 4-5 rolls
 
-### CU-2 — Consultar el mapa técnico
+### CU-2 — Consultar y editar el mapa técnico
 **Actor:** yo
-**Dispositivo:** móvil (lectura) o desktop (lectura + edición)
-**Flujo móvil (lectura):**
+**Dispositivo:** móvil o desktop (ambos lectura + edición)
+**Flujo:**
 1. Seleccionar una posición
 2. Ver: ataques disponibles desde esa posición, defensas/escapes, contras conocidas
 3. Navegar al detalle de una técnica concreta
-**Flujo desktop (edición):**
-1. Lo anterior +
-2. Crear/editar/eliminar posiciones y técnicas
-3. Definir relaciones entre técnicas (qué contra a qué)
+4. Crear/editar/eliminar posiciones y técnicas
+5. Definir relaciones entre técnicas (qué contra a qué)
 
 ### CU-3 — Ver análisis tras capturar sesión
 **Actor:** yo
@@ -182,7 +180,7 @@ Recorrido típico ejemplo: nodo guardia cerrada bottom → ataque "hip bump swee
 
 ### 4.1 Plataformas
 - **Desktop:** uso completo (captura, mapa, análisis, gestión)
-- **Móvil:** captura de rolls/sesiones + lectura del mapa técnico (no edición)
+- **Móvil:** captura de rolls/sesiones + lectura y edición del mapa técnico
 
 ### 4.2 Conectividad
 - 100% offline para uso normal en ambas plataformas
@@ -316,7 +314,7 @@ Propuesta inicial. Iteraremos sobre esto.
 **Criterio de éxito:** la vista grafo me hace ver una técnica/contra que en lista no había notado.
 
 ### Iteración 4 — Móvil
-- App móvil con captura + lectura mapa
+- App móvil con captura + lectura y edición del mapa
 - Export/import JSON entre móvil y desktop
 
 **Criterio de éxito:** capturo desde el móvil tras una clase y consigo importar en desktop sin pérdida.

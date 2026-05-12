@@ -17,10 +17,25 @@
 export type MapaModalEntry =
 	| { kind: 'posicion'; id: string; nombre: string }
 	| { kind: 'tecnica'; id: string; nombre: string }
-	| { kind: 'sumision'; id: string; nombre: string };
+	| { kind: 'sumision'; id: string; nombre: string }
+	| { kind: 'wizard-posicion'; modo: 'crear'; nombre: string }
+	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string };
+
+/**
+ * Dirty-handler API (T-8 fixes E):
+ *
+ * El wizard (montado en la entrada top del stack) registra un callback
+ * que devuelve `true` si tiene cambios sin guardar. El host
+ * (`MapaModalHost`) consulta `isDirty()` antes de cerrar todo el stack o
+ * de hacer pop a una entrada anterior; si devuelve true, muestra un
+ * AlertDialog de confirmación. El wizard desregistra el handler al
+ * desmontarse para no dejar referencias colgantes.
+ */
+type DirtyHandler = () => boolean;
 
 class MapaModalStack {
 	#stack = $state<MapaModalEntry[]>([]);
+	#dirtyHandler: DirtyHandler | null = null;
 
 	get stack(): readonly MapaModalEntry[] {
 		return this.#stack;
@@ -50,6 +65,14 @@ class MapaModalStack {
 
 	closeAll(): void {
 		this.#stack = [];
+	}
+
+	setDirtyHandler(handler: DirtyHandler | null): void {
+		this.#dirtyHandler = handler;
+	}
+
+	isDirty(): boolean {
+		return this.#dirtyHandler ? this.#dirtyHandler() : false;
 	}
 }
 

@@ -24,7 +24,7 @@ Introducir **Posiciones**, **Técnicas** y **Sumisiones terminales** como entida
 1. Catálogo poblado con **2 posiciones bien mapeadas** (guardia cerrada bottom + mount bottom) — al menos 3 técnicas por posición y sus contras conocidas.
 2. Al capturar un roll, selecciono **posiciones donde tuve problema** referenciando catálogo.
 3. **Recorrido de modales encadenado** funciona en uso real: nodo → técnica → contra → respuesta → ... sin bucles ni errores.
-4. En **móvil** veo el catálogo en lectura (sin FAB ni edición).
+4. En **móvil y desktop** veo el catálogo y puedo crearlo/editarlo (uso real: capturar técnicas tras clase desde móvil).
 
 ---
 
@@ -86,16 +86,15 @@ UNIQUE: (`nombre`, `posicion_origen_id`, `variante`) — evita duplicados exacto
 - Sección aparte al final con **sumisiones** (lista plana, no agrupada).
 - **Buscador** por nombre que filtra ambas listas.
 
-**Diferencias por dispositivo:**
-| | Desktop | Móvil |
-|---|---|---|
-| FAB | "+ Nueva posición" / "+ Nueva sumisión" (FAB extended con toggle) | Sin FAB |
-| Edición | Sí, desde modales | No (read-only) |
-| Modales | Navegables completos | Navegables completos |
+**Acciones (mismas en móvil y desktop tras revisión T-8):**
+| Acción | Comportamiento |
+|---|---|
+| FAB "+ Nueva posición" / "+ Nueva sumisión" | Visible siempre. |
+| Edición / borrado desde modales | Disponible siempre. |
+| Modales navegables encadenados | Idéntico en ambos. |
 
-**Empty states:**
-- Catálogo vacío en desktop: "Aún no hay posiciones. Crea la primera." + CTA al FAB.
-- Catálogo vacío en móvil: "Aún no hay catálogo. Constrúyelo desde desktop."
+**Empty state:**
+- Catálogo vacío: "Catálogo vacío. Pulsa '+ Nueva posición' para empezar."
 
 **Acceso:**
 - Desktop: link en barra de navegación.
@@ -114,7 +113,7 @@ Diseño del patrón **stack de modales**:
 - Notas/principios.
 - Tabs por tipo de técnica que sale de aquí (solo los tabs con contenido): **Ataques | Sweeps | Escapes | Transiciones | Sumisiones**.
 - Cada item del tab: nombre + variante (si aplica) + destino + número de contras.
-- Acciones (desktop): editar, borrar (con confirmación si tiene técnicas).
+- Acciones: editar, borrar (con confirmación si tiene técnicas). Disponibles en móvil y desktop.
 
 **Modal de TECNICA:**
 - Header: nombre [+ variante] + chip de tipo + chip de estado.
@@ -124,15 +123,15 @@ Diseño del patrón **stack de modales**:
 - Errores comunes.
 - **Contras conocidas**: lista clickable de técnicas que la responden.
 - **Otras variantes de [nombre]**: aparece si hay aristas hermanas con mismo nombre (distinto origen y/o variante).
-- Acciones (desktop): editar, añadir contra, borrar.
+- Acciones: editar, añadir contra, borrar. Disponibles en móvil y desktop.
 
 **Modal de SUMISION:**
 - Header: nombre.
 - Notas.
 - **Variaciones agrupadas por posición de origen**: lista de aristas que llegan, click → modal de la técnica.
-- Acciones (desktop): editar, borrar.
+- Acciones: editar, borrar. Disponibles en móvil y desktop.
 
-### F-4 — Editores (wizards desktop)
+### F-4 — Editores (wizards)
 
 Mismo patrón auto-avance que it.0.5 (chips para enums, combobox con "+ crear nuevo" inline, "Saltar" en pasos opcionales).
 
@@ -185,7 +184,7 @@ Persiste en `roll_posicion_problema` al guardar el roll.
 2. **Variantes como aristas paralelas** (REQUISITOS §7 cerrado).
 3. **Tipos:** ataque / sweep / escape / transición / sumisión. "Defensa" fuera (vive como contra).
 4. **Posiciones semilla:** guardia cerrada bottom + mount bottom.
-5. **Móvil del mapa entra en it.1** (lectura). No esperamos a it.4.
+5. **Móvil del mapa entra en it.1 con edición.** Cambio de scope (2026-05-13, s5) respecto a la decisión original "móvil read-only": el stakeholder usa móvil para capturar técnicas durante/tras clase.
 6. **Linkear rolls a técnicas: it.2**, no en it.1. En it.1 solo posiciones.
 7. **Modales encadenados desde it.1** — no esperan al grafo (it.3).
 8. **Wizards con auto-avance** mismo patrón que it.0.5.
@@ -198,7 +197,7 @@ Persiste en `roll_posicion_problema` al guardar el roll.
 | Pantalla | Cambio |
 |---|---|
 | `/` home | Sin cambio. |
-| `/mapa` (nueva) | Lista + buscador + modales navegables. FAB solo en desktop. |
+| `/mapa` (nueva) | Lista + buscador + modales navegables. FAB visible siempre (móvil + desktop). |
 | `/rolls` tabla | Filtro nuevo por posición de problema. |
 | `/sesion/[id]` detalle | Chips de posiciones problema bajo cada roll. |
 | Wizard de roll | Paso nuevo: "posiciones donde tuve problema". |
@@ -251,12 +250,12 @@ Ordenadas por dependencias. Cada tarea = 1 commit (o pocos).
 - [ ] `SumisionModal.svelte` con variaciones agrupadas por origen.
 
 ### T-8 — Editor de POSICION (wizard)
-- [ ] FAB "+ Nueva posición" en desktop.
-- [ ] Wizard 3 pasos con auto-avance.
+- [ ] FAB "+ Nueva posición" visible en móvil y desktop.
+- [ ] Wizard 4 pasos con auto-avance.
 - [ ] Acciones editar/borrar desde modal de posición.
 
 ### T-9 — Editor de SUMISION (wizard)
-- [ ] FAB toggle "+ Nueva sumisión" en desktop.
+- [ ] FAB toggle "+ Nueva sumisión" visible en móvil y desktop.
 - [ ] Wizard mínimo.
 - [ ] Acciones editar/borrar.
 
@@ -294,17 +293,17 @@ Ordenadas por dependencias. Cada tarea = 1 commit (o pocos).
 
 **Funcionales:**
 - [ ] Schema v2 migra de v1 sin perder datos.
-- [ ] Puedo crear/editar/borrar posiciones, sumisiones y técnicas desde desktop.
+- [ ] Puedo crear/editar/borrar posiciones, sumisiones y técnicas desde móvil y desktop.
 - [ ] Puedo añadir contras a una técnica.
 - [ ] Puedo navegar nodo → técnica → contra → otra técnica sin bucles ni errores.
 - [ ] El modal de técnica muestra "otras variantes de [nombre]" cuando hay aristas hermanas.
-- [ ] En móvil veo el catálogo en read-only (sin FAB).
+- [ ] En móvil veo y edito el catálogo igual que en desktop (FAB + acciones disponibles).
 - [ ] Al capturar un roll, selecciono posiciones de problema desde el wizard.
 - [ ] El detalle de sesión y la tabla `/rolls` muestran las posiciones de problema.
 
 **Visuales:**
 - [ ] Stack de modales coherente: botones atrás y cerrar visibles y funcionales, breadcrumb claro.
-- [ ] Empty states claros (catálogo vacío en desktop y móvil).
+- [ ] Empty state claro (catálogo vacío con CTA al FAB).
 
 **Uso real:**
 - [ ] Guardia cerrada bottom + mount bottom mapeadas con al menos 3 técnicas cada una y sus contras conocidas.

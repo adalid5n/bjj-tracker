@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import MapaModalHost from '$lib/components/MapaModalHost.svelte';
 	import { mapaModalStack } from '$lib/components/mapa-modal-stack.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import type {
 		CategoriaPosicion,
@@ -48,7 +50,11 @@
 	let errorMessage = $state('');
 	let query = $state('');
 
-	onMount(async () => {
+	onMount(() => {
+		void refresh();
+	});
+
+	async function refresh() {
 		try {
 			const { listPosiciones } = await import('$lib/posiciones');
 			const { listSumisiones } = await import('$lib/sumisiones');
@@ -57,9 +63,9 @@
 		} catch (err) {
 			errorMessage = err instanceof Error ? err.message : String(err);
 			status = 'error';
-			console.error('[mapa] init failed:', err);
+			console.error('[mapa] refresh failed:', err);
 		}
-	});
+	}
 
 	const queryNormalized = $derived(query.trim().toLowerCase());
 
@@ -104,6 +110,13 @@
 		mapaModalStack.closeAll();
 		mapaModalStack.push({ kind: 'sumision', id: s.id, nombre: s.nombre });
 	}
+
+	// Abre el wizard de creación de posición. El host renderiza el wizard
+	// como contenido del Dialog cuando el top del stack es `wizard-posicion`.
+	function openWizardCrear() {
+		mapaModalStack.closeAll();
+		mapaModalStack.push({ kind: 'wizard-posicion', modo: 'crear', nombre: 'Nueva posición' });
+	}
 </script>
 
 <svelte:head>
@@ -126,7 +139,7 @@
 		<div class="rounded border border-dashed border-border p-8 text-center">
 			<p class="text-muted-foreground">Catálogo vacío.</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Las posiciones, sumisiones y técnicas se podrán crear cuando llegue T-8.
+				Pulsa "+ Nueva posición" para empezar.
 			</p>
 		</div>
 	{:else}
@@ -207,4 +220,22 @@
 
 <BottomNav />
 
-<MapaModalHost />
+<!--
+  FAB "+ Nueva posición" visible en cualquier anchura (cambio T-8 fixes D:
+  el stakeholder captura técnicas desde móvil). La BottomNav del proyecto
+  se mantiene siempre, por lo que dejamos hueco con `bottom-24` para no
+  chocar con ella.
+-->
+{#if status === 'ready'}
+	<Button
+		onclick={openWizardCrear}
+		class="fixed right-6 bottom-24 z-30 inline-flex shadow-lg"
+		size="lg"
+		aria-label="Nueva posición"
+	>
+		<PlusIcon />
+		Nueva posición
+	</Button>
+{/if}
+
+<MapaModalHost onCatalogChanged={refresh} />

@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-12 (cierre sesión 5)
+**Última actualización:** 2026-05-13 (cierre sesión 6)
 **Fase activa:** Iteración 1 — Mapa técnico básico
-**Iteración en curso:** it.1 (7.5/15 tareas cerradas: T-1, T-2, T-2.5, T-3, T-4, T-5, T-6, T-7)
+**Iteración en curso:** it.1 (8.5/15 tareas cerradas: T-1 a T-8, T-2.5 intercalada)
 
 ---
 
@@ -16,14 +16,78 @@ Iteración 0.5 ✅ funcionalmente cerrada (auto-update PWA + wizards + chips
 capturada con el flujo nuevo) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
 Estamos en **iteración 1** — base estructural del mapa técnico. Plan
-completo en `ITERACION_1.md`. 7 tareas y media cerradas (T-1 a T-7,
-T-2.5 intercalada). El recorrido encadenado de modales (posición →
-técnica → contra → ...) funciona end-to-end. Queda toda la mitad de
-edición (editores wizard, UI de contras, captura inline en roll).
+completo en `ITERACION_1.md`. 8 tareas y media cerradas (T-1 a T-8,
+T-2.5 intercalada). El recorrido encadenado de modales funciona
+end-to-end y ya se pueden crear / editar / borrar posiciones desde
+móvil y desktop. Quedan los wizards de sumisión y técnica (T-9, T-10),
+la UI de contras (T-11), la captura inline en roll (T-12) y el cierre
+(T-13 a T-15).
 
 ---
 
-## Última sesión (2026-05-12, sesión 5)
+## Última sesión (2026-05-13, sesión 6)
+
+**Hecho:**
+- **T-8** ✅ Editor de POSICION (wizard) + FAB + acciones editar/borrar.
+  Wizard de 4 pasos con auto-avance (`PosicionWizard.svelte`, 330+
+  líneas), integrado **dentro del stack de modales** como `kind:
+  'wizard-posicion'` (no es un Dialog independiente, contenido inline
+  del Dialog del host). Reutilizable crear/editar.
+- **MapaModalEntry** extendido con union discriminada `wizard-posicion`
+  modo `crear` / `editar`. `MapaModalHost` dispatcha al wizard, invalida
+  cache `posicionesById[id]` tras guardar, expone `onCatalogChanged`
+  para refrescar `/mapa`, y gestiona `AlertDialog "¿Descartar cambios?"`
+  cuando cualquier acción de cierre (Esc / overlay / ✕ / ← Atrás /
+  Cancelar) ocurre con isDirty.
+- **Dirty handler** en `mapa-modal-stack` (`setDirtyHandler` / `isDirty`).
+  El wizard registra un `$derived` que compara estado actual vs snapshot
+  inicial (modo editar) o defaults vacíos (modo crear), y lo limpia
+  tras guardar o desmontar.
+- **Botones Editar / Borrar** en `PosicionModalContent` visibles en
+  cualquier anchura (móvil + desktop). Borrar deshabilitado con
+  `Tooltip` (wrapper shadcn) explicativo si la posición tiene técnicas
+  o rolls asociados; si no, `AlertDialog` de confirmación.
+- **FAB extended "+ Nueva posición"** en `/mapa` visible en cualquier
+  anchura, posición `fixed bottom-24 right-6` (no choca con BottomNav).
+- **Query nueva** `countRollsByPosicionProblema(id)` en `rolls.ts`.
+- **Wrappers shadcn-svelte instalados**: `alert-dialog` y `tooltip`
+  vía `pnpm dlx shadcn-svelte@latest add alert-dialog tooltip`. Sin
+  cambios en `package.json` / `pnpm-lock.yaml` (primitives bits-ui ya
+  estaban). `confirm()` nativo y `title` HTML reemplazados.
+- **Fixes UX** post-validación del stakeholder:
+  - "Saltar" → "Continuar" en pasos skippables cuando ya hay valor.
+  - **Bug de persistencia**: los inputs estaban dentro de `{#if
+    currentStep === N}`, el remount con `bind:value` $bindable emitía
+    `undefined` antes de leer la prop, sobrescribía el `$state` del
+    padre. Fix: todos los pasos montados, ocultos con `class:hidden`.
+- **Decisión de scope**: móvil del mapa **también edita**. Revierte la
+  decisión original de it.1 (móvil read-only). `REQUISITOS.md`
+  (CU-2, §4.1, §6 it.4) e `ITERACION_1.md` (§F-2, §F-3, §F-4,
+  §DECISIONES, §PANTALLAS, T-8/T-9, §CRITERIOS) actualizados.
+
+**Decisiones tomadas (con peso):**
+- **Wizard como `kind` del stack**, no Dialog independiente. UN solo
+  Dialog en toda la app, sin anidados. Patrón reusable para T-9 / T-10.
+- **Borrado prohibido** si la posición tiene técnicas saliendo o rolls
+  que la referencian (vs cascade automático). Más seguro y obliga al
+  usuario a limpiar primero. Tooltip explica el motivo.
+- **`AlertDialog` y `Tooltip` (shadcn-svelte) sobre `confirm()` y
+  `title` nativos** — heredan tokens del proyecto, dark mode,
+  accesibilidad. Coste: 0 deps añadidas.
+- **Patrón `class:hidden` para pasos del wizard** (en lugar de
+  `{#if}`) para evitar bug de remount con `bind:value` $bindable.
+  Documentado para futuros wizards (T-9, T-10).
+- **`categoria` y `tipo` como `undefined` por defecto** en el wizard
+  (no `'otro'`). Permite distinguir "vacío" de "el usuario eligió
+  algo" para decidir label del botón skippable. Materializa el
+  default `'otro'` al guardar.
+- **Dirty handler registrado en el stack** (vs binding directo). El
+  host consulta antes de cualquier cierre. Reusable para T-9 / T-10.
+- **Móvil del mapa edita**. Cambio de scope explicado arriba.
+
+---
+
+## Sesión previa (2026-05-12, sesión 5)
 
 **Hecho:**
 - **T-6** ✅ `TecnicaModalContent.svelte` (288 líneas) — chips de tipo +
@@ -153,30 +217,51 @@ edición (editores wizard, UI de contras, captura inline en roll).
 
 ## Próximo paso
 
-**T-8 — Editor de POSICION (wizard desktop).** Toca abrir la fase de
-edición. ITERACION_1.md §F-4 define el wizard de 4 pasos (solo el primero
-obligatorio): Nombre → Categoría (chips, skippable, default `otro`) →
-Tipo (chips, skippable) → Notas (textarea opcional). Patrón
-auto-avance como en it.0.5.
+**T-9 — Editor de SUMISION (wizard).** El más sencillo de los tres
+wizards: 1 paso real (nombre obligatorio) + notas opcionales. Mismo
+patrón que el de posición (kind nuevo en el stack, integrado en
+`MapaModalHost`). Botones Editar / Borrar en `SumisionModalContent` y
+FAB toggle (o segundo FAB) en `/mapa` para "+ Nueva sumisión".
 
-**T-8 también requiere:**
-- FAB extended "+ Nueva posición" solo en desktop (en `/mapa`).
-- Acciones editar / borrar desde el modal de posición (botones en
-  desktop, ausentes en móvil).
-- Borrado con confirmación si la posición tiene técnicas asociadas
-  (decisión pendiente: cascade vs prohibir — propuesta: confirmar +
-  cascade).
+**Notas para T-9:**
+- Reutilizar todo el patrón establecido en T-8: `kind: 'wizard-sumision'`,
+  dirty handler, AlertDialog "¿Descartar cambios?", Tooltip si el botón
+  Borrar queda deshabilitado por aristas de técnicas que terminan en la
+  sumisión.
+- Borrado: prohibir si hay técnicas con `sumision_destino_id = this.id`.
+- FAB: o un segundo botón al lado del de posición, o un menú/toggle.
+  Decisión de UX al empezar T-9.
 
-Después de T-8: T-9 (editor de sumisión, wizard mínimo), T-10 (editor
-de técnica, wizard de 7 pasos con condicional en destino), T-11 (UI de
-contras), T-12 (captura inline en wizard de roll), T-13 (chips en
-detalle de sesión + filtro nuevo en /rolls), T-14 (semilla real con
-catálogo BJJ realista + uso real), T-15 (cierre con tag `v0.2-it1`).
+Después de T-9: T-10 (editor de técnica, wizard de 7 pasos con
+condicional en destino), T-11 (UI de contras), T-12 (captura inline en
+wizard de roll), T-13 (chips en detalle de sesión + filtro nuevo en
+/rolls), T-14 (semilla real con catálogo BJJ realista + uso real),
+T-15 (cierre con tag `v0.2-it1`).
 
 ---
 
 ## Decisiones recientes con peso
 
+- **2026-05-13 (s6) — Wizard como `kind` del stack de modales.** No
+  Dialog independiente. UN solo Dialog en toda la app. Patrón reusable
+  para wizards de sumisión (T-9) y técnica (T-10).
+- **2026-05-13 (s6) — Borrado prohibido si hay referencias.** En lugar
+  de cascade automático, se obliga al usuario a limpiar primero. Tooltip
+  explica el motivo. Mismo criterio aplicará para sumisión (técnicas
+  destino) y técnica (contras + rolls).
+- **2026-05-13 (s6) — `AlertDialog` + `Tooltip` (shadcn-svelte) como
+  estándar UI** sobre `confirm()` y `title` nativos. Heredan tokens y
+  dark mode. Sin coste de deps (primitives bits-ui ya estaban).
+- **2026-05-13 (s6) — Patrón `class:hidden` para pasos de wizard** en
+  lugar de `{#if}` (evita bug de remount con `bind:value` $bindable).
+  Aplicar también en T-9 y T-10.
+- **2026-05-13 (s6) — Dirty handler registrado en el stack.** El host
+  consulta antes de cerrar / pop / volver atrás. Reusable.
+- **2026-05-13 (s6) — Móvil del mapa también edita.** Cambio de scope
+  respecto a la decisión original (it.1 = móvil read-only) porque el
+  stakeholder revela uso real: capturar técnicas durante o tras clase
+  desde móvil. FAB "+ Nueva posición" y botones Editar/Borrar visibles
+  en cualquier anchura. `REQUISITOS.md` y `ITERACION_1.md` actualizados.
 - **2026-05-12 (s5) — Colores semánticos del chip de tipo de técnica.**
   ataque=primary/15, sweep=success/15, escape=warning/15,
   transicion=muted, sumision=destructive/15. Patrón: éxito tonal (sweep
@@ -240,8 +325,14 @@ catálogo BJJ realista + uso real), T-15 (cierre con tag `v0.2-it1`).
   T-6/T-7. Se elimina en T-15.
 - **Smoke de migración vigente en `/dev/db-migration-smoke`** — útil
   para sanidad de schema. Se evalúa mantener o eliminar al cerrar it.1.
-- **Tareas que faltan de it.1:** T-8, T-9, T-10, T-11, T-12, T-13,
-  T-14, T-15. Empieza la fase de edición (FAB + wizards).
+- **Tareas que faltan de it.1:** T-9, T-10, T-11, T-12, T-13, T-14,
+  T-15. T-8 cerrada esta sesión.
+- **Wrappers shadcn nuevos** disponibles: `alert-dialog` y `tooltip`.
+  Usar en T-9 / T-10 sin reinstalar.
+- **Patrones reusables establecidos en T-8** (aplicar tal cual en T-9 /
+  T-10): wizard como `kind` del stack, dirty handler, AlertDialog para
+  descartar cambios, Tooltip sobre botón disabled, `class:hidden` para
+  pasos del wizard, defaults `undefined` para enums skippables.
 - **Bug pendiente de cerrar de it.0.5:** falta T-9 (captura de 1 sesión
   real con el flujo nuevo) + tag `v0.1-it0.5`. No bloquea it.1.
 - Push: SSH con `id_ed25519_personal` (alias `github-personal`). Si
