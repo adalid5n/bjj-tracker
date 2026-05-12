@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import { SCHEMA_V1 } from './schema';
+import { SCHEMA_V1, applyPendingMigrations } from './schema';
 import type { Row, SqlValue } from './types';
 
 type InMessage =
@@ -72,6 +72,9 @@ async function installPool(): Promise<void> {
 function openDbHandle(): void {
 	if (!poolUtil) throw new Error('SAH-Pool not installed');
 	db = new poolUtil.OpfsSAHPoolDb('/bjj-tracker.sqlite3') as unknown as DbHandle;
+	// Las FK están OFF por defecto en SQLite. Sin esto, REFERENCES y
+	// ON DELETE CASCADE/SET NULL declarados en el schema son letra muerta.
+	db.exec('PRAGMA foreign_keys = ON');
 	const needsSchema =
 		(
 			db.exec({
@@ -83,6 +86,7 @@ function openDbHandle(): void {
 	if (needsSchema) {
 		db.exec(SCHEMA_V1);
 	}
+	applyPendingMigrations(db);
 }
 
 async function pauseDb(): Promise<void> {

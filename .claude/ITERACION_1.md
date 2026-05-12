@@ -223,6 +223,12 @@ Ordenadas por dependencias. Cada tarea = 1 commit (o pocos).
 - [ ] `src/lib/db/contras.ts` — addContra, removeContra, getContras(tecnicaId).
 - [ ] Extender `src/lib/db/rolls.ts` con `setPosicionesProblema(rollId, posicionIds[])`.
 
+### T-2.5 — Export/import (sync.ts) cubre schema v2
+- [ ] Actualizar `src/lib/sync.ts`: `CURRENT_SCHEMA_VERSION` → 2.
+- [ ] `exportAll()` incluye `posiciones`, `sumisiones_terminales`, `tecnicas`, `tecnica_contras`, `roll_posicion_problema`.
+- [ ] `importAll()` valida `schema_version === 2` y mergea/restaura las tablas nuevas con la misma estrategia que las v1 (upsert por id, last-write-wins por timestamp donde aplique).
+- [ ] Verificación: export → wipe BD → import → estado idéntico.
+
 ### T-3 — Ruta `/mapa` lista (read-only)
 - [ ] Página con lista de posiciones por categoría + sumisiones aparte + buscador.
 - [ ] Renderizado desde BD (sin edición todavía).
