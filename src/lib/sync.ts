@@ -9,9 +9,22 @@
  */
 
 import { init, query, run } from '$lib/db';
-import type { Companero, Roll, Sesion } from '$lib/types';
+import type {
+	Companero,
+	Posicion,
+	Roll,
+	Sesion,
+	SumisionTerminal,
+	Tecnica,
+	TecnicaContra
+} from '$lib/types';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
+
+export type RollPosicionProblemaRow = {
+	roll_id: string;
+	posicion_id: string;
+};
 
 export type ExportPayload = {
 	schema_version: number;
@@ -19,21 +32,47 @@ export type ExportPayload = {
 	companeros: Companero[];
 	sesiones: Sesion[];
 	rolls: Roll[];
+	posiciones: Posicion[];
+	sumisiones_terminales: SumisionTerminal[];
+	tecnicas: Tecnica[];
+	tecnica_contras: TecnicaContra[];
+	roll_posicion_problema: RollPosicionProblemaRow[];
 };
 
 export async function exportAll(): Promise<ExportPayload> {
 	await init();
-	const [companeros, sesiones, rolls] = await Promise.all([
+	const [
+		companeros,
+		sesiones,
+		rolls,
+		posiciones,
+		sumisionesTerminales,
+		tecnicas,
+		tecnicaContras,
+		rollPosicionProblema
+	] = await Promise.all([
 		query<Companero>('SELECT * FROM companeros ORDER BY created_at'),
 		query<Sesion>('SELECT * FROM sesiones ORDER BY created_at'),
-		query<Roll>('SELECT * FROM rolls ORDER BY created_at')
+		query<Roll>('SELECT * FROM rolls ORDER BY created_at'),
+		query<Posicion>('SELECT * FROM posiciones ORDER BY created_at'),
+		query<SumisionTerminal>('SELECT * FROM sumisiones_terminales ORDER BY created_at'),
+		query<Tecnica>('SELECT * FROM tecnicas ORDER BY created_at'),
+		query<TecnicaContra>('SELECT * FROM tecnica_contras ORDER BY created_at'),
+		query<RollPosicionProblemaRow>(
+			'SELECT roll_id, posicion_id FROM roll_posicion_problema ORDER BY roll_id, posicion_id'
+		)
 	]);
 	return {
 		schema_version: CURRENT_SCHEMA_VERSION,
 		exported_at: new Date().toISOString(),
 		companeros,
 		sesiones,
-		rolls
+		rolls,
+		posiciones,
+		sumisiones_terminales: sumisionesTerminales,
+		tecnicas,
+		tecnica_contras: tecnicaContras,
+		roll_posicion_problema: rollPosicionProblema
 	};
 }
 
@@ -53,20 +92,37 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 	if (typeof p.schema_version !== 'number') {
 		throw new Error('Falta el campo schema_version en el JSON.');
 	}
-	if (!Array.isArray(p.companeros) || !Array.isArray(p.sesiones) || !Array.isArray(p.rolls)) {
-		throw new Error('Faltan tablas (companeros, sesiones, rolls) en el JSON.');
+	const requiredArrays = [
+		'companeros',
+		'sesiones',
+		'rolls',
+		'posiciones',
+		'sumisiones_terminales',
+		'tecnicas',
+		'tecnica_contras',
+		'roll_posicion_problema'
+	];
+	for (const key of requiredArrays) {
+		if (!Array.isArray(p[key])) {
+			throw new Error(`Falta la tabla "${key}" en el JSON (o no es un array).`);
+		}
 	}
 }
 
 /**
  * Reemplaza TODA la BD con el contenido del payload.
- * Borra companeros, sesiones y rolls en orden de FK y luego inserta lo nuevo.
+ * Borra todas las tablas en orden de FK y luego inserta lo nuevo.
  * Si schema_version no coincide con CURRENT_SCHEMA_VERSION → throws.
  */
 export async function importAll(payload: unknown): Promise<{
 	companeros: number;
 	sesiones: number;
 	rolls: number;
+	posiciones: number;
+	sumisiones_terminales: number;
+	tecnicas: number;
+	tecnica_contras: number;
+	roll_posicion_problema: number;
 }> {
 	assertExportShape(payload);
 
@@ -80,8 +136,7 @@ export async function importAll(payload: unknown): Promise<{
 
 	// Desactivamos FK durante el bulk import. Patrón estándar (pg_dump,
 	// sqlite .dump): permite wipe+insert sin importar el orden y tolera
-	// referencias huérfanas heredadas de exports previos a v2 (cuando FK
-	// estaba OFF y no se detectaban inconsistencias). Tras el import,
+	// referencias huérfanas heredadas de exports previos. Tras el import,
 	// `PRAGMA foreign_key_check` audita la integridad y reporta huérfanos
 	// sin abortar — la app sigue funcional aunque haya datos inconsistentes.
 	await run('PRAGMA foreign_keys = OFF');
@@ -91,8 +146,13 @@ export async function importAll(payload: unknown): Promise<{
 		try {
 			// Wipe en orden FK (hijos antes que padres) — no estrictamente
 			// necesario con FK OFF, pero mantenemos el orden por claridad.
+			await run('DELETE FROM roll_posicion_problema');
+			await run('DELETE FROM tecnica_contras');
+			await run('DELETE FROM tecnicas');
 			await run('DELETE FROM rolls');
 			await run('DELETE FROM sesiones');
+			await run('DELETE FROM sumisiones_terminales');
+			await run('DELETE FROM posiciones');
 			await run('DELETE FROM companeros');
 
 			await insertAll(payload);
@@ -106,8 +166,8 @@ export async function importAll(payload: unknown): Promise<{
 		await run('PRAGMA foreign_keys = ON');
 	}
 
-	// Auditoría post-import: detecta filas huérfanas (rolls apuntando a
-	// sesiones/companeros que no están en el JSON). No aborta — solo log.
+	// Auditoría post-import: detecta filas huérfanas heredadas del JSON.
+	// No aborta — solo log.
 	const violations = await query<{ table: string; rowid: number; parent: string; fkid: number }>(
 		'PRAGMA foreign_key_check'
 	);
@@ -121,11 +181,19 @@ export async function importAll(payload: unknown): Promise<{
 	return {
 		companeros: payload.companeros.length,
 		sesiones: payload.sesiones.length,
-		rolls: payload.rolls.length
+		rolls: payload.rolls.length,
+		posiciones: payload.posiciones.length,
+		sumisiones_terminales: payload.sumisiones_terminales.length,
+		tecnicas: payload.tecnicas.length,
+		tecnica_contras: payload.tecnica_contras.length,
+		roll_posicion_problema: payload.roll_posicion_problema.length
 	};
 }
 
 async function insertAll(payload: ExportPayload): Promise<void> {
+	// Orden parent-first (no estrictamente necesario con FK OFF, pero
+	// mantiene el INSERT legible y resiliente si en el futuro reactivamos
+	// las FK durante el import).
 	for (const c of payload.companeros) {
 		await run(
 			`INSERT INTO companeros (id, nombre, cinturon, peso_relativo, notas, created_at, updated_at)
@@ -142,6 +210,30 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 		);
 	}
 
+	for (const p of payload.posiciones) {
+		await run(
+			`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			[
+				p.id,
+				p.nombre,
+				p.categoria,
+				p.tipo ?? null,
+				p.notas,
+				p.created_at,
+				p.updated_at
+			]
+		);
+	}
+
+	for (const s of payload.sumisiones_terminales) {
+		await run(
+			`INSERT INTO sumisiones_terminales (id, nombre, notas, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+			[s.id, s.nombre, s.notas, s.created_at, s.updated_at]
+		);
+	}
+
 	for (const s of payload.sesiones) {
 		await run(
 			`INSERT INTO sesiones (id, fecha, tipo, foco, tecnica_clase, obs_profesor, created_at, updated_at)
@@ -155,6 +247,30 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 				s.obs_profesor ?? null,
 				s.created_at,
 				s.updated_at
+			]
+		);
+	}
+
+	for (const t of payload.tecnicas) {
+		await run(
+			`INSERT INTO tecnicas (
+				id, nombre, variante, posicion_origen_id, posicion_destino_id,
+				sumision_destino_id, tipo, estado, detalles, errores_comunes,
+				created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			[
+				t.id,
+				t.nombre,
+				t.variante ?? null,
+				t.posicion_origen_id,
+				t.posicion_destino_id ?? null,
+				t.sumision_destino_id ?? null,
+				t.tipo,
+				t.estado,
+				t.detalles,
+				t.errores_comunes,
+				t.created_at,
+				t.updated_at
 			]
 		);
 	}
@@ -180,6 +296,22 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 				r.created_at,
 				r.updated_at
 			]
+		);
+	}
+
+	for (const tc of payload.tecnica_contras) {
+		await run(
+			`INSERT INTO tecnica_contras (tecnica_id, contra_tecnica_id, created_at)
+			 VALUES (?, ?, ?)`,
+			[tc.tecnica_id, tc.contra_tecnica_id, tc.created_at]
+		);
+	}
+
+	for (const rpp of payload.roll_posicion_problema) {
+		await run(
+			`INSERT INTO roll_posicion_problema (roll_id, posicion_id)
+			 VALUES (?, ?)`,
+			[rpp.roll_id, rpp.posicion_id]
 		);
 	}
 }
