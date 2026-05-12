@@ -1,199 +1,214 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-12 (cierre sesión 3)
-**Fase activa:** Iteración 0.5 — pulido pre-iteración 1
-**Iteración en curso:** it.0.5 (8/9 tareas cerradas; falta verificación en uso real)
+**Última actualización:** 2026-05-12 (cierre sesión 4)
+**Fase activa:** Iteración 1 — Mapa técnico básico
+**Iteración en curso:** it.1 (5.5/15 tareas cerradas: T-1, T-2, T-2.5, T-3, T-4, T-5)
 
 ---
 
 ## Dónde estamos en macro
 
-Iteración 0 ✅ cerrada en `v0.1-it0` (2026-05-10). La app permite capturar
+Iteración 0 ✅ cerrada en `v0.1-it0` (2026-05-10). App permite capturar
 sesiones, rolls, compañeros, ver tabla filtrable y exportar/importar JSON.
-Desplegada en https://adalid5n.github.io/bjj-tracker/ — versión publicada
-**v0.0.2** con auto-update PWA funcional.
 
-Estamos al final de **iteración 0.5** — fase de pulido. Plan completo en
-`ITERACION_0_5.md`. T-1 a T-8 cerradas + cleanup de T-9 hecho. Falta
-solo la verificación en uso real (capturar 1 sesión con el flujo nuevo
-y anotar fricción residual si aparece) para cerrar iteración.
+Iteración 0.5 ✅ funcionalmente cerrada (auto-update PWA + wizards + chips
++ DateField). Falta solo T-9 (verificación en uso real con 1 sesión
+capturada con el flujo nuevo) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
----
-
-## Última sesión (2026-05-11 → 12, sesión 3)
-
-**Hecho:**
-- **Bug `pwa.svelte.ts` con `$state` module-level** rompía el bundle prod
-  (TypeError al cargar la app, "Cargando…" eterno). Refactor a class
-  fields, patrón canónico Svelte 5. Commit `066321e`.
-- **Bug `sqlite3-opfs-async-proxy.js` no se copiaba** al deploy (el script
-  `copy-sqlite-wasm.mjs` solo copiaba el `.wasm`). Causaba 404 en runtime
-  y pantalla en blanco en Chrome móvil al refrescar la PWA. Añadidos
-  proxy y `sqlite3-worker1.mjs` al script. Commit `b923766`.
-- **Bug pre-existente del refresh** (no introducido por it.0.5):
-  TypeError dentro del initializer de la clase `Page` interna de SvelteKit
-  al re-evaluarse el módulo. Reproducido con Playwright que la app
-  funcionaba en `pnpm dev` y siempre cascaba en `pnpm preview` tras el
-  primer goto. Diagnóstico de ~2h descartó: SW, minify, modo prompt vs
-  autoUpdate, sessionStorage, dual package. **Fix: `pnpm install` con
-  patches recientes** (kit `2.57→2.59.1`, vite `8.0.7→8.0.12`,
-  svelte `5.55.2→5.55.5`). Eliminado `package-lock.json` del repo (el
-  CI usa `pnpm-lock.yaml`, ese es el único lockfile autoritativo).
-  Commit `8c7c62c`. ADR completo en `decisiones/001-bump-deps-fix-refresh.md`.
-- **Indicador de versión** `v0.0.2` añadido como footer discreto de la
-  home. Sirve para confirmar qué versión está activa tras un update y
-  como cambio mínimo para disparar el toast en el segundo deploy.
-  Commit `0815106`.
-- **Documentación de criterios técnicos** ampliada en `CONTEXTO_AGENTE.md`:
-  sección nueva "Entorno y herramientas" (Node 22 + pnpm),
-  `$state` solo dentro de class fields, regla de verificar con
-  `pnpm preview` + refresh antes de pushear cambios a SW/PWA/bundle,
-  y el truco de `pnpm install` para bugs solo-en-prod. Commit `1eb9784`.
-
-**Decisiones tomadas:**
-- Subir patches de svelte/kit/vite en lugar de bisectar código para el
-  bug pre-existente del refresh. Razón: bug claramente del framework,
-  los patches resuelven sin tocar nuestro código. ADR-001 documenta.
-- `package-lock.json` no se versiona; el lockfile autoritativo es
-  `pnpm-lock.yaml`. CI usa `pnpm install --frozen-lockfile`.
-- `$state` solo dentro de class fields, nunca en module-level. Patrón
-  canónico documentado en `CONTEXTO_AGENTE.md`.
-- Antes de pushear cambios que toquen SW/PWA/bundle config, verificar
-  con `pnpm preview` + refresh (no solo `check` + `build`).
+Estamos en **iteración 1** — base estructural del mapa técnico. Plan
+completo en `ITERACION_1.md`. 5 tareas y media cerradas (T-1 a T-5,
+T-2.5 intercalada). Queda toda la mitad visible (modales de técnica y
+sumisión, editores wizard, contras, captura inline en roll).
 
 ---
 
-## Sesión previa (2026-05-11 sesión 2)
+## Última sesión (2026-05-12, sesión 4)
 
 **Hecho:**
-- **T-6** ✅ Wizard de `CompaneroEditor.svelte` (4 pasos: nombre →
-  cinturón → peso → notas) + form de edición migrado a Chips/
-  CinturonChips. Schema BD intacto (campo "experiencia en años" del
-  plan inicial descartado por la regla "no tocar schema"). Commit
-  `eb4a51b`.
-- **Fix cinturones** Stripe visible en blanco (punta negra) y negro
-  (punta roja, convención faixa preta) vía token nuevo
-  `--cinturon-tip-rojo`. Commit `9569705`.
-- **FAB nuevo roll** en detalle de sesión sustituye al botón inline
-  `+ Añadir roll`. Acabó como FAB extended (icono + texto "Nuevo roll")
-  porque en pantalla con form de sesión + lista de rolls un `+` redondo
-  solo era ambiguo. Commits `b6a336d`, `44058c4`.
-- **T-7** ✅ Wizard de sesión como `SesionEditor.svelte` (Dialog modal
-  abierto desde el FAB de home). Pasos: fecha → tipo → foco → técnica
-  → observaciones; pasos 1-2 obligatorios. Ruta `/sesion/nueva`
-  eliminada. Edición sigue inline con `SesionForm` en `/sesion/[id]`.
-  Commit `bc96af4`.
-- **DateField (bits-ui)** Inputs de fecha migrados de `<Input type="date">`
-  a `DateInput.svelte`, un wrapper de `bits-ui DateField` con locale
-  es-ES — segmentos DD/MM/YYYY navegables, auto-corrección y bisiestos
-  heredados del framework. Commit `e36cf6a`. Display de tabla rolls
-  alineado con home ("mié, 11 may"). Commit `6c620e2`.
-- **T-8** ✅ Auto-update PWA. `registerType: 'autoUpdate'` → `'prompt'`
-  en `vite.config.ts`. Nuevo `$lib/pwa.svelte.ts` con state reactivo
-  (`needRefresh`, `update`, `dismiss`) y `initPWA()`. `UpdateToast.svelte`
-  renderiza snackbar fijo bottom-left con "Recargar" y "Cerrar" cuando
-  hay nueva versión disponible — descartable por sesión. Commit `0a68351`.
-- **T-9 cleanup** Eliminados `/dev/chips` y `/dev/combobox` (playgrounds
-  temporales de T-3 y T-4, ya cumplido su propósito). Commit `903e196`.
-- **Regla nueva** "Antes de construir un primitive de UI desde cero,
-  revisar qué hay disponible en los paquetes UI ya instalados (bits-ui,
-  shadcn-svelte)" añadida a `CONTEXTO_AGENTE.md` sección "Criterios
-  técnicos". Motivación: en T-7 perdimos un rework completo construyendo
-  un DateInput a mano antes de comprobar que bits-ui exponía DateField.
-  Commit `cbaa6ef`.
+- **Discusión de diseño del mapa** con stakeholder. Cerradas las 3
+  cuestiones abiertas de `REQUISITOS.md §7`:
+    - Sumisiones = nodos terminales del grafo (no salen aristas).
+    - Mismo nombre técnico desde distintos orígenes = aristas distintas
+      que comparten el `nombre`. UI las agrupa.
+    - Variantes ("la cross choke de mi profe") = aristas paralelas con
+      campo `variante` distinto. No hay plantilla/instancia separadas.
+  Commit `f345d2e`.
+- **Tipos de técnica** confirmados: ataque / sweep / escape / transicion
+  / sumision. "Defensa" fuera (vive como contra de otra técnica).
+- **Plan de iteración 1** escrito en `.claude/ITERACION_1.md` — 15 tareas
+  (F-1 a F-6), criterios, riesgos, decisiones confirmadas. Commit
+  `50e31da`. T-2.5 (sync v2) añadida tras descubrir deuda en T-1.
+- **T-1** ✅ Schema v2 + migración v1→v2 + smoke `/dev/db-migration-smoke`
+  + `PRAGMA foreign_keys = ON` global. Migraciones como array
+  `{from,to,run}` extensible. BDs nuevas aplican V1 + migraciones siempre
+  (no schema_v2_fresh paralelo). Verificado por Adalid: 23/23 checks OK
+  (subió de 17/17 tras añadir verificación FK). Commit `f93b72f`.
+- **Fix sync.ts** ✅ — al activar FK, importar JSONs v1 antiguos con
+  referencias huérfanas fallaba. Patrón estándar de bulk-import: PRAGMA
+  OFF + BEGIN/COMMIT + PRAGMA ON + `foreign_key_check` para auditar sin
+  abortar. Lección documentada en ADR mental: cuando activas invariantes
+  hay que revisar callers que dependían del comportamiento permisivo.
+  Commit `e5f2462`.
+- **T-2** ✅ Capa de datos CRUD para schema v2: `posiciones.ts`,
+  `sumisiones.ts`, `tecnicas.ts` (CRUD + 4 consultas para modal),
+  `contras.ts` (N:N asimétrica), extensión de `rolls.ts` con
+  `setPosicionesProblema`/`getPosicionesProblema`. Validación TS en
+  `createTecnica` con `assertDestinoCoherente` para evitar el CHECK
+  críptico de SQLite. Commit `e62b19a`.
+- **T-2.5** ✅ `sync.ts` cubre schema v2 (8 tablas en export/import).
+  `CURRENT_SCHEMA_VERSION → 2`. Validación strict. Commit `df61670`.
+- **T-3** ✅ Página `/mapa` read-only: header + buscador + posiciones
+  agrupadas por categoría + sumisiones aparte + chips de tipo/categoría
+  con tokens semánticos. Tab "Mapa" añadido al `BottomNav` entre Rolls
+  y Compañeros (orden final: Home → Rolls → Mapa → Compañeros → Ajustes).
+  Items en read-only con `cursor-default`. Commit `f65bf4c`.
+- **T-4 + T-5** ✅ Stack de modales del mapa + modal de posición:
+    - `mapa-modal-stack.svelte.ts`: store singleton con `$state` en class
+      field privado. Operaciones push/pop/popTo/closeAll.
+    - `MapaModalHost.svelte`: UN solo Dialog controlado por el store (no
+      Dialogs anidados, evita problemas de focus/overlay). Breadcrumb si
+      stack>1, botón ← si stack>1, botón ✕ siempre. Esc/click overlay/✕
+      van por `onOpenChange` → `closeAll`.
+    - `PosicionModalContent.svelte`: chips de tipo+categoría, notas,
+      tabs por tipo de técnica (a mano con botones-chip, shadcn-svelte
+      no tiene Tabs primitive instalado). Item de técnica clickable →
+      push modal de técnica (placeholder T-6).
+    - Seed temporal `/dev/seed-mapa` para validar inmediatamente sin
+      esperar a T-8: 3 posiciones + 2 sumisiones + 6 técnicas idempotente.
+      Se elimina al cerrar it.1 (T-15).
+  Validado por Adalid: lista, modales, breadcrumb, navegación, ← / ✕,
+  placeholders correctos. Commit `2542d71`.
 
-**Decisiones tomadas:**
-- Wizard de sesión arquitectura final = Dialog modal (NO página entera
-  con card). Igual patrón que RollEditor y CompaneroEditor: abierto
-  inline desde el FAB de la pantalla padre, sin cambiar URL.
-- `tipo` de sesión obligatorio en el wizard (paso 2 sin preselección).
-  El plan original decía "solo fecha obligatoria"; se actualizó F-4
-  y T-7 en `ITERACION_0_5.md` para reflejar realidad del modelo.
-- FAB extended (icono + texto) cuando el `+` redondo solo sea ambiguo
-  (pantallas multi-entidad como detalle de sesión).
-- `bits-ui DateField` sobre componente custom con máscara. Razón:
-  validación de rangos, segmentos navegables, auto-corrección,
-  soporte de locales — todo gratis. Custom desde cero es deuda técnica
-  innecesaria.
+**Decisiones tomadas (con peso):**
+- Las 3 cuestiones abiertas de REQUISITOS §7 cerradas (ver arriba).
+- Tipos de técnica: ataque/sweep/escape/transicion/sumision. Sin
+  "defensa".
+- `PRAGMA foreign_keys = ON` activado globalmente. Bulk imports usan
+  PRAGMA OFF + transacción + foreign_key_check para tolerar huérfanos
+  heredados.
+- Stack de modales = UN Dialog controlado por store (no Dialogs anidados).
+  Patrón potencialmente reusable en otras pantallas si hace falta.
+- Wizard de técnica en 7 pasos sin fusión (decisión producto).
+- Móvil del mapa en it.1 (lectura), no esperar a it.4.
+- Linkear rolls a técnicas se queda para it.2 (respeta REQUISITOS §6).
+- Posiciones semilla para T-14: guardia cerrada bottom + mount bottom
+  (las que sugería REQUISITOS).
+- Validación de destino exclusivo en TS además del CHECK en BD, para
+  devolver mensajes accionables a la UI.
+- Naming asimétrico de contras: `getContras(X)` = "contras DE X";
+  `getTecnicasQueContrarresta(X)` = "técnicas para las que X es la
+  contra". Direccion explícita en el nombre.
+
+---
+
+## Sesión previa (2026-05-11 → 12, sesión 3)
+
+Fix de bugs introducidos por it.0.5 + cierre de la fase de pulido.
+
+**Hecho (resumen):**
+- Bug `pwa.svelte.ts` con `$state` module-level → refactor a class fields.
+- Bug `sqlite3-opfs-async-proxy.js` no copiado al deploy → ampliado
+  `copy-sqlite-wasm.mjs`.
+- Bug pre-existente del refresh resuelto con bump de patches svelte/
+  kit/vite. ADR-001 documenta. Eliminado `package-lock.json` (lockfile
+  autoritativo es `pnpm-lock.yaml`).
+- Indicador de versión en home, criterios técnicos ampliados en
+  `CONTEXTO_AGENTE.md`.
+
+**Decisiones con peso (vigentes):**
+- `$state` solo dentro de class fields, nunca module-level.
+- Verificar con `pnpm preview` + refresh antes de pushear cambios a
+  SW/PWA/bundle.
+- `pnpm-lock.yaml` es el único lockfile autoritativo.
 
 ---
 
 ## Próximo paso
 
-**T-9 — Verificación en uso real.** Único pendiente para cerrar it.0.5:
+**T-6 + T-7 — Modales de técnica y sumisión.** Son placeholders hoy en
+`MapaModalHost.svelte` (líneas que dicen "Modal de técnica llega en T-6"
+y "Modal de sumisión llega en T-7"). T-5 ya hace el push correcto al
+stack al hacer click, así que solo hay que rellenar el contenido.
 
-1. Capturar 1 sesión real con el flujo nuevo (FAB → wizard sesión →
-   detalle → FAB extended → wizard roll → guardar).
-2. Anotar fricción residual en `MEJORAS_FUTURAS.md` si aparece.
-3. Toast de auto-update ya verificado funcional en sesión 3 (apareció
-   tras el segundo deploy y la recarga limpia la app sin pantalla
-   blanca). Subir `version` en `package.json` antes de cada deploy
-   permitirá ver con claridad qué versión está activa.
-4. Cerrar iteración con tag `v0.1-it0.5` y actualización macro del
-   estado.
+**Modal de técnica (T-6) — REQUISITOS §3.5:**
+- Header: nombre [+ variante] + chip de tipo + chip de estado.
+- Origen → link al nodo de posición (push).
+- Destino → link al nodo (posición o sumisión, push).
+- Setup / detalles.
+- Errores comunes.
+- Contras conocidas (lista clickable de técnicas que la responden, push).
+- "Otras variantes de [nombre]" si hay aristas hermanas (push).
+
+**Modal de sumisión (T-7):**
+- Header: nombre.
+- Notas.
+- Variaciones agrupadas por posición de origen (lista clickable, push).
+
+Ambos siguen el patrón de `PosicionModalContent.svelte`: componente que
+recibe la entidad como prop, carga lo necesario en `onMount`, render con
+tokens semánticos. Cuando estén ambos, el recorrido encadenado completo
+(nodo → técnica → contra → respuesta → ...) funciona end-to-end.
+
+Después de T-6/T-7: T-8 a T-10 (editores wizard de posición/sumisión/
+técnica desktop), T-11 (UI de contras), T-12 (captura inline en wizard
+de roll), T-13 (chips en detalle de sesión + filtro nuevo en /rolls),
+T-14 (semilla real con guardia cerrada bottom + mount bottom + uso real),
+T-15 (cierre con tag `v0.2-it1`).
 
 ---
 
 ## Decisiones recientes con peso
 
+- **2026-05-12 (s4) — REQUISITOS §7 cerrado.** Sumisiones nodos
+  terminales, variantes como aristas paralelas con campo `variante`,
+  mismo nombre técnico desde distintos orígenes = aristas hermanas.
+- **2026-05-12 (s4) — Tipos de técnica finales.** ataque / sweep /
+  escape / transicion / sumision. "Defensa" eliminada (vive como
+  contra).
+- **2026-05-12 (s4) — PRAGMA foreign_keys = ON globalmente.** Bulk
+  imports usan PRAGMA OFF + transacción + foreign_key_check para
+  tolerar huérfanos sin abortar.
+- **2026-05-12 (s4) — Stack de modales = UN Dialog + store.** No
+  Dialogs anidados. Evita problemas de focus/overlay y queda como
+  patrón reusable.
+- **2026-05-12 (s4) — Wizard de técnica en 7 pasos sin fusión.**
 - **2026-05-12 (s3) — Bump de patches svelte/kit/vite** para resolver
-  bug pre-existente del refresh en prod (TypeError en clase Page de
-  SvelteKit). ADR completo en `decisiones/001-bump-deps-fix-refresh.md`.
-- **2026-05-12 (s3) — `pnpm-lock.yaml` es el único lockfile autoritativo**;
-  `package-lock.json` no se versiona y se eliminó del repo. CI usa
-  `pnpm install --frozen-lockfile`.
-- **2026-05-12 (s3) — `$state` solo dentro de class fields**, nunca a
-  nivel de módulo en `.svelte.ts`. Patrón canónico documentado en
-  `CONTEXTO_AGENTE.md`. Reventó la PWA en prod por module-level.
+  bug pre-existente del refresh en prod. ADR `decisiones/001`.
+- **2026-05-12 (s3) — `pnpm-lock.yaml` es el único lockfile autoritativo**.
+- **2026-05-12 (s3) — `$state` solo dentro de class fields**, nunca
+  module-level.
 - **2026-05-12 (s3) — Verificación con `pnpm preview` + refresh** antes
-  de pushear cambios que toquen SW/PWA/bundle config. `check` + `build`
-  no detectan bugs de runtime ni de bundle minificado.
-- **2026-05-11 (s2) — `bits-ui DateField` para inputs de fecha.** Razón:
-  la regla recién documentada de "framework primitives antes de custom".
-  El DateField hereda toda la UX de validación/navegación/locale.
-- **2026-05-11 (s2) — Wizard de sesión como Dialog modal abierto desde
-  home, no como página `/sesion/nueva`.** Razón: coherencia con los
-  otros dos wizards (roll y compañero) que viven como modal abierto
-  inline desde su pantalla padre. La ruta `/sesion/nueva` se eliminó.
-- **2026-05-11 (s2) — FAB extended (icono + label) cuando el `+` solo
-  sea ambiguo.** Aplica a pantallas con varias entidades visibles a la
-  vez (detalle de sesión = sesión + rolls). El FAB redondo de home y
-  /companeros se queda sin texto porque la pantalla es lista única.
-- **2026-05-11 (s2) — Cinturones blanco y negro llevan stripe** (negro
-  el blanco, rojo el negro). Antes se veían como bloques de color sin
-  contraste. Token nuevo `--cinturon-tip-rojo`.
-- **2026-05-11 — bits-ui Combobox sobre implementación a mano** para el
-  combobox dentro de Dialog. Razón: portal + focus management coordinado
-  con el Dialog padre es exactamente lo que el headless component
-  resuelve. La implementación a mano se complicó mucho con interacciones
-  cruzadas (interact outside, blur, focus stealing).
-- **2026-05-11 — `Dialog.Footer` global cambiado a `flex-row justify-between`**
-  en lugar del `flex-col-reverse sm:flex-row` que traía shadcn-svelte por
-  defecto. Botones a `size="sm"` para caber en una fila incluso en mobile
-  (S20 Ultra). Aplica a TODOS los dialog footers de la app.
-- **2026-05-10 — Auto-update PWA: opción B (prompt) sobre opción A
-  (skipWaiting).** Razón: más respetuoso con flujo de captura,
-  sin riesgo de recarga forzada en mitad de edición.
-- **2026-05-10 — Sync de docs por git, no Syncthing.**
+  de pushear cambios que toquen SW/PWA/bundle.
+- **2026-05-11 (s2) — `bits-ui DateField`** para inputs de fecha.
+- **2026-05-11 (s2) — Wizard de sesión como Dialog modal** abierto desde
+  home, no como página `/sesion/nueva`.
+- **2026-05-11 (s2) — FAB extended (icono + label)** cuando el `+` solo
+  sea ambiguo (detalle de sesión).
+- **2026-05-10 — Auto-update PWA: opción B (prompt)** sobre opción A
+  (skipWaiting).
 
 ---
 
 ## Notas internas para próxima sesión
 
-- **Node 22 obligatorio** (`.nvmrc`). Si entras a una shell fresca:
-  `nvm use 22` antes de cualquier comando.
-- **Usar pnpm, no npm.** Dev: `pnpm dev -- --host`. Preview: `pnpm preview
-  -- --host`. Install: `pnpm install`. El `--host` es necesario para
-  acceder desde el navegador de Windows al server de WSL.
-- Push: SSH con `id_ed25519_personal` (alias `github-personal`).
-  Si falla con "ssh_askpass", `ssh-add ~/.ssh/id_ed25519_personal` antes
-  de intentar.
-- Auto-update PWA confirmado funcional en sesión 3. Para verificar update
-  en futuros deploys: subir `version` en `package.json`, push, y al abrir
-  la app debe aparecer el snackbar.
-- Falta crear `docs/diseño.md` con la guía del sistema de tokens.
-  Decidido posponerlo: toda la info está en `layout.css`,
-  `CONTEXTO_AGENTE.md`, `ITERACION_0_5.md` y `MEJORAS_FUTURAS.md`.
+- **Node 22 obligatorio** (`.nvmrc`). `nvm use 22` antes de cualquier
+  comando.
+- **pnpm, no npm.** Dev: `pnpm dev -- --host`. Preview: `pnpm preview
+  -- --host`. Install: `pnpm install`.
+- **Path quirk de dev:** en `pnpm dev` la app sirve en `/`, no en
+  `/bjj-tracker/`. El base path solo aplica en build de producción.
+  Las URLs de smoke/seed durante dev son `/dev/db-migration-smoke` y
+  `/dev/seed-mapa` (sin prefijo).
+- **Seed temporal vigente en `/dev/seed-mapa`** — botones "sembrar" y
+  "limpiar". Útil para validar T-6/T-7. Se elimina en T-15.
+- **Smoke de migración vigente en `/dev/db-migration-smoke`** — útil
+  para sanidad de schema. Se evalúa mantener o eliminar al cerrar it.1.
+- **Tareas que faltan de it.1:** T-6, T-7, T-8, T-9, T-10, T-11, T-12,
+  T-13, T-14, T-15. La mitad visible aún por hacer.
+- **Bug pendiente de cerrar de it.0.5:** falta T-9 (captura de 1 sesión
+  real con el flujo nuevo) + tag `v0.1-it0.5`. No bloquea it.1.
+- Push: SSH con `id_ed25519_personal` (alias `github-personal`). Si
+  falla con "ssh_askpass", `ssh-add ~/.ssh/id_ed25519_personal`.
 
 ---
 
