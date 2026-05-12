@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import MapaModalHost from '$lib/components/MapaModalHost.svelte';
+	import { mapaModalStack } from '$lib/components/mapa-modal-stack.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import type {
 		CategoriaPosicion,
@@ -90,6 +92,18 @@
 			posicionesFiltradas.length === 0 &&
 			sumisionesFiltradas.length === 0
 	);
+
+	// Push de nodo al stack de modales. Cierra automáticamente cualquier
+	// stack residual de una navegación anterior antes de empezar uno nuevo.
+	function openPosicion(p: Posicion) {
+		mapaModalStack.closeAll();
+		mapaModalStack.push({ kind: 'posicion', id: p.id, nombre: p.nombre });
+	}
+
+	function openSumision(s: SumisionTerminal) {
+		mapaModalStack.closeAll();
+		mapaModalStack.push({ kind: 'sumision', id: s.id, nombre: s.nombre });
+	}
 </script>
 
 <svelte:head>
@@ -143,18 +157,24 @@
 					</h2>
 					<ul class="divide-y divide-border rounded border border-border">
 						{#each grupo.items as p (p.id)}
-							<li class="cursor-default p-3">
-								<div class="font-medium">{p.nombre}</div>
-								<div class="mt-1 flex flex-wrap gap-1">
-									{#if p.tipo}
-										<span class="rounded px-2 py-0.5 text-xs {TIPO_ROL_BADGE[p.tipo]}">
-											{TIPO_ROL_LABEL[p.tipo]}
+							<li>
+								<button
+									type="button"
+									class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+									onclick={() => openPosicion(p)}
+								>
+									<div class="font-medium">{p.nombre}</div>
+									<div class="mt-1 flex flex-wrap gap-1">
+										{#if p.tipo}
+											<span class="rounded px-2 py-0.5 text-xs {TIPO_ROL_BADGE[p.tipo]}">
+												{TIPO_ROL_LABEL[p.tipo]}
+											</span>
+										{/if}
+										<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+											{CATEGORIA_LABEL[p.categoria]}
 										</span>
-									{/if}
-									<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-										{CATEGORIA_LABEL[p.categoria]}
-									</span>
-								</div>
+									</div>
+								</button>
 							</li>
 						{/each}
 					</ul>
@@ -168,8 +188,14 @@
 					</h2>
 					<ul class="divide-y divide-border rounded border border-border">
 						{#each sumisionesFiltradas as s (s.id)}
-							<li class="cursor-default p-3">
-								<div class="font-medium">{s.nombre}</div>
+							<li>
+								<button
+									type="button"
+									class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+									onclick={() => openSumision(s)}
+								>
+									<div class="font-medium">{s.nombre}</div>
+								</button>
 							</li>
 						{/each}
 					</ul>
@@ -180,3 +206,5 @@
 </main>
 
 <BottomNav />
+
+<MapaModalHost />
