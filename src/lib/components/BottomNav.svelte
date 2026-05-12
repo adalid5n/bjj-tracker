@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import HomeIcon from '@lucide/svelte/icons/house';
 	import ListIcon from '@lucide/svelte/icons/list';
+	import MapIcon from '@lucide/svelte/icons/map';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 
@@ -13,6 +14,12 @@
 			label: 'Rolls',
 			icon: ListIcon,
 			match: (p: string) => p.startsWith(resolve('/rolls'))
+		},
+		{
+			href: resolve('/mapa'),
+			label: 'Mapa',
+			icon: MapIcon,
+			match: (p: string) => p.startsWith(resolve('/mapa'))
 		},
 		{
 			href: resolve('/companeros'),
