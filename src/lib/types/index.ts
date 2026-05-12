@@ -41,3 +41,57 @@ export interface Roll {
 	created_at: string;
 	updated_at: string;
 }
+
+// --- Mapa técnico (schema v2) ---
+
+export type CategoriaPosicion =
+	| 'guardia'
+	| 'control_superior'
+	| 'espalda'
+	| 'transicion'
+	| 'otro';
+
+export type TipoRolPosicion = 'ofensiva' | 'defensiva' | 'neutral';
+
+export type TipoTecnica = 'ataque' | 'sweep' | 'escape' | 'transicion' | 'sumision';
+
+export type EstadoTecnica = 'probando' | 'funciona' | 'descartada';
+
+export interface Posicion {
+	id: string;
+	nombre: string;
+	categoria: CategoriaPosicion;
+	tipo?: TipoRolPosicion;
+	notas: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface SumisionTerminal {
+	id: string;
+	nombre: string;
+	notas: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface Tecnica {
+	id: string;
+	nombre: string;
+	variante?: string;
+	posicion_origen_id: string;
+	posicion_destino_id?: string;
+	sumision_destino_id?: string;
+	tipo: TipoTecnica;
+	estado: EstadoTecnica;
+	detalles: string;
+	errores_comunes: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface TecnicaContra {
+	tecnica_id: string;
+	contra_tecnica_id: string;
+	created_at: string;
+}

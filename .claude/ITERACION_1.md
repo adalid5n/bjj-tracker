@@ -217,11 +217,12 @@ Ordenadas por dependencias. Cada tarea = 1 commit (o pocos).
 - [ ] Test unitario de migración (Vitest).
 
 ### T-2 — Capa de datos (CRUD interno)
-- [ ] `src/lib/db/posiciones.ts` — list / get / create / update / delete.
-- [ ] `src/lib/db/sumisiones.ts` — idem.
-- [ ] `src/lib/db/tecnicas.ts` — idem + `getByPosicion(id)`, `getOtrasVariantes(nombre, excluirId)`.
-- [ ] `src/lib/db/contras.ts` — addContra, removeContra, getContras(tecnicaId).
-- [ ] Extender `src/lib/db/rolls.ts` con `setPosicionesProblema(rollId, posicionIds[])`.
+- [ ] `src/lib/posiciones.ts` — list / get / create / update / delete.
+- [ ] `src/lib/sumisiones.ts` — idem (sobre `sumisiones_terminales`).
+- [ ] `src/lib/tecnicas.ts` — idem + `getByPosicion(id)`, `getByPosicionYTipo(id, tipo)`, `getOtrasVariantes(nombre, excluirId)`.
+- [ ] `src/lib/contras.ts` — `addContra`, `removeContra`, `getContras(tecnicaId)`.
+- [ ] Extender `src/lib/rolls.ts` con `setPosicionesProblema(rollId, posicionIds[])` y `getPosicionesProblema(rollId)`.
+- [ ] Añadir tipos `Posicion`, `SumisionTerminal`, `Tecnica`, `TipoTecnica`, etc. en `src/lib/types/`.
 
 ### T-2.5 — Export/import (sync.ts) cubre schema v2
 - [ ] Actualizar `src/lib/sync.ts`: `CURRENT_SCHEMA_VERSION` → 2.

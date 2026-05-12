@@ -4,7 +4,7 @@
  */
 
 import { init, query, run } from '$lib/db';
-import type { ResultadoRoll, Roll, TipoSesion } from '$lib/types';
+import type { Posicion, ResultadoRoll, Roll, TipoSesion } from '$lib/types';
 
 export type NewRoll = Omit<Roll, 'id' | 'orden' | 'created_at' | 'updated_at'>;
 export type RollUpdate = Omit<Roll, 'orden' | 'created_at' | 'updated_at'>;
@@ -137,4 +137,54 @@ export async function updateRoll(data: RollUpdate): Promise<void> {
 export async function deleteRoll(id: string): Promise<void> {
 	await init();
 	await run('DELETE FROM rolls WHERE id = ?', [id]);
+}
+
+/**
+ * Reemplaza el conjunto de posiciones de problema de un roll por las
+ * indicadas en `posicionIds`. Operación atómica: envuelta en
+ * BEGIN/COMMIT (ROLLBACK si algo falla a mitad).
+ *
+ * IDs duplicados en el array se ignoran (la PK compuesta lo impediría;
+ * de-duplicamos antes para evitar el error y ahorrar inserts).
+ */
+export async function setPosicionesProblema(
+	rollId: string,
+	posicionIds: string[]
+): Promise<void> {
+	await init();
+	const unicos = Array.from(new Set(posicionIds));
+	await run('BEGIN');
+	try {
+		await run('DELETE FROM roll_posicion_problema WHERE roll_id = ?', [rollId]);
+		for (const posicionId of unicos) {
+			await run(
+				'INSERT INTO roll_posicion_problema (roll_id, posicion_id) VALUES (?, ?)',
+				[rollId, posicionId]
+			);
+		}
+		await run('COMMIT');
+	} catch (err) {
+		await run('ROLLBACK').catch(() => {
+			// si el ROLLBACK falla (transacción ya cerrada), priorizamos
+			// reportar el error original.
+		});
+		throw err;
+	}
+}
+
+/**
+ * Devuelve las posiciones de problema asociadas a un roll, ordenadas por
+ * nombre. JOIN con `posiciones` para devolver el objeto completo y no
+ * solo el id.
+ */
+export async function getPosicionesProblema(rollId: string): Promise<Posicion[]> {
+	await init();
+	return query<Posicion>(
+		`SELECT p.*
+		 FROM roll_posicion_problema rpp
+		 JOIN posiciones p ON p.id = rpp.posicion_id
+		 WHERE rpp.roll_id = ?
+		 ORDER BY p.nombre`,
+		[rollId]
+	);
 }
