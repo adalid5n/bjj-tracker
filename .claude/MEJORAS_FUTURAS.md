@@ -103,6 +103,32 @@ La nueva ruta `/companeros` usa FAB consistente con `/`. La página dev `/dev/co
 - **Implicación técnica:** Cytoscape.js debe rendear bien en móvil (touch gestures, zoom). Validarlo cuando se aborde iteración 3.
 - **Cuándo:** iteración 3.
 
+### Una técnica con múltiples destinos posibles
+
+- **Origen:** T-10, feedback Adalid 2026-05-13
+- **Idea:** hoy una técnica tiene UN destino (`posicion_destino_id`
+  o `sumision_destino_id`, exclusivo). En BJJ real el mismo movimiento
+  puede terminar en sitios distintos según reacción del rival (ej.
+  "Hip bump sweep" puede dejarte en mount, en knee-on-belly o en side
+  control top según cómo reaccione). Soportarlo permitiría modelar la
+  arista realmente como una "ejecución" con varios resultados.
+- **Modos de modelarlo:**
+  - **A) Refactor schema N:M**: tabla `tecnica_destino` con un row
+    por (técnica, destino). Cambio grande: schema, migración,
+    `tecnicas.ts`, sync.ts, wizard de técnica (paso 5 pasa a ser
+    multi-select), modal de técnica, vista grafo (it.3) genera N
+    aristas hermanas. Más fiel a la realidad.
+  - **B) Sin tocar nada**: una técnica por destino, mismo nombre,
+    distintas filas (variantes). Ya soportado por el modelo. El
+    catálogo tiene más entradas pero la UI las puede agrupar por
+    nombre (igual que hace con variantes).
+- **Por qué:** depende del uso real. Si al rellenar el catálogo
+  empieza a sentirse forzado tener "técnica X→A" + "técnica X→B" +
+  "técnica X→C" como entradas independientes, refactor a A.
+- **Cuándo:** decisión post-T-14 (uso real con catálogo poblado) o
+  cuando llegue iteración 3 (vista grafo) y veamos si las aristas
+  hermanas se ven raras.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`

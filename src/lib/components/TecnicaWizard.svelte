@@ -1,0 +1,818 @@
+<script lang="ts">
+	/**
+	 * Wizard de TECNICA (T-10) — crear / editar.
+	 *
+	 * Mismo patrón que `PosicionWizard` / `SumisionWizard` (kind dentro
+	 * del stack, dirty handler, class:hidden por paso, AlertDialog en el
+	 * host) pero con 7 pasos y dos elementos nuevos:
+	 *
+	 *  1. Nombre (obligatorio, Enter avanza).
+	 *  2. Variante (input texto, skippable; botón siempre "Continuar").
+	 *  3. Posición de origen (Combobox, sin "+ Crear nueva"). En modo crear
+	 *     prefill con `posicionOrigenId` del entry.
+	 *  4. Tipo (chips: ataque / sweep / escape / transicion / sumision).
+	 *     Obligatorio (no skippable). Decide la rama del paso 5.
+	 *  5. Destino:
+	 *     - Si `tipo !== 'sumision'`: Combobox de posiciones con
+	 *       "+ Crear nueva posición" inline (push wizard-posicion + return
+	 *       handler — al guardar la nueva posición, el id vuelve aquí).
+	 *     - Si `tipo === 'sumision'`: Combobox de sumisiones con
+	 *       "+ Crear nueva sumisión" inline (idem con wizard-sumision).
+	 *  6. Estado (chips: probando / funciona / descartada). Skippable,
+	 *     default `probando`.
+	 *  7. Detalles + errores comunes (2 textareas opcionales). Guardar.
+	 *
+	 * Validación UNIQUE `(nombre, posicion_origen_id, variante)`: como
+	 * depende de origen (paso 3) y variante (paso 2), se valida al pulsar
+	 * Guardar (paso 7), no al avanzar del paso 1. Si el match es completo
+	 * salta a paso 1 con `nombreError` inline. El catch del UNIQUE de
+	 * SQLite en `handleSave` se conserva como defensa frente a carreras
+	 * entre pestañas.
+	 *
+	 * Coherencia destino-tipo: si el usuario cambia `tipo` después de
+	 * elegir destino, limpiamos el destino del otro tipo (paso de
+	 * "ataque" a "sumision" o viceversa). Evita guardar incoherencias y
+	 * fuerza una selección consciente.
+	 */
+	import { onMount, onDestroy } from 'svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import Chips from '$lib/components/Chips.svelte';
+	import Combobox from '$lib/components/Combobox.svelte';
+	import type {
+		EstadoTecnica,
+		Posicion,
+		SumisionTerminal,
+		Tecnica,
+		TipoTecnica
+	} from '$lib/types';
+	import { mapaModalStack, tecnicaWizardDraft } from './mapa-modal-stack.svelte';
+
+	let {
+		modo,
+		tecnicaId,
+		posicionOrigenId: posicionOrigenIdProp,
+		onSaved,
+		onRequestClose
+	}: {
+		modo: 'crear' | 'editar';
+		tecnicaId?: string;
+		/** Id de la posición que el usuario está mirando cuando abre el wizard. Solo modo crear. */
+		posicionOrigenId?: string;
+		// Hook para que el host invalide su cache tras guardar/crear.
+		onSaved?: (id: string, modo: 'crear' | 'editar') => void;
+		// Hook para que el host pida cerrar el stack desde aquí (Cancelar).
+		onRequestClose?: () => void;
+	} = $props();
+
+	const TIPOS: { value: TipoTecnica; label: string }[] = [
+		{ value: 'ataque', label: 'Ataque' },
+		{ value: 'sweep', label: 'Sweep' },
+		{ value: 'escape', label: 'Escape' },
+		{ value: 'transicion', label: 'Transición' },
+		{ value: 'sumision', label: 'Sumisión' }
+	];
+
+	const ESTADOS: { value: EstadoTecnica; label: string }[] = [
+		{ value: 'probando', label: 'Probando' },
+		{ value: 'funciona', label: 'Funciona' },
+		{ value: 'descartada', label: 'Descartada' }
+	];
+
+	const totalSteps = 7;
+
+	// Estado del wizard.
+	let nombre = $state('');
+	let variante = $state('');
+	let posicionOrigenId = $state<string | null>(null);
+	let posicionDestinoId = $state<string | null>(null);
+	let sumisionDestinoId = $state<string | null>(null);
+	// `tipo` empieza undefined: el paso 4 es obligatorio, así no hay
+	// default silencioso. `estado` también undefined para distinguir
+	// "no elegido" de "el usuario eligió probando" en el botón skippable.
+	let tipo = $state<TipoTecnica | undefined>(undefined);
+	let estado = $state<EstadoTecnica | undefined>(undefined);
+	let detalles = $state('');
+	let erroresComunes = $state('');
+
+	let currentStep = $state(1);
+	let visitedSteps = $state<Set<number>>(new Set([1]));
+
+	let status: 'loading' | 'ready' | 'error' = $state('loading');
+	let loadError = $state('');
+	let saving = $state(false);
+	let errorMsg = $state('');
+	let nombreError = $state('');
+
+	// Catálogos para los Comboboxes y la validación UNIQUE.
+	let posiciones = $state<Posicion[]>([]);
+	let sumisiones = $state<SumisionTerminal[]>([]);
+	let tecnicasExistentes = $state<Tecnica[]>([]);
+
+	// Snapshot para detectar dirty. En modo crear comparamos contra los
+	// defaults vacíos (con el prefill de origen si lo hay).
+	type Snapshot = {
+		nombre: string;
+		variante: string;
+		posicionOrigenId: string | null;
+		posicionDestinoId: string | null;
+		sumisionDestinoId: string | null;
+		tipo: TipoTecnica | undefined;
+		estado: EstadoTecnica | undefined;
+		detalles: string;
+		erroresComunes: string;
+	};
+	let snapshot = $state<Snapshot>({
+		nombre: '',
+		variante: '',
+		posicionOrigenId: null,
+		posicionDestinoId: null,
+		sumisionDestinoId: null,
+		tipo: undefined,
+		estado: undefined,
+		detalles: '',
+		erroresComunes: ''
+	});
+
+	// Discriminador del draft: 'crear' para crear, 'editar:<id>' para editar.
+	// Si el draft persistido tiene otro `key`, lo descartamos (significa que
+	// es de una sesión anterior del wizard sobre OTRA técnica / modo).
+	const draftKey = $derived(modo === 'crear' ? 'crear' : `editar:${tecnicaId ?? ''}`);
+
+	onMount(async () => {
+		mapaModalStack.setDirtyHandler(() => isDirty);
+
+		// Carga catálogos en paralelo para los Comboboxes y la validación
+		// UNIQUE. El catálogo de técnicas se usa solo para detectar
+		// duplicados, no merece query dedicada (decenas de elementos).
+		try {
+			const [{ listPosiciones }, { listSumisiones }, { listTecnicas }] = await Promise.all([
+				import('$lib/posiciones'),
+				import('$lib/sumisiones'),
+				import('$lib/tecnicas')
+			]);
+			[posiciones, sumisiones, tecnicasExistentes] = await Promise.all([
+				listPosiciones(),
+				listSumisiones(),
+				listTecnicas()
+			]);
+		} catch (err) {
+			// No es crítico — si falla, los Comboboxes salen vacíos y el
+			// catch del UNIQUE en `handleSave` sigue cubriendo el caso.
+			console.warn('[TecnicaWizard] no se pudieron cargar catálogos:', err);
+		}
+
+		// Si hay un draft persistido que coincide con la clave del wizard
+		// actual (mismo modo y mismo id en editar), lo restauramos. Pasa
+		// cuando el wizard se remonta tras un sub-wizard inline ("+ Crear
+		// nueva posición/sumisión" en el paso de destino). Sin esto el
+		// usuario perdería todo lo que llevaba escrito.
+		const draft = tecnicaWizardDraft.value;
+		if (draft && draft.key === draftKey) {
+			nombre = draft.nombre;
+			variante = draft.variante;
+			posicionOrigenId = draft.posicionOrigenId;
+			posicionDestinoId = draft.posicionDestinoId;
+			sumisionDestinoId = draft.sumisionDestinoId;
+			tipo = draft.tipo;
+			estado = draft.estado;
+			detalles = draft.detalles;
+			erroresComunes = draft.erroresComunes;
+			currentStep = draft.currentStep;
+			visitedSteps = new Set(draft.visitedSteps);
+			// El snapshot se sigue cargando desde BD (modo editar) o
+			// defaults (modo crear) para que la detección de dirty sea
+			// correcta. Si el draft difiere del snapshot, isDirty=true.
+		}
+
+		if (modo !== 'editar') {
+			// Prefill del origen si el wizard se abrió desde un modal de
+			// posición (botón "+ Añadir técnica" en `PosicionModalContent`).
+			// Si ya había draft (caso del remount), no pisamos el origen
+			// elegido por el usuario (el draft puede tener otro).
+			if (posicionOrigenIdProp && posicionOrigenId === null) {
+				posicionOrigenId = posicionOrigenIdProp;
+			}
+			// snapshot del modo crear: estado vacío + el prefill de origen
+			// si llegó por prop (para que isDirty no cuente eso como cambio).
+			snapshot = {
+				...snapshot,
+				posicionOrigenId: posicionOrigenIdProp ?? null
+			};
+			status = 'ready';
+			return;
+		}
+		if (!tecnicaId) {
+			loadError = 'Falta el id de la técnica a editar.';
+			status = 'error';
+			return;
+		}
+		try {
+			const { getTecnica } = await import('$lib/tecnicas');
+			const t = await getTecnica(tecnicaId);
+			if (!t) {
+				loadError = 'No se encontró la técnica.';
+				status = 'error';
+				return;
+			}
+			// El snapshot SIEMPRE refleja el estado guardado en BD (para
+			// dirty detection). El estado actual del wizard puede venir del
+			// draft (si se restauró arriba) o de la BD si no había draft.
+			if (!draft || draft.key !== draftKey) {
+				nombre = t.nombre;
+				variante = t.variante ?? '';
+				posicionOrigenId = t.posicion_origen_id;
+				posicionDestinoId = t.posicion_destino_id ?? null;
+				sumisionDestinoId = t.sumision_destino_id ?? null;
+				tipo = t.tipo;
+				estado = t.estado;
+				detalles = t.detalles;
+				erroresComunes = t.errores_comunes;
+			}
+			snapshot = {
+				nombre: t.nombre,
+				variante: t.variante ?? '',
+				posicionOrigenId: t.posicion_origen_id,
+				posicionDestinoId: t.posicion_destino_id ?? null,
+				sumisionDestinoId: t.sumision_destino_id ?? null,
+				tipo: t.tipo,
+				estado: t.estado,
+				detalles: t.detalles,
+				erroresComunes: t.errores_comunes
+			};
+			status = 'ready';
+		} catch (err) {
+			loadError = err instanceof Error ? err.message : String(err);
+			status = 'error';
+		}
+	});
+
+	onDestroy(() => {
+		mapaModalStack.setDirtyHandler(null);
+		// OJO: NO limpiamos el draft aquí. `onDestroy` se dispara también
+		// cuando el wizard se remonta tras un sub-wizard inline (pop de
+		// `wizard-posicion`/`wizard-sumision` deja al TecnicaWizard como
+		// top → host lo remonta). Limpiar el draft aquí perdería el
+		// progreso del usuario. El draft se limpia en `handleSave` (éxito)
+		// y en el host cuando la entrada `wizard-tecnica` deja el stack
+		// (cancelar, closeAll, popTo).
+		//
+		// El returnHandler tampoco se limpia: si el wizard se desmonta
+		// porque empujamos un sub-wizard, lo necesitamos vivo para recibir
+		// el id de vuelta. La limpieza ocurre en `invokeReturnHandler` (la
+		// hace el propio store al consumirlo).
+	});
+
+	// Persiste el draft en el store en cada cambio. Esto permite sobrevivir
+	// el remount del wizard cuando el sub-wizard inline ("+ Crear nueva
+	// posición/sumisión") se monta encima — el host renderiza solo el top
+	// del stack, así que el TecnicaWizard se desmonta y luego se remonta
+	// al volver. Sin esto el usuario perdería todo lo escrito.
+	$effect(() => {
+		if (status !== 'ready') return;
+		tecnicaWizardDraft.set({
+			key: draftKey,
+			nombre,
+			variante,
+			posicionOrigenId,
+			posicionDestinoId,
+			sumisionDestinoId,
+			tipo,
+			estado,
+			detalles,
+			erroresComunes,
+			currentStep,
+			visitedSteps: [...visitedSteps]
+		});
+	});
+
+	const isDirty = $derived(
+		nombre.trim() !== snapshot.nombre.trim() ||
+			variante.trim() !== snapshot.variante.trim() ||
+			posicionOrigenId !== snapshot.posicionOrigenId ||
+			posicionDestinoId !== snapshot.posicionDestinoId ||
+			sumisionDestinoId !== snapshot.sumisionDestinoId ||
+			tipo !== snapshot.tipo ||
+			estado !== snapshot.estado ||
+			detalles.trim() !== snapshot.detalles.trim() ||
+			erroresComunes.trim() !== snapshot.erroresComunes.trim()
+	);
+
+	// Limpia el error inline al editar nombre/variante/origen. Usamos
+	// handlers explícitos en vez de un `$effect` porque el `$effect` que
+	// lee `nombreError` dentro de un `if` se suscribe a él reactivamente,
+	// y al escribir `nombreError = '...'` desde `handleSave` el efecto se
+	// dispara en el siguiente microtask y lo limpia de inmediato — el
+	// usuario nunca ve el mensaje (mismo bug que en SumisionWizard, fix
+	// del 2026-05-13).
+	function clearNombreError() {
+		if (nombreError) nombreError = '';
+	}
+
+	// Items de los Comboboxes: precomputados para evitar reordenar/re-derive
+	// dentro del template.
+	const posicionItems = $derived(
+		posiciones.map((p) => ({ id: p.id, label: p.nombre, sublabel: undefined }))
+	);
+	const sumisionItems = $derived(
+		sumisiones.map((s) => ({ id: s.id, label: s.nombre, sublabel: undefined }))
+	);
+
+	function nombreYaExiste(): boolean {
+		const norm = nombre.trim().toLowerCase();
+		if (!norm) return false;
+		if (!posicionOrigenId) return false;
+		const varNorm = variante.trim().toLowerCase();
+		return tecnicasExistentes.some(
+			(t) =>
+				t.nombre.toLowerCase() === norm &&
+				t.posicion_origen_id === posicionOrigenId &&
+				(t.variante ?? '').toLowerCase() === varNorm &&
+				(modo === 'crear' || t.id !== tecnicaId)
+		);
+	}
+
+	function goToStep(step: number) {
+		if (step > currentStep && !visitedSteps.has(step)) return;
+		currentStep = step;
+	}
+
+	function advance() {
+		if (currentStep < totalSteps) {
+			currentStep += 1;
+			visitedSteps = new Set([...visitedSteps, currentStep]);
+		}
+	}
+
+	function handleNombreKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && nombre.trim().length > 0) {
+			e.preventDefault();
+			advance();
+		}
+	}
+
+	function handleVarianteKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			advance();
+		}
+	}
+
+	function handleTipoChange(v: string | null) {
+		const nuevoTipo = (v ?? undefined) as TipoTecnica | undefined;
+		// Coherencia destino-tipo: si cambia la "rama" (sumisión vs no),
+		// limpiamos el destino del otro tipo. Si solo cambia entre
+		// no-sumision (ataque ↔ sweep) mantenemos `posicionDestinoId`.
+		if (nuevoTipo === 'sumision' && tipo !== 'sumision') {
+			posicionDestinoId = null;
+		} else if (nuevoTipo !== 'sumision' && tipo === 'sumision') {
+			sumisionDestinoId = null;
+		}
+		tipo = nuevoTipo;
+		if (v) advance();
+	}
+
+	function handleEstadoChange(v: string | null) {
+		estado = (v ?? undefined) as EstadoTecnica | undefined;
+		if (v) advance();
+	}
+
+	function handleSkipEstado() {
+		estado = undefined;
+		advance();
+	}
+
+	function handleContinueStep6() {
+		advance();
+	}
+
+	// "+ Crear nueva posición" inline en paso 5 (rama no-sumision).
+	// Registra el return handler y pushea el sub-wizard al stack. Cuando
+	// el usuario guarda la nueva posición, `PosicionWizard.handleSave`
+	// detecta el handler y lo invoca con el nuevo id (vía
+	// `invokeReturnHandler`), volviendo aquí con `posicionDestinoId`
+	// prefill. El sub-wizard hace `pop()` antes de invocar el handler,
+	// por lo que el wizard de técnica vuelve a ser el top del stack.
+	function handleCreateNuevaPosicion() {
+		mapaModalStack.setReturnHandler((newId, kind) => {
+			if (kind !== 'posicion') return;
+			// Refresca el catálogo local para que el Combobox muestre
+			// el nombre correcto del nuevo destino.
+			void import('$lib/posiciones').then(async ({ listPosiciones }) => {
+				posiciones = await listPosiciones();
+			});
+			// Asignación local: cubre el caso poco frecuente en que la
+			// instancia del TecnicaWizard NO llegó a desmontarse (p. ej.
+			// si el host decide reutilizar la instancia en algún flujo
+			// futuro). Hoy el host desmonta y vuelve a montar, así que
+			// esta línea no tiene efecto sobre la instancia "nueva".
+			posicionDestinoId = newId;
+			// CRUCIAL: escribir al draft para que la instancia remontada
+			// del wizard recoja el nuevo destino en su `onMount`. Sin
+			// esto, el wizard recién montado lee del draft que se
+			// persistió justo antes del push (con posicionDestinoId =
+			// null) y el destino se queda vacío.
+			const current = tecnicaWizardDraft.value;
+			if (current) {
+				tecnicaWizardDraft.set({ ...current, posicionDestinoId: newId });
+			}
+		});
+		mapaModalStack.push({
+			kind: 'wizard-posicion',
+			modo: 'crear',
+			nombre: 'Nueva posición (destino)'
+		});
+	}
+
+	// Idem para sumisión (rama tipo=sumision).
+	function handleCreateNuevaSumision() {
+		mapaModalStack.setReturnHandler((newId, kind) => {
+			if (kind !== 'sumision') return;
+			void import('$lib/sumisiones').then(async ({ listSumisiones }) => {
+				sumisiones = await listSumisiones();
+			});
+			sumisionDestinoId = newId;
+			// Misma lógica que en handleCreateNuevaPosicion: actualiza el
+			// draft para que la instancia remontada lo recoja.
+			const current = tecnicaWizardDraft.value;
+			if (current) {
+				tecnicaWizardDraft.set({ ...current, sumisionDestinoId: newId });
+			}
+		});
+		mapaModalStack.push({
+			kind: 'wizard-sumision',
+			modo: 'crear',
+			nombre: 'Nueva sumisión (destino)'
+		});
+	}
+
+	function cancel() {
+		if (onRequestClose) {
+			onRequestClose();
+		} else {
+			mapaModalStack.pop();
+		}
+	}
+
+	// Decisión 2026-05-13 (s7): el botón skippable de los wizards siempre
+	// dice "Continuar", nunca "Saltar". El comportamiento es idéntico
+	// (avanza sin tocar el campo si está vacío, o con el valor seleccionado
+	// si lo hay), solo cambia la etiqueta.
+
+	const canAdvanceFromStep1 = $derived(nombre.trim().length > 0);
+	const canAdvanceFromStep3 = $derived(posicionOrigenId !== null);
+	const canAdvanceFromStep5 = $derived(
+		tipo === 'sumision' ? sumisionDestinoId !== null : posicionDestinoId !== null
+	);
+
+	function isUniqueError(err: unknown): boolean {
+		const msg = err instanceof Error ? err.message : String(err);
+		return /UNIQUE constraint failed/i.test(msg);
+	}
+
+	async function handleSave() {
+		const nombreFinal = nombre.trim();
+		if (!nombreFinal) {
+			nombreError = 'El nombre es obligatorio.';
+			errorMsg = '';
+			currentStep = 1;
+			return;
+		}
+		if (!posicionOrigenId) {
+			errorMsg = 'Falta la posición de origen.';
+			currentStep = 3;
+			return;
+		}
+		if (!tipo) {
+			errorMsg = 'Falta el tipo de técnica.';
+			currentStep = 4;
+			return;
+		}
+		if (tipo === 'sumision') {
+			if (!sumisionDestinoId) {
+				errorMsg = 'Falta la sumisión de destino.';
+				currentStep = 5;
+				return;
+			}
+		} else {
+			if (!posicionDestinoId) {
+				errorMsg = 'Falta la posición de destino.';
+				currentStep = 5;
+				return;
+			}
+		}
+
+		// Validación UNIQUE local (carga en `onMount`). Catch de SQLite
+		// abajo como defensa frente a carrera entre pestañas.
+		if (nombreYaExiste()) {
+			nombreError =
+				'Ya existe una técnica con ese mismo nombre, origen y variante. Cambia el nombre o la variante.';
+			errorMsg = '';
+			currentStep = 1;
+			return;
+		}
+
+		saving = true;
+		errorMsg = '';
+		try {
+			const varianteFinal = variante.trim().length > 0 ? variante.trim() : undefined;
+			const estadoFinal: EstadoTecnica = estado ?? 'probando';
+			// Materializa null explícito en el destino que no aplica al tipo
+			// — `createTecnica` asserta coherencia y SQLite tiene CHECK.
+			const posicionDestinoFinal = tipo === 'sumision' ? undefined : (posicionDestinoId ?? undefined);
+			const sumisionDestinoFinal = tipo === 'sumision' ? (sumisionDestinoId ?? undefined) : undefined;
+
+			if (modo === 'crear') {
+				const { createTecnica } = await import('$lib/tecnicas');
+				const nueva = await createTecnica({
+					nombre: nombreFinal,
+					variante: varianteFinal,
+					posicion_origen_id: posicionOrigenId,
+					posicion_destino_id: posicionDestinoFinal,
+					sumision_destino_id: sumisionDestinoFinal,
+					tipo,
+					estado: estadoFinal,
+					detalles: detalles.trim(),
+					errores_comunes: erroresComunes.trim()
+				});
+				onSaved?.(nueva.id, 'crear');
+				mapaModalStack.setDirtyHandler(null);
+				// Draft consumido: limpia para que la próxima vez que se
+				// abra el wizard empiece vacío.
+				tecnicaWizardDraft.clear();
+				mapaModalStack.closeAll();
+				mapaModalStack.push({ kind: 'tecnica', id: nueva.id, nombre: nueva.nombre });
+			} else {
+				if (!tecnicaId) {
+					throw new Error('Falta tecnicaId en modo editar.');
+				}
+				const { updateTecnica } = await import('$lib/tecnicas');
+				await updateTecnica({
+					id: tecnicaId,
+					nombre: nombreFinal,
+					variante: varianteFinal,
+					posicion_origen_id: posicionOrigenId,
+					posicion_destino_id: posicionDestinoFinal,
+					sumision_destino_id: sumisionDestinoFinal,
+					tipo,
+					estado: estadoFinal,
+					detalles: detalles.trim(),
+					errores_comunes: erroresComunes.trim()
+				});
+				onSaved?.(tecnicaId, 'editar');
+				mapaModalStack.setDirtyHandler(null);
+				tecnicaWizardDraft.clear();
+				mapaModalStack.pop();
+			}
+		} catch (err) {
+			if (isUniqueError(err)) {
+				nombreError =
+					'Ya existe una técnica con ese mismo nombre, origen y variante. Cambia el nombre o la variante.';
+				errorMsg = '';
+				currentStep = 1;
+			} else {
+				errorMsg = err instanceof Error ? err.message : String(err);
+			}
+		} finally {
+			saving = false;
+		}
+	}
+</script>
+
+{#if status === 'loading'}
+	<p class="text-sm text-muted-foreground">Cargando técnica…</p>
+{:else if status === 'error'}
+	<div class="rounded border border-destructive/30 bg-destructive/10 p-3">
+		<p class="text-sm font-semibold text-destructive">Error</p>
+		<pre class="mt-1 text-xs whitespace-pre-wrap text-destructive">{loadError}</pre>
+	</div>
+{:else}
+	<!-- Indicador de progreso (7 segmentos, mismo patrón que PosicionWizard). -->
+	<div class="flex items-center gap-1 pt-2">
+		{#each Array(totalSteps) as _, i (i)}
+			{@const step = i + 1}
+			{@const visited = visitedSteps.has(step)}
+			{@const isCurrent = step === currentStep}
+			<button
+				type="button"
+				class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
+					? 'bg-primary'
+					: visited
+						? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
+						: 'bg-muted'}"
+				disabled={!visited || isCurrent}
+				onclick={() => goToStep(step)}
+				aria-label="Ir al paso {step}"
+			></button>
+		{/each}
+	</div>
+	<p class="text-center text-xs text-muted-foreground">
+		Paso {currentStep} de {totalSteps}
+	</p>
+
+	<!-- Todos los pasos montados (class:hidden); evita el bug de remount T-8. -->
+	<div class="space-y-4 py-2">
+		<!-- Paso 1: Nombre -->
+		<div class="space-y-3" class:hidden={currentStep !== 1}>
+			<h3 class="text-sm font-semibold">Nombre *</h3>
+			<Input
+				bind:value={nombre}
+				placeholder="p. ej. armbar, hip bump sweep, upa"
+				onkeydown={handleNombreKeydown}
+				oninput={clearNombreError}
+				autofocus={currentStep === 1}
+				aria-invalid={nombreError ? 'true' : undefined}
+				aria-describedby={nombreError ? 'tecnica-nombre-error' : undefined}
+			/>
+			{#if nombreError}
+				<p id="tecnica-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+			{/if}
+			<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
+		</div>
+
+		<!-- Paso 2: Variante -->
+		<div class="space-y-3" class:hidden={currentStep !== 2}>
+			<h3 class="text-sm font-semibold">Variante</h3>
+			<Input
+				bind:value={variante}
+				placeholder='p. ej. "desde guardia", "con grip cruzado"'
+				onkeydown={handleVarianteKeydown}
+				oninput={clearNombreError}
+			/>
+			<p class="text-xs text-muted-foreground">
+				Opcional. Útil si tienes varias versiones de la misma técnica.
+			</p>
+		</div>
+
+		<!-- Paso 3: Posición de origen -->
+		<div class="space-y-3" class:hidden={currentStep !== 3}>
+			<h3 class="text-sm font-semibold">Posición de origen *</h3>
+			<Combobox
+				value={posicionOrigenId}
+				onValueChange={(id) => {
+					posicionOrigenId = id;
+					clearNombreError();
+				}}
+				items={posicionItems}
+				placeholder="Selecciona una posición…"
+				searchPlaceholder="Buscar posición…"
+				emptyMessage="Sin posiciones en el catálogo. Crea una desde /mapa antes."
+				ariaLabel="Posición de origen"
+			/>
+			<p class="text-xs text-muted-foreground">
+				La posición desde donde sale esta técnica. Si no existe, crea la posición primero
+				en el mapa y vuelve.
+			</p>
+		</div>
+
+		<!-- Paso 4: Tipo -->
+		<div class="space-y-3" class:hidden={currentStep !== 4}>
+			<h3 class="text-sm font-semibold">Tipo *</h3>
+			<Chips
+				options={TIPOS}
+				value={tipo ?? null}
+				onChange={handleTipoChange}
+				ariaLabel="Tipo de técnica"
+			/>
+			<p class="text-xs text-muted-foreground">
+				El tipo decide a qué nodo llega la técnica: posición (ataque/sweep/escape/transición)
+				o sumisión terminal.
+			</p>
+		</div>
+
+		<!-- Paso 5: Destino (rama por tipo) -->
+		<div class="space-y-3" class:hidden={currentStep !== 5}>
+			<h3 class="text-sm font-semibold">Destino *</h3>
+			{#if tipo === 'sumision'}
+				<Combobox
+					value={sumisionDestinoId}
+					onValueChange={(id) => (sumisionDestinoId = id)}
+					items={sumisionItems}
+					placeholder="Selecciona una sumisión…"
+					searchPlaceholder="Buscar sumisión…"
+					emptyMessage="Sin sumisiones todavía."
+					onCreateNew={handleCreateNuevaSumision}
+					createNewLabel="Crear nueva sumisión"
+					ariaLabel="Sumisión de destino"
+				/>
+				<p class="text-xs text-muted-foreground">
+					La sumisión donde acaba la técnica. Si no existe, pulsa "+ Crear nueva sumisión".
+				</p>
+			{:else if tipo}
+				<Combobox
+					value={posicionDestinoId}
+					onValueChange={(id) => (posicionDestinoId = id)}
+					items={posicionItems}
+					placeholder="Selecciona una posición…"
+					searchPlaceholder="Buscar posición…"
+					emptyMessage="Sin posiciones en el catálogo."
+					onCreateNew={handleCreateNuevaPosicion}
+					createNewLabel="Crear nueva posición"
+					ariaLabel="Posición de destino"
+				/>
+				<p class="text-xs text-muted-foreground">
+					La posición a la que llegas con esta técnica. Si no existe, pulsa
+					"+ Crear nueva posición".
+				</p>
+			{:else}
+				<p class="text-sm text-muted-foreground">Selecciona primero el tipo en el paso anterior.</p>
+			{/if}
+		</div>
+
+		<!-- Paso 6: Estado -->
+		<div class="space-y-3" class:hidden={currentStep !== 6}>
+			<h3 class="text-sm font-semibold">Estado</h3>
+			<Chips
+				options={ESTADOS}
+				value={estado ?? null}
+				onChange={handleEstadoChange}
+				ariaLabel="Estado de la técnica"
+			/>
+			<p class="text-xs text-muted-foreground">
+				Si la saltas, queda como "Probando". Se puede cambiar después.
+			</p>
+		</div>
+
+		<!-- Paso 7: Detalles + errores comunes -->
+		<div class="space-y-3" class:hidden={currentStep !== 7}>
+			<h3 class="text-sm font-semibold">Detalles (opcional)</h3>
+			<div class="space-y-1.5">
+				<Label for="tecnica-detalles">Setup / ejecución</Label>
+				<Textarea
+					id="tecnica-detalles"
+					bind:value={detalles}
+					rows={4}
+					placeholder="Pinta-pega cómo se ejecuta la técnica, claves del setup, etc."
+				/>
+			</div>
+			<div class="space-y-1.5">
+				<Label for="tecnica-errores">Errores comunes</Label>
+				<Textarea
+					id="tecnica-errores"
+					bind:value={erroresComunes}
+					rows={3}
+					placeholder="Qué falla habitualmente, mistakes que detectas en rolls, etc."
+				/>
+			</div>
+		</div>
+	</div>
+
+	{#if errorMsg}
+		<p class="text-sm text-destructive">{errorMsg}</p>
+	{/if}
+
+	<!--
+	  Footer: Cancelar | ← Anterior | Continuar/Saltar/Guardar. Mismo patrón
+	  que PosicionWizard. El "Anterior" navega dentro del wizard; el "← Atrás"
+	  del header del host hace pop del stack (no entra aquí).
+	-->
+	<div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+		<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
+
+		<div class="flex flex-wrap gap-2">
+			{#if currentStep > 1}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={() => goToStep(currentStep - 1)}
+					disabled={saving}
+				>
+					← Anterior
+				</Button>
+			{/if}
+
+			{#if currentStep === 2}
+				<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
+					Continuar
+				</Button>
+			{:else if currentStep === 6}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={estado !== undefined ? handleContinueStep6 : handleSkipEstado}
+					disabled={saving}
+				>
+					Continuar
+				</Button>
+			{/if}
+
+			{#if currentStep === 1}
+				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep1}>Continuar</Button>
+			{:else if currentStep === 3}
+				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep3}>Continuar</Button>
+			{:else if currentStep === 5}
+				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep5}>Continuar</Button>
+			{:else if currentStep === totalSteps}
+				<Button
+					size="sm"
+					onclick={handleSave}
+					disabled={saving || !nombre.trim() || !posicionOrigenId || !tipo}
+				>
+					{saving ? 'Guardando…' : 'Guardar'}
+				</Button>
+			{/if}
+		</div>
+	</div>
+{/if}

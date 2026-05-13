@@ -175,6 +175,18 @@
 		});
 	}
 
+	function handleAddTecnica() {
+		// Acceso canónico al wizard de técnica (T-10): desde el modal de
+		// la posición, con el origen prefill. El usuario puede cambiar el
+		// origen dentro del wizard si quiere; el prefill solo guía.
+		mapaModalStack.push({
+			kind: 'wizard-tecnica',
+			modo: 'crear',
+			nombre: `Nueva técnica desde ${posicion.nombre}`,
+			posicionOrigenId: posicion.id
+		});
+	}
+
 	function handleDeleteClick() {
 		if (refsBloqueantes > 0) return;
 		mostrarConfirmBorrar = true;
@@ -276,6 +288,20 @@
 					</li>
 				{/each}
 			</ul>
+		</div>
+	{/if}
+
+	<!--
+	  "+ Añadir técnica desde aquí" (T-10): acceso canónico al wizard de
+	  técnica. Visible cuando los datos están listos (status === 'ready'),
+	  tanto si hay técnicas como si no — la vacía sirve también como CTA.
+	  El wizard recibe `posicionOrigenId` prefill.
+	-->
+	{#if status === 'ready'}
+		<div class="pt-1">
+			<Button variant="outline" size="sm" onclick={handleAddTecnica}>
+				+ Añadir técnica desde aquí
+			</Button>
 		</div>
 	{/if}
 

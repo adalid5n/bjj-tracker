@@ -23,10 +23,10 @@
 	 *    `<Chips>` el `bind:value` podía resetear el estado del padre
 	 *    durante el ciclo de unmount → mount. Con todos los componentes
 	 *    presentes el binding se mantiene estable.
-	 *  - **Botón skippable dinámico (A)**: en pasos 2 y 3, si ya hay
-	 *    valor en `categoria` / `tipo` el botón dice "Continuar" y
-	 *    avanza sin tocar el valor. Si está vacío dice "Saltar" y aplica
-	 *    el default (categoria=otro, tipo=undefined).
+	 *  - **Botón skippable (A)**: en pasos 2 y 3 el botón siempre dice
+	 *    "Continuar" (decisión stakeholder 2026-05-13 s7). Si ya hay
+	 *    valor en `categoria` / `tipo` avanza sin tocarlo; si está vacío
+	 *    aplica el default (categoria=otro, tipo=undefined).
 	 *  - **Dirty handler (E)**: el host consulta este wizard antes de
 	 *    cerrar todo el stack o pop a una entrada anterior, para
 	 *    confirmar "¿descartar cambios?".
@@ -90,6 +90,12 @@
 	let loadError = $state('');
 	let saving = $state(false);
 	let errorMsg = $state('');
+	let nombreError = $state('');
+
+	// Catálogo de posiciones existentes para validar duplicados de nombre.
+	// El schema tiene `UNIQUE` en `nombre` de `posiciones`, así que validamos
+	// inline al avanzar del paso 1 (mismo patrón que SumisionWizard).
+	let existentes = $state<Posicion[]>([]);
 
 	// Snapshot para detectar dirty en modo editar. En modo crear comparamos
 	// contra "vacío" (los defaults de arriba).
@@ -104,6 +110,16 @@
 		// Registra el dirty handler en el stack para que el host lo consulte
 		// antes de cerrar / hacer pop a una entrada anterior.
 		mapaModalStack.setDirtyHandler(() => isDirty);
+
+		// Carga el catálogo siempre (crear y editar). En editar lo usamos
+		// para validar duplicados excluyendo la propia posición.
+		try {
+			const { listPosiciones } = await import('$lib/posiciones');
+			existentes = await listPosiciones();
+		} catch (err) {
+			// No es crítico: el catch del UNIQUE en handleSave sigue cubriendo.
+			console.warn('[PosicionWizard] no se pudo cargar listPosiciones:', err);
+		}
 
 		if (modo !== 'editar') {
 			// snapshot ya es el "vacío" inicial.
@@ -167,11 +183,39 @@
 		}
 	}
 
+	function nombreYaExiste(n: string): boolean {
+		const norm = n.trim().toLowerCase();
+		if (!norm) return false;
+		return existentes.some(
+			(p) => p.nombre.toLowerCase() === norm && (modo === 'crear' || p.id !== posicionId)
+		);
+	}
+
+	function tryAdvanceFromStep1() {
+		const n = nombre.trim();
+		if (!n) return;
+		if (nombreYaExiste(n)) {
+			nombreError = 'Ya existe una posición con ese nombre.';
+			return;
+		}
+		nombreError = '';
+		advance();
+	}
+
 	function handleNombreKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && nombre.trim().length > 0) {
 			e.preventDefault();
-			advance();
+			tryAdvanceFromStep1();
 		}
+	}
+
+	// Limpia el error inline al editar el nombre. Lo hacemos con `oninput`
+	// explícito (NO con `$effect` reactivo que escuche `nombre`): el effect
+	// se auto-borraba un microtask después de `tryAdvanceFromStep1`, lo que
+	// hacía que el error apareciera y desapareciera sin que el usuario lo
+	// viera. Patrón establecido en T-10 fixes-1.
+	function handleNombreInput() {
+		if (nombreError) nombreError = '';
 	}
 
 	function handleCategoriaChange(v: string | null) {
@@ -222,10 +266,9 @@
 	}
 
 	const canAdvanceFromStep1 = $derived(nombre.trim().length > 0);
-	// Etiquetas dinámicas del botón skippable (cambio A): "Continuar" si
-	// el usuario ya tiene un valor seleccionado en ese paso, "Saltar" si no.
-	const step2SkipLabel = $derived(categoria !== undefined ? 'Continuar' : 'Saltar');
-	const step3SkipLabel = $derived(tipo !== undefined ? 'Continuar' : 'Saltar');
+	// Decisión 2026-05-13 (s7): el botón skippable de los wizards siempre
+	// dice "Continuar", nunca "Saltar". El comportamiento sigue siendo:
+	// si hay valor avanza con él, si no hay aplica default y avanza.
 
 	async function handleSave() {
 		const nombreFinal = nombre.trim();
@@ -251,9 +294,20 @@
 				// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 				// handler antes de cerrar para no disparar el prompt.
 				mapaModalStack.setDirtyHandler(null);
-				// Cierra el wizard y abre el modal de la posición recién creada.
-				mapaModalStack.closeAll();
-				mapaModalStack.push({ kind: 'posicion', id: nueva.id, nombre: nueva.nombre });
+				// T-10: si hay un return handler registrado (caso típico:
+				// el wizard de técnica abrió este sub-wizard desde "+ Crear
+				// nueva posición" en el paso de destino), salimos del wizard
+				// con `pop` y le pasamos el nuevo id al handler — en lugar de
+				// hacer el `closeAll + push modal` habitual, que rompería el
+				// flujo dejando al usuario en el modal de la nueva posición.
+				if (mapaModalStack.hasReturnHandler()) {
+					mapaModalStack.pop();
+					mapaModalStack.invokeReturnHandler(nueva.id, 'posicion');
+				} else {
+					// Cierra el wizard y abre el modal de la posición recién creada.
+					mapaModalStack.closeAll();
+					mapaModalStack.push({ kind: 'posicion', id: nueva.id, nombre: nueva.nombre });
+				}
 			} else {
 				if (!posicionId) {
 					throw new Error('Falta posicionId en modo editar.');
@@ -273,7 +327,16 @@
 				mapaModalStack.pop();
 			}
 		} catch (err) {
-			errorMsg = err instanceof Error ? err.message : String(err);
+			// Red defensiva frente a carreras: si dos pestañas crean a la vez,
+			// la validación en memoria no detecta el duplicado y SQLite levanta
+			// el UNIQUE. Lo presentamos en el paso 1 como cualquier otro.
+			const msg = err instanceof Error ? err.message : String(err);
+			if (/UNIQUE constraint failed/i.test(msg)) {
+				nombreError = 'Ya existe una posición con ese nombre.';
+				currentStep = 1;
+			} else {
+				errorMsg = msg;
+			}
 		} finally {
 			saving = false;
 		}
@@ -324,8 +387,14 @@
 				bind:value={nombre}
 				placeholder="p. ej. guardia cerrada bottom"
 				onkeydown={handleNombreKeydown}
+				oninput={handleNombreInput}
 				autofocus={currentStep === 1}
+				aria-invalid={nombreError ? 'true' : undefined}
+				aria-describedby={nombreError ? 'posicion-nombre-error' : undefined}
 			/>
+			{#if nombreError}
+				<p id="posicion-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+			{/if}
 			<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
 		</div>
 
@@ -398,7 +467,7 @@
 					onclick={categoria !== undefined ? handleContinueStep2 : handleSkipCategoria}
 					disabled={saving}
 				>
-					{step2SkipLabel}
+					Continuar
 				</Button>
 			{:else if currentStep === 3}
 				<Button
@@ -407,7 +476,7 @@
 					onclick={tipo !== undefined ? handleContinueStep3 : handleSkipTipo}
 					disabled={saving}
 				>
-					{step3SkipLabel}
+					Continuar
 				</Button>
 			{/if}
 
@@ -416,7 +485,9 @@
 					{saving ? 'Guardando…' : 'Guardar'}
 				</Button>
 			{:else if currentStep === 1}
-				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep1}>Continuar</Button>
+				<Button size="sm" onclick={tryAdvanceFromStep1} disabled={!canAdvanceFromStep1}
+					>Continuar</Button
+				>
 			{/if}
 		</div>
 	</div>

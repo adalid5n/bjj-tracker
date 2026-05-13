@@ -72,3 +72,21 @@ export async function getTecnicasQueContrarresta(tecnicaId: string): Promise<Tec
 		[tecnicaId]
 	);
 }
+
+/**
+ * Cuenta cuántas técnicas tienen a `tecnicaId` como su contra (es decir,
+ * cuántas filas de `tecnica_contras` tienen `contra_tecnica_id = ?`).
+ * Se usa para decidir si una técnica se puede borrar — si es contra de
+ * otra(s), bloqueamos el borrado para no romper referencias.
+ *
+ * Convención del proyecto: alias en lowercase (el worker preserva el
+ * case del alias tal cual).
+ */
+export async function countContrasIncoming(tecnicaId: string): Promise<number> {
+	await init();
+	const rows = await query<{ n: number }>(
+		'SELECT COUNT(*) AS n FROM tecnica_contras WHERE contra_tecnica_id = ?',
+		[tecnicaId]
+	);
+	return rows[0]?.n ?? 0;
+}

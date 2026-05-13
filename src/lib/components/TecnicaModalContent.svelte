@@ -13,6 +13,9 @@
 	 * `onMount`, estados loading/ready/error.
 	 */
 	import { onMount } from 'svelte';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type {
 		EstadoTecnica,
 		Posicion,
@@ -22,7 +25,7 @@
 	} from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 
-	let { tecnica }: { tecnica: Tecnica } = $props();
+	let { tecnica, onChanged }: { tecnica: Tecnica; onChanged?: () => void } = $props();
 
 	const TIPO_TECNICA_LABEL: Record<TipoTecnica, string> = {
 		ataque: 'Ataque',
@@ -69,13 +72,19 @@
 	let posicionesById = $state<Record<string, string>>({});
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
+	// Técnicas que tienen ESTA técnica como su contra. Bloquea el borrado
+	// (decisión del proyecto: borrar prohibido si hay referencias). Mismo
+	// patrón que `tecnicasCount` en `SumisionModalContent`.
+	let contrasIncomingCount = $state<number>(0);
+	let deleting = $state(false);
+	let mostrarConfirmBorrar = $state(false);
 
 	onMount(async () => {
 		try {
 			const [
 				{ getPosicion, listPosiciones },
 				{ getSumision },
-				{ getContras },
+				{ getContras, countContrasIncoming },
 				{ getOtrasVariantes }
 			] = await Promise.all([
 				import('$lib/posiciones'),
@@ -91,13 +100,15 @@
 						? getPosicion(tecnica.posicion_destino_id)
 						: Promise.resolve(null);
 
-			const [origenRes, destinoRes, contrasRes, variantesRes, todasPos] = await Promise.all([
-				getPosicion(tecnica.posicion_origen_id),
-				destinoPromise,
-				getContras(tecnica.id),
-				getOtrasVariantes(tecnica.nombre, tecnica.id),
-				listPosiciones()
-			]);
+			const [origenRes, destinoRes, contrasRes, variantesRes, todasPos, incomingCount] =
+				await Promise.all([
+					getPosicion(tecnica.posicion_origen_id),
+					destinoPromise,
+					getContras(tecnica.id),
+					getOtrasVariantes(tecnica.nombre, tecnica.id),
+					listPosiciones(),
+					countContrasIncoming(tecnica.id)
+				]);
 
 			origen = origenRes;
 			if (tecnica.tipo === 'sumision') {
@@ -108,6 +119,7 @@
 			contras = contrasRes;
 			otrasVariantes = variantesRes;
 			posicionesById = Object.fromEntries(todasPos.map((p) => [p.id, p.nombre]));
+			contrasIncomingCount = incomingCount;
 
 			status = 'ready';
 		} catch (err) {
@@ -127,6 +139,43 @@
 
 	function pushTecnica(t: Tecnica) {
 		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+	}
+
+	const motivoBloqueoBorrado = $derived(
+		contrasIncomingCount > 0
+			? `Esta técnica es contra de ${contrasIncomingCount} técnica(s). Quita esas referencias antes.`
+			: ''
+	);
+
+	function handleEdit() {
+		mapaModalStack.push({
+			kind: 'wizard-tecnica',
+			modo: 'editar',
+			id: tecnica.id,
+			nombre: `Editar: ${tecnica.nombre}`
+		});
+	}
+
+	function handleDeleteClick() {
+		if (contrasIncomingCount > 0) return;
+		mostrarConfirmBorrar = true;
+	}
+
+	async function handleConfirmDelete() {
+		if (contrasIncomingCount > 0) return;
+		deleting = true;
+		try {
+			const { deleteTecnica } = await import('$lib/tecnicas');
+			await deleteTecnica(tecnica.id);
+			onChanged?.();
+			mostrarConfirmBorrar = false;
+			mapaModalStack.closeAll();
+		} catch (err) {
+			errorMessage = err instanceof Error ? err.message : String(err);
+			status = 'error';
+		} finally {
+			deleting = false;
+		}
 	}
 </script>
 
@@ -285,4 +334,66 @@
 			</div>
 		{/if}
 	{/if}
+
+	<!--
+	  Acciones editar / borrar (T-10). Visibles también en móvil. El botón
+	  Borrar se deshabilita si la técnica es contra de otra(s); en ese
+	  caso un Tooltip envuelve un <span> con el botón disabled (los buttons
+	  disabled no emiten hover, el span sí). Mismo patrón que en
+	  PosicionModalContent y SumisionModalContent.
+	-->
+	{#if status === 'ready'}
+		<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">
+			<Button variant="outline" size="sm" onclick={handleEdit} disabled={deleting}>
+				Editar
+			</Button>
+			{#if contrasIncomingCount > 0}
+				<Tooltip.Provider>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<span {...props} class="inline-flex">
+									<Button variant="destructive" size="sm" disabled>Borrar</Button>
+								</span>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{motivoBloqueoBorrado}</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
+			{:else}
+				<Button
+					variant="destructive"
+					size="sm"
+					onclick={handleDeleteClick}
+					disabled={deleting}
+				>
+					{deleting ? 'Borrando…' : 'Borrar'}
+				</Button>
+			{/if}
+		</div>
+	{/if}
 </div>
+
+<!--
+  AlertDialog para confirmar borrado (mismo patrón que las otras entidades).
+-->
+<AlertDialog.Root bind:open={mostrarConfirmBorrar}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Borrar técnica</AlertDialog.Title>
+			<AlertDialog.Description>
+				¿Borrar definitivamente «{tecnica.nombre}»? No se puede deshacer.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={deleting}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={handleConfirmDelete}
+				disabled={deleting}
+				class={buttonVariants({ variant: 'destructive' })}
+			>
+				{deleting ? 'Borrando…' : 'Borrar'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

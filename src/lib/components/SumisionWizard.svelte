@@ -126,13 +126,19 @@
 		nombre.trim() !== snapshot.nombre.trim() || notas.trim() !== snapshot.notas.trim()
 	);
 
-	// Limpia el error inline en cuanto el usuario edita el nombre — así el
-	// mensaje no queda pegado mientras el usuario corrige.
-	$effect(() => {
-		// referenciamos `nombre` para que el efecto reaccione a cambios.
-		nombre;
+	// Limpia el error inline cuando el usuario edita el nombre. Antes esto
+	// vivía en un `$effect` que leía `nombre` para "trackear" cambios, pero
+	// el `if (nombreError)` dentro también suscribía al efecto a
+	// `nombreError`. Cuando `tryAdvanceFromStep1` escribía
+	// `nombreError = 'Ya existe...'`, el `$effect` se re-disparaba en el
+	// siguiente microtask, veía `nombreError` truthy y lo limpiaba de
+	// inmediato — el usuario nunca llegaba a ver el mensaje y Enter/
+	// Continuar daban la sensación de "no hacer nada". El handler
+	// explícito `handleNombreInput`, cableado en `oninput` del <Input>,
+	// solo limpia el error en respuesta a la edición real del input.
+	function handleNombreInput() {
 		if (nombreError) nombreError = '';
-	});
+	}
 
 	function nombreYaExiste(n: string): boolean {
 		const norm = n.trim().toLowerCase();
@@ -210,9 +216,20 @@
 				// Tras guardar ya no hay cambios pendientes: desactiva el
 				// dirty handler antes de cerrar para no disparar el prompt.
 				mapaModalStack.setDirtyHandler(null);
-				// Cierra el wizard y abre el modal de la sumisión creada.
-				mapaModalStack.closeAll();
-				mapaModalStack.push({ kind: 'sumision', id: nueva.id, nombre: nueva.nombre });
+				// T-10: si hay un return handler registrado (caso típico:
+				// el wizard de técnica abrió este sub-wizard desde "+ Crear
+				// nueva sumisión" en el paso de destino), salimos del wizard
+				// con `pop` y le pasamos el nuevo id al handler — en lugar
+				// de hacer el `closeAll + push modal` habitual, que rompería
+				// el flujo dejando al usuario en el modal de la nueva sumisión.
+				if (mapaModalStack.hasReturnHandler()) {
+					mapaModalStack.pop();
+					mapaModalStack.invokeReturnHandler(nueva.id, 'sumision');
+				} else {
+					// Cierra el wizard y abre el modal de la sumisión creada.
+					mapaModalStack.closeAll();
+					mapaModalStack.push({ kind: 'sumision', id: nueva.id, nombre: nueva.nombre });
+				}
 			} else {
 				if (!sumisionId) {
 					throw new Error('Falta sumisionId en modo editar.');
@@ -290,6 +307,7 @@
 				bind:value={nombre}
 				placeholder="p. ej. armbar, mata leão, kimura"
 				onkeydown={handleNombreKeydown}
+				oninput={handleNombreInput}
 				autofocus={currentStep === 1}
 				aria-invalid={nombreError ? 'true' : undefined}
 				aria-describedby={nombreError ? 'sumision-nombre-error' : undefined}

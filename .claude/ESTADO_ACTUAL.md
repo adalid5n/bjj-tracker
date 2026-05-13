@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-13 (cierre sesión 7)
+**Última actualización:** 2026-05-13 (cierre sesión 8)
 **Fase activa:** Iteración 1 — Mapa técnico básico
-**Iteración en curso:** it.1 (9.5/15 tareas cerradas: T-1 a T-9, T-2.5 intercalada)
+**Iteración en curso:** it.1 (10.5/15 tareas cerradas: T-1 a T-10, T-2.5 intercalada)
 
 ---
 
@@ -16,16 +16,110 @@ Iteración 0.5 ✅ funcionalmente cerrada (auto-update PWA + wizards + chips
 capturada con el flujo nuevo) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
 Estamos en **iteración 1** — base estructural del mapa técnico. Plan
-completo en `ITERACION_1.md`. 9 tareas y media cerradas (T-1 a T-9,
-T-2.5 intercalada). El recorrido encadenado de modales funciona
-end-to-end y ya se pueden crear / editar / borrar posiciones **y
-sumisiones** desde móvil y desktop. Queda el wizard de técnica (T-10),
-la UI de contras (T-11), la captura inline en roll (T-12) y el cierre
-(T-13 a T-15).
+completo en `ITERACION_1.md`. 10 tareas y media cerradas (T-1 a T-10,
+T-2.5 intercalada). El catálogo está **completo**: crear / editar /
+borrar posiciones, sumisiones y técnicas (con su lógica de destino
+condicional por tipo y "+ Crear nueva inline" desde el paso de
+destino). Queda la UI de contras (T-11), la captura inline de
+posiciones-problema en wizard de roll (T-12), chips + filtro en
+/rolls (T-13), semilla real (T-14) y cierre (T-15).
 
 ---
 
-## Última sesión (2026-05-13, sesión 7)
+## Última sesión (2026-05-13, sesión 8)
+
+**Hecho:**
+- **T-10** ✅ Editor de TECNICA (wizard de 7 pasos con destino
+  condicional). Acceso desde el modal de una posición vía botón
+  "+ Añadir técnica desde aquí" — origen prefill. 7 pasos: Nombre →
+  Variante (skippable) → Origen (combobox) → Tipo (chips: ataque /
+  sweep / escape / transicion / sumision) → Destino (combobox de
+  posiciones o sumisiones según tipo, con "+ Crear nueva" inline) →
+  Estado (chips skippable) → Detalles + errores comunes (textareas).
+- **`Combobox.svelte`** NUEVO (~145 líneas) — wrapper sobre
+  `Popover` + `Command` (shadcn-svelte). Soporta `onCreateNew` para
+  meter la opción "+ Crear nuevo …" al final de la lista filtrada.
+  Reutilizable más allá del wizard de técnica.
+- **"+ Crear nueva inline" en paso 5** — patrón nuevo del proyecto:
+  el TecnicaWizard registra un `returnHandler` en el stack, pushea el
+  sub-wizard (posición / sumisión) y, cuando éste guarda en modo
+  crear y detecta el handler, hace `pop()` + `invokeReturnHandler` en
+  lugar del habitual `closeAll + push modal`. El TecnicaWizard recibe
+  el id nuevo y prefill el destino.
+- **`tecnicaWizardDraft` store** — necesario porque al pushear el
+  sub-wizard, el TecnicaWizard se desmonta (host renderiza solo el
+  top). El draft persiste el estado completo entre montajes; el
+  wizard escribe en cada cambio y lee al montar. Se limpia al guardar
+  con éxito y cuando `wizard-tecnica` deja el stack (host vigila).
+- **Botones Editar / Borrar en `TecnicaModalContent`** con el mismo
+  patrón Tooltip + AlertDialog de T-8/T-9. Borrar bloqueado si la
+  técnica es contra de otra (vía nuevo helper `countContrasIncoming`
+  en `contras.ts`).
+- **Botón "+ Añadir técnica desde aquí"** en `PosicionModalContent`,
+  visible siempre, pushea `wizard-tecnica modo crear` con
+  `posicionOrigenId` prefijado.
+- **Validación UNIQUE en TecnicaWizard** — pre-carga `listTecnicas()`
+  y comprueba `(nombre, posicion_origen_id, variante)` antes de
+  guardar. Catch del UNIQUE de SQLite como red defensiva.
+- **Fix: toast/confirm de export-import incluyen el mapa** (sesión
+  paralela). El toast solo contaba 3 tablas v1 (compañeros/sesiones/
+  rolls) y el confirm() decía "REEMPLAZA compañeros, sesiones y
+  rolls" sin mencionar el catálogo — daba falsa sensación de no
+  exportar el mapa. Helper `countsLine` unificado, singular/plural,
+  confirm dice "logbook + mapa técnico". Commit `a108332`.
+- **Merge manual de dos exports** (sesión paralela): unimos un export
+  v1 (logbook) con uno v2 (mapa) en un solo JSON v2 que el stakeholder
+  pudo importar. Script ad-hoc, no se persiste en código.
+- **Fixes T-10 (post-validación stakeholder):**
+  - Etiqueta "Saltar" → siempre "Continuar" en wizards skippables
+    (TecnicaWizard y PosicionWizard). Comportamiento idéntico (si hay
+    valor avanza con él, si no aplica default), solo cambia el label.
+  - **Bug del autoselect del destino inline**: el `returnHandler`
+    asignaba `posicionDestinoId = newId` en la instancia VIEJA del
+    TecnicaWizard (la que se desmontó al pushear el sub-wizard). La
+    instancia remontada leía del draft (donde el destino seguía
+    `null`) y sobrescribía la asignación. Fix: el handler escribe
+    también al draft con el nuevo destino — el wizard remontado lo
+    recoge correctamente en su `onMount`.
+  - **Bug del Enter/Continuar invisible**: en SumisionWizard, un
+    `$effect` reactivo que limpiaba `nombreError` cuando cambiaba
+    `nombre` también se auto-borraba en el mismo microtask en que
+    `tryAdvanceFromStep1` escribía el error. El usuario veía un flash
+    (o nada). Fix: reemplazado por `oninput` explícito en el `<Input>`.
+    Patrón aplicado también defensivamente en TecnicaWizard.
+- **Validación inline de duplicado en PosicionWizard** (post-fixes):
+  el patrón ya existía en SumisionWizard y TecnicaWizard; faltaba en
+  PosicionWizard pese a que `posiciones.nombre` también tiene UNIQUE.
+  Añadido `existentes` cargado en `onMount`, helper `nombreYaExiste`
+  (case-insensitive, excluye el propio id en editar), `tryAdvanceFromStep1`
+  + `handleNombreInput`, mensaje inline con `aria-invalid` /
+  `aria-describedby`, y catch defensivo del UNIQUE en `handleSave`.
+
+**Decisiones tomadas (con peso):**
+- **"+ Crear nueva inline" se gestiona con `returnHandler` + draft**.
+  No con un `returnTo` declarativo en el entry. Más flexible y deja
+  el patrón abierto a otros casos (cualquier wizard puede registrar
+  un handler antes de pushear otro y volver con el id).
+- **Draft persistente del TecnicaWizard** como solución al desmontaje
+  por sub-wizard. El draft es de un solo wizard (no genérico) pero
+  patrón replicable si en el futuro otros wizards lo necesitan.
+- **Acceso al wizard de técnica SOLO desde el modal de una posición**
+  (no desde el dropdown del FAB de `/mapa`). El origen siempre tiene
+  contexto. Si se necesita más adelante se añade.
+- **Etiqueta "Continuar" siempre** en wizards skippables. Más simple
+  cognitivamente que el "Continuar/Saltar dinámico" original de T-8.
+  Aplica a Posicion, Sumision y Tecnica.
+- **Validación inline de nombre duplicado siempre con `oninput`**,
+  nunca con `$effect` reactivo escuchando el campo. El effect se
+  auto-borraba un microtask después de escribir el error. Regla
+  general del proyecto.
+- **Múltiples destinos por técnica** — anotado en MEJORAS_FUTURAS
+  con dos modos (refactor schema N:M vs filas independientes con
+  mismo nombre). Decisión post-T-14 (uso real).
+
+---
+
+## Sesión previa (2026-05-13, sesión 7)
 
 **Hecho:**
 - **T-9** ✅ Editor de SUMISION (wizard) + dropdown del FAB + acciones
@@ -292,42 +386,64 @@ la UI de contras (T-11), la captura inline en roll (T-12) y el cierre
 
 ## Próximo paso
 
-**T-10 — Editor de TECNICA (wizard).** El más complejo de los tres:
-7 pasos con lógica condicional en el paso de destino (si tipo = sumision
-combobox de sumisiones + "+ crear nueva sumisión" inline; si no,
-combobox de posiciones + "+ crear nueva posición" inline). Mismo
-patrón que T-8/T-9 (kind nuevo, dirty handler, AlertDialog,
-intercepción Esc/interact con preventDefault).
+**T-11 — UI de contras.** Permitir definir relaciones "X es contra de Y"
+entre técnicas. Desde el modal de una técnica, botón "+ Añadir contra"
+abre un combobox de técnicas existentes (autocomplete por nombre) con
+"+ Crear nueva técnica" inline (que abre el wizard completo de técnica).
 
-**Notas para T-10:**
-- Reutilizar todo el patrón consolidado: `kind: 'wizard-tecnica'`,
-  snapshot/dirty, `class:hidden` para pasos, `setDirtyHandler`,
-  validación inline contra lista pre-cargada, AlertDialog controlado.
-- Validación de unicidad: UNIQUE `(nombre, posicion_origen_id,
-  variante)` en BD. Pre-cargar `listTecnicas()` y validar antes de
-  guardar. Probablemente mejor al final del wizard (no es practicable
-  validar al avanzar del paso 1 porque depende también de origen +
-  variante, que vienen en pasos posteriores).
-- "+ Crear nueva posición" / "+ Crear nueva sumisión" inline desde el
-  paso destino: push al stack del wizard correspondiente y volver al
-  wizard de técnica al guardar. Estudiar si el patrón `kind` actual
-  basta o hace falta un `returnTo` en el entry del stack.
-- Borrado prohibido si la técnica es referenciada por alguna contra o
-  por algún roll (ambos linkeos futuros — la primera vía
-  `tecnica_contras`, la segunda no aplica todavía en it.1).
-- Decidir si el wizard de técnica entra también en el dropdown de
-  `/mapa` ("Nueva técnica") o solo se abre desde dentro de un modal de
-  posición. La 2ª es la canónica (técnica = arista, necesita origen).
+**Notas para T-11:**
+- Reutilizar el `Combobox` ya creado en T-10. Ítems = todas las
+  técnicas excepto la actual.
+- "+ Crear nueva técnica" inline: misma mecánica que T-10 con
+  `returnHandler` — el modal de técnica registra un handler, pushea
+  `wizard-tecnica modo crear`, y al guardar recibe el id nuevo y lo
+  añade como contra. Necesita ampliar el `ReturnHandler` type para
+  aceptar `'tecnica'` además de `'posicion'`/`'sumision'`. Cuando se
+  cree la técnica inline, el `posicionOrigenId` puede no estar claro
+  — decidir UX: ¿lo elige el usuario en el wizard nuevo, o se le
+  prefill con la posición de origen de la técnica actual? (Probable:
+  paso 3 del wizard pasa a ser editable normal, sin prefill.)
+- Lista de contras existentes con icono "✕" para quitar — decisión de
+  T-11 (vs solo añadir). Probablemente sí, mismo combobox + lista.
+- Persistencia: `addContra` / `removeContra` ya existen en
+  `src/lib/contras.ts`.
+- Borrar técnica: ya está bloqueado en T-10 si la técnica aparece como
+  contra de otra (vía `countContrasIncoming`). No tocar.
 
-Después de T-10: T-11 (UI de contras), T-12 (captura inline en wizard
-de roll), T-13 (chips en detalle de sesión + filtro nuevo en /rolls),
-T-14 (semilla real con catálogo BJJ realista + uso real), T-15
-(cierre con tag `v0.2-it1`).
+Después de T-11: T-12 (captura inline de posiciones-problema en
+wizard de roll), T-13 (chips en detalle de sesión + filtro nuevo en
+/rolls), T-14 (semilla real con catálogo BJJ realista + uso real),
+T-15 (cierre con tag `v0.2-it1`).
 
 ---
 
 ## Decisiones recientes con peso
 
+- **2026-05-13 (s8) — Patrón "+ Crear nueva inline" con
+  `returnHandler` + draft del wizard padre.** Cuando un wizard A
+  abre otro wizard B en el stack y necesita el id de B al guardar:
+  A registra un `returnHandler`, B detecta el handler y, en vez de
+  `closeAll + push modal` habitual, hace `pop()` +
+  `invokeReturnHandler(id, kind)`. A escribe el id al draft (no a la
+  variable local, porque la instancia se desmontó). Patrón replicable
+  para T-11 (contras inline).
+- **2026-05-13 (s8) — Etiqueta "Continuar" siempre** en wizards
+  skippables. El "Continuar/Saltar dinámico" original de T-8 era más
+  ruido que beneficio. Aplica a los tres wizards actuales.
+- **2026-05-13 (s8) — Validación inline de duplicado con `oninput`,
+  nunca con `$effect` reactivo escuchando el campo.** El effect se
+  auto-borraba un microtask después de escribir el error. Regla
+  general del proyecto (Posicion, Sumision, Tecnica).
+- **2026-05-13 (s8) — Acceso al wizard de técnica solo desde el modal
+  de una posición.** Origen siempre con contexto. El dropdown del
+  FAB de `/mapa` no incluye "Nueva técnica".
+- **2026-05-13 (s8) — Múltiples destinos por técnica** anotado en
+  MEJORAS_FUTURAS como decisión post-T-14. Dos modos posibles:
+  refactor N:M o filas independientes con mismo nombre (modelo actual
+  ya lo soporta).
+- **2026-05-13 (s8) — Toast/confirm de export-import incluyen las 8
+  tablas.** Antes solo contaba 3 v1, daba falsa sensación de no
+  exportar el mapa. Commit `a108332`.
 - **2026-05-13 (s7) — `onEscapeKeydown` + `onInteractOutside` con
   `preventDefault()` en `Dialog.Content`** como patrón de intercepción
   de cierre cuando hay dirty. Más limpio que abortar tarde en
@@ -429,25 +545,31 @@ T-14 (semilla real con catálogo BJJ realista + uso real), T-15
   T-6/T-7. Se elimina en T-15.
 - **Smoke de migración vigente en `/dev/db-migration-smoke`** — útil
   para sanidad de schema. Se evalúa mantener o eliminar al cerrar it.1.
-- **Tareas que faltan de it.1:** T-10, T-11, T-12, T-13, T-14, T-15.
-  T-9 cerrada esta sesión.
-- **Wrappers shadcn disponibles**: `alert-dialog`, `tooltip` (de T-8) y
-  `dropdown-menu` (de T-9). Usar en T-10 sin reinstalar.
-- **Patrones reusables establecidos en T-8 + T-9** (aplicar tal cual
-  en T-10):
+- **Tareas que faltan de it.1:** T-11, T-12, T-13, T-14, T-15.
+  T-10 cerrada esta sesión.
+- **Wrappers shadcn disponibles**: `alert-dialog`, `tooltip` (T-8),
+  `dropdown-menu` (T-9) y `command`/`popover` (T-10, primitives de
+  bits-ui usados via wrapper). Más `Combobox.svelte` propio sobre
+  ellos. Reutilizar en T-11 sin reinstalar.
+- **Patrones reusables establecidos en T-8 + T-9 + T-10** (aplicar
+  tal cual en T-11):
   - Wizard como `kind` del stack (no Dialog independiente).
   - `class:hidden` para pasos del wizard (no `{#if}`).
   - Snapshot + `$derived isDirty` + `setDirtyHandler` en
     `onMount`/`onDestroy`.
-  - Validación inline contra lista pre-cargada en memoria.
+  - Validación inline contra lista pre-cargada en memoria, limpieza
+    con `oninput` (NO `$effect`).
   - `onEscapeKeydown` + `onInteractOutside` en `Dialog.Content` con
     `preventDefault()` si dirty.
   - AlertDialog controlado (`open`+`onOpenChange`, no `bind:open`).
   - Botón "Descartar" baja el flag **antes** de tocar el stack.
   - Tooltip sobre `<span><Button disabled></span>` para botón Borrar
     bloqueado por referencias.
+  - Etiqueta "Continuar" siempre (no "Saltar").
   - Defaults `undefined` para enums skippables (materializar al
     guardar).
+  - "+ Crear nueva inline" → `returnHandler` + escritura al draft del
+    wizard padre.
 - **Bug pendiente de cerrar de it.0.5:** falta T-9 (captura de 1 sesión
   real con el flujo nuevo) + tag `v0.1-it0.5`. No bloquea it.1.
 - Push: SSH con `id_ed25519_personal` (alias `github-personal`). Si

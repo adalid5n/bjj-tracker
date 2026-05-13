@@ -32,12 +32,13 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import type { Posicion, SumisionTerminal, Tecnica } from '$lib/types';
-	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { mapaModalStack, tecnicaWizardDraft } from './mapa-modal-stack.svelte';
 	import PosicionModalContent from './PosicionModalContent.svelte';
 	import TecnicaModalContent from './TecnicaModalContent.svelte';
 	import SumisionModalContent from './SumisionModalContent.svelte';
 	import PosicionWizard from './PosicionWizard.svelte';
 	import SumisionWizard from './SumisionWizard.svelte';
+	import TecnicaWizard from './TecnicaWizard.svelte';
 
 	// Opcional: callback que el host (página) puede pasar para refrescar
 	// listas tras un cambio en el catálogo (crear/editar/borrar posición).
@@ -75,6 +76,19 @@
 		} else if (top.kind === 'sumision' && !sumisionesById[top.id] && loadingSumision !== top.id) {
 			loadingSumision = top.id;
 			loadSumision(top.id);
+		}
+	});
+
+	// Limpia el draft del wizard de técnica cuando su entrada deja el stack
+	// (cancelar, closeAll, popTo). El draft sobrevive remounts intencionados
+	// (sub-wizard inline "+ Crear nueva …") pero NO debe persistir si el
+	// usuario cierra el wizard de técnica sin guardar — la próxima vez que
+	// lo abra debería empezar vacío. La limpieza por guardado exitoso la
+	// hace el propio wizard en `handleSave`.
+	$effect(() => {
+		const tieneWizardTecnica = stack.some((e) => e.kind === 'wizard-tecnica');
+		if (!tieneWizardTecnica && tecnicaWizardDraft.value !== null) {
+			tecnicaWizardDraft.clear();
 		}
 	});
 
@@ -230,6 +244,15 @@
 		onCatalogChanged?.();
 	}
 
+	function handleTecnicaWizardSaved(id: string) {
+		if (tecnicasById[id]) {
+			const next = { ...tecnicasById };
+			delete next[id];
+			tecnicasById = next;
+		}
+		onCatalogChanged?.();
+	}
+
 	// Idem cuando se borra desde el modal de posición o sumisión.
 	function handleModalChanged() {
 		onCatalogChanged?.();
@@ -240,6 +263,7 @@
 		if (!top) return '';
 		if (top.kind === 'wizard-posicion' && top.modo === 'crear') return 'Nueva posición';
 		if (top.kind === 'wizard-sumision' && top.modo === 'crear') return 'Nueva sumisión';
+		if (top.kind === 'wizard-tecnica' && top.modo === 'crear') return 'Nueva técnica';
 		return top.nombre;
 	});
 </script>
@@ -299,7 +323,7 @@
 				{:else if top.kind === 'tecnica'}
 					{@const tec = tecnicasById[top.id]}
 					{#if tec}
-						<TecnicaModalContent tecnica={tec} />
+						<TecnicaModalContent tecnica={tec} onChanged={handleModalChanged} />
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando técnica…</p>
 					{/if}
@@ -322,6 +346,14 @@
 						modo={top.modo}
 						sumisionId={top.modo === 'editar' ? top.id : undefined}
 						onSaved={handleSumisionWizardSaved}
+						onRequestClose={handleWizardRequestClose}
+					/>
+				{:else if top.kind === 'wizard-tecnica'}
+					<TecnicaWizard
+						modo={top.modo}
+						tecnicaId={top.modo === 'editar' ? top.id : undefined}
+						posicionOrigenId={top.modo === 'crear' ? top.posicionOrigenId : undefined}
+						onSaved={handleTecnicaWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>
 				{/if}
