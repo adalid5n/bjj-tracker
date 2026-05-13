@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -87,6 +88,63 @@
 	);
 	const canSave = $derived(fecha.length === 10 && !!tipo && !saving);
 
+	/**
+	 * Enter en el wizard: dispara la acción primaria del paso actual.
+	 * Listener global para cubrir "foco perdido". Respeta textareas.
+	 */
+	function handleWizardKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		const target = e.target as HTMLElement | null;
+		if (target?.tagName === 'TEXTAREA') return;
+		// Si el foco está en un chip (button dentro de un radiogroup),
+		// Enter activa la selección/toggle del chip — semántica propia, no
+		// la pisamos. Para cualquier OTRO target (body, botón del indicador
+		// de progreso, botón del footer, input sin handler propio…) sí
+		// interceptamos para evitar que Enter active el elemento enfocado
+		// (típicamente: el botón 'Paso 1' del indicador, que dispararía
+		// goToStep(1)).
+		if (target?.closest('[role="radiogroup"]')) return;
+		// Intercept inmediato: incluso si NO podemos avanzar (paso obligatorio
+		// vacío), bloqueamos el evento para que no active el botón enfocado.
+		e.preventDefault();
+		e.stopImmediatePropagation();
+		const intercept = () => {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		};
+		if (currentStep === totalSteps) {
+			if (canSave) {
+				intercept();
+				handleSave();
+			}
+			return;
+		}
+		if (canAdvance) {
+			intercept();
+			advance();
+		}
+	}
+
+	function handleDocumentEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		const target = e.target as HTMLElement | null;
+		// Inputs y textareas tienen semántica natural de Enter (submit del
+		// form, newline). Cualquier otra cosa (body con foco perdido, botón
+		// del indicador de progreso del wizard, label, etc.) deja el control
+		// al wizard — handleWizardKeydown hace preventDefault y evita que
+		// se dispare el click sintético del botón enfocado.
+		if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+		handleWizardKeydown(e);
+	}
+
+	onMount(() => {
+		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
+	});
+
+	onDestroy(() => {
+		if (typeof document !== 'undefined') document.removeEventListener('keydown', handleDocumentEnter, true);
+	});
+
 	async function handleSave() {
 		if (!canSave || !tipo) return;
 		saving = true;
@@ -110,7 +168,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
-		class="max-h-[90vh] overflow-y-auto sm:max-w-md"
+		class="flex max-h-[90vh] flex-col sm:max-w-md"
 		onOpenAutoFocus={(e) => e.preventDefault()}
 	>
 		<Dialog.Header>
@@ -139,60 +197,66 @@
 			Paso {currentStep} de {totalSteps}
 		</p>
 
-		<div class="space-y-4 py-2">
-			{#if currentStep === 1}
-				<div class="space-y-3">
-					<h3 class="text-sm font-semibold">Fecha *</h3>
-					<Label for="fecha" class="sr-only">Fecha</Label>
-					<DateInput id="fecha" bind:value={fecha} required />
-				</div>
-			{/if}
+		<!--
+		  Body scrollable. El footer queda fuera para que siempre se vea,
+		  incluso si el contenido del paso (p. ej. textareas de notas) desborda.
+		-->
+		<div class="-mx-3 flex-1 overflow-y-auto px-3" onkeydowncapture={handleWizardKeydown} role="presentation">
+			<div class="space-y-4 py-2">
+				{#if currentStep === 1}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Fecha *</h3>
+						<Label for="fecha" class="sr-only">Fecha</Label>
+						<DateInput id="fecha" bind:value={fecha} required />
+					</div>
+				{/if}
 
-			{#if currentStep === 2}
-				<div class="space-y-3">
-					<h3 class="text-sm font-semibold">Tipo *</h3>
-					<Chips
-						options={TIPOS}
-						value={tipo}
-						onChange={handleTipoChange}
-						ariaLabel="Tipo de sesión"
-					/>
-				</div>
-			{/if}
+				{#if currentStep === 2}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Tipo *</h3>
+						<Chips
+							options={TIPOS}
+							value={tipo}
+							onChange={handleTipoChange}
+							ariaLabel="Tipo de sesión"
+						/>
+					</div>
+				{/if}
 
-			{#if currentStep === 3}
-				<div class="space-y-3">
-					<h3 class="text-sm font-semibold">Foco que traía</h3>
-					<Label for="foco" class="sr-only">Foco</Label>
-					<Input
-						id="foco"
-						bind:value={foco}
-						placeholder="p. ej. trabajar paso de guardia"
-						onkeydown={handleFocoKeydown}
-					/>
-				</div>
-			{/if}
+				{#if currentStep === 3}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Foco que traía</h3>
+						<Label for="foco" class="sr-only">Foco</Label>
+						<Input
+							id="foco"
+							bind:value={foco}
+							placeholder="p. ej. trabajar paso de guardia"
+							onkeydown={handleFocoKeydown}
+						/>
+					</div>
+				{/if}
 
-			{#if currentStep === 4}
-				<div class="space-y-3">
-					<h3 class="text-sm font-semibold">Técnica enseñada en clase</h3>
-					<Label for="tecnica" class="sr-only">Técnica</Label>
-					<Textarea id="tecnica" bind:value={tecnicaClase} rows={3} />
-				</div>
-			{/if}
+				{#if currentStep === 4}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Técnica enseñada en clase</h3>
+						<Label for="tecnica" class="sr-only">Técnica</Label>
+						<Textarea id="tecnica" bind:value={tecnicaClase} rows={3} />
+					</div>
+				{/if}
 
-			{#if currentStep === 5}
-				<div class="space-y-3">
-					<h3 class="text-sm font-semibold">Observaciones del profesor</h3>
-					<Label for="obs" class="sr-only">Observaciones</Label>
-					<Textarea id="obs" bind:value={obsProfesor} rows={3} />
-				</div>
+				{#if currentStep === 5}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Observaciones del profesor</h3>
+						<Label for="obs" class="sr-only">Observaciones</Label>
+						<Textarea id="obs" bind:value={obsProfesor} rows={3} />
+					</div>
+				{/if}
+			</div>
+
+			{#if errorMsg}
+				<p class="text-sm text-destructive">{errorMsg}</p>
 			{/if}
 		</div>
-
-		{#if errorMsg}
-			<p class="text-sm text-destructive">{errorMsg}</p>
-		{/if}
 
 		<Dialog.Footer>
 			<Button variant="outline" size="sm" onclick={() => (open = false)} disabled={saving}>

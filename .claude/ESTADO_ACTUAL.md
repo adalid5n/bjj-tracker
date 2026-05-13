@@ -1,28 +1,153 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-13 (cierre sesión 8)
+**Última actualización:** 2026-05-14 (cierre sesión 10)
 **Fase activa:** Iteración 1 — Mapa técnico básico
-**Iteración en curso:** it.1 (10.5/15 tareas cerradas: T-1 a T-10, T-2.5 intercalada)
+**Iteración en curso:** it.1 (12.5/15 tareas cerradas: T-1 a T-12 + T-2.5 + tab Técnicas extra)
 
 ---
 
 ## Dónde estamos en macro
 
-Iteración 0 ✅ cerrada en `v0.1-it0` (2026-05-10). App permite capturar
-sesiones, rolls, compañeros, ver tabla filtrable y exportar/importar JSON.
+Iteración 0 ✅ cerrada en `v0.1-it0` (2026-05-10).
 
-Iteración 0.5 ✅ funcionalmente cerrada (auto-update PWA + wizards + chips
-+ DateField). Falta solo T-9 (verificación en uso real con 1 sesión
-capturada con el flujo nuevo) y tag `v0.1-it0.5`. Pendiente, no bloquea.
+Iteración 0.5 ✅ funcionalmente cerrada. Falta solo T-9 (verificación en
+uso real) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
-Estamos en **iteración 1** — base estructural del mapa técnico. Plan
-completo en `ITERACION_1.md`. 10 tareas y media cerradas (T-1 a T-10,
-T-2.5 intercalada). El catálogo está **completo**: crear / editar /
-borrar posiciones, sumisiones y técnicas (con su lógica de destino
-condicional por tipo y "+ Crear nueva inline" desde el paso de
-destino). Queda la UI de contras (T-11), la captura inline de
-posiciones-problema en wizard de roll (T-12), chips + filtro en
-/rolls (T-13), semilla real (T-14) y cierre (T-15).
+Estamos en **iteración 1** — base estructural del mapa técnico. T-1 a
+T-12 cerradas + T-2.5 + tab "Técnicas" añadido a `/mapa` como mejora
+de UX (no estaba en el plan original). El catálogo está completo
+(crear/editar/borrar posiciones, sumisiones, técnicas con destino
+condicional y "+ Crear nueva inline") y los rolls ya capturan
+posiciones-problema referenciando el catálogo (T-12). Queda **T-13**
+(chips de posiciones-problema en `/sesion/[id]` + filtro en `/rolls`),
+**T-14** (semilla real con catálogo BJJ realista) y **T-15** (cierre
+con tag `v0.2-it1`).
+
+**Iteración 2 confirmada como T-1.it2:** vincular posiciones
+complementarias (top ↔ bottom) + vista del oponente en el modal de
+posición. Decidido en sesión 9. Mini-ADR pendiente
+(`decisiones/002-vinculo-top-bottom.md`).
+
+---
+
+## Última sesión (2026-05-14, sesión 10)
+
+**Hecho — T-12: Captura inline de posiciones-problema en wizard de roll**
+
+- `RollEditor.svelte` ganó un paso nuevo "Posiciones donde tuve problema"
+  entre compañero y tamaño (wizard de 5 → 6 pasos). Multi-chips
+  agrupados por categoría con orden de `/mapa`.
+- Botón "+ Crear nueva posición" inline → abre **wrapper standalone**
+  `PosicionWizardDialog.svelte` (componente NUEVO) con el wizard de
+  posición completo en su propio Dialog. Al guardar, la nueva posición
+  queda preseleccionada y vuelve al RollEditor sin perder progreso.
+- `PosicionWizard.svelte` desacoplado: prop nueva `mode: 'stack' | 'standalone'`
+  (default `'stack'`). En standalone usa callbacks (`onSaved`,
+  `onRequestClose`, `onDirtyChange`) en lugar de `mapaModalStack`. El
+  flujo del mapa sigue funcionando idéntico.
+- `MultiChips.svelte` NUEVO — chips multi-select reutilizable (Chips
+  existente es single-select estricto en 5 sitios).
+- Persistencia: `setPosicionesProblema(rollId, ids[])` (ya existía en
+  T-2) se invoca en `/sesion/[id]` y `/rolls` tras `createRoll` /
+  `updateRoll`. En modo editar precarga con `getPosicionesProblema`.
+- Skip de tamaño preconfigurado pasa de inmediato → diferido vía
+  `pendingSkipTamano` (porque el paso 2 nuevo se intercala antes).
+
+**Hecho — Tab "Técnicas" en `/mapa` (extra, no en plan original)**
+
+- Toggle "Posiciones" / "Técnicas" en la cabecera de `/mapa`. Tab
+  Técnicas con buscador + filtro multi-select por tipo + lista plana
+  ordenada alfabética. Cada item: nombre + variante + "desde X → Y" +
+  chip de tipo + chip de estado (oculto si "probando"). Click → push
+  modal de técnica.
+- `onCatalogChanged` recarga también `listTecnicas()`.
+
+**Hecho — Pulido UX masivo**
+
+- **Sticky footers en todos los wizards/editores**: `Dialog.Content`
+  pasa a `flex max-h-[90vh] flex-col`, body envuelto en
+  `flex-1 overflow-y-auto`, footer fuera del scroll. Aplicado a
+  RollEditor, SesionEditor, CompaneroEditor, PosicionWizardDialog,
+  MapaModalHost, PosicionWizard, SumisionWizard, TecnicaWizard.
+- **Wrappers scroll simétricos** `-mx-3 px-3` (antes `-mr-1 pr-1`,
+  cortaba los inputs por la derecha y luego por la izquierda).
+- **Enter handler en todos los wizards** — patrón:
+  `onkeydowncapture={handleWizardKeydown}` en el wrapper + listener
+  global `document.addEventListener('keydown', ..., true)` en `onMount`
+  para cubrir "foco perdido". El handler **siempre intercepta** Enter
+  dentro del wizard (preventDefault + stopImmediatePropagation) excepto
+  cuando el target es input/textarea/`role="radiogroup"`. Esto evita
+  el bug del Enter activando el botón "Paso 1" del indicador de
+  progreso (que es focuseable). Guard `if (typeof document !== 'undefined')`
+  en mount/destroy porque `onDestroy` SÍ se ejecuta en SSR/prerender.
+- **Botón Continuar en paso 1 del RollEditor** (faltaba — el `{:else}`
+  caía en `<span></span>` vacío).
+- **Botón Continuar en paso 4 (tipo) del TecnicaWizard** (faltaba).
+- **"+ Crear nueva posición" inline en paso 3 (origen) del TecnicaWizard**
+  (antes solo en paso 5 destino).
+- **Renombre**: "+ Añadir técnica desde aquí" → "+ Nueva técnica desde
+  esta posición" en `PosicionModalContent`.
+- **Bug bucle Upa→Upa**: `MapaModalHost` no remontaba ModalContent al
+  cambiar `top.id` (mismo `kind`), la lista de contras se quedaba con
+  la del anterior. Fix con `{#key top.id}` en los 3 ModalContent.
+- **Bug returnHandler singleton** (descubierto en flujo de contras
+  inline): `mapa-modal-stack.svelte.ts` cambia `#returnHandler` por
+  pila LIFO `#returnHandlers[]`. Sin esto, el handler del modal padre
+  se sobrescribía cuando un sub-wizard registraba el suyo.
+- **Auto-peso del compañero**: al cambiar `companeroId`, ahora siempre
+  pisa `tamanoRelativo` con `peso_relativo` del compañero (antes solo
+  si estaba vacío, fallaba al cambiar entre compañeros).
+- **Quitar prefill incorrecto** del wizard de técnica desde flujo de
+  contras: la contra la ejecuta el oponente, no la misma posición.
+  Sin schema de vínculo top/bottom no se puede inferir el origen
+  correcto, así que sin prefill. (Se reintroducirá en it.2.)
+- **Validación nombre paso 1 TecnicaWizard (Opción A)**: aviso
+  informativo si nombre coincide con otro existente (no bloquea).
+  Bloqueo real al avanzar del paso 3 cuando ya hay (nombre + origen +
+  variante).
+- **Bug `d` suelta en `src/lib/companeros.ts`**: identificador huérfano
+  que rompía el prerender en bundle minificado. Eliminado.
+- **Seed corregido**: añadida "Guardia cerrada top"; destinos de Upa y
+  Elbow escape apuntan a esa nueva posición.
+
+**Hecho — Infra / docs**
+
+- `.gitignore`: excluidos exports JSON locales (`bjj-tracker-*.json`).
+- `CONTEXTO_AGENTE.md`: sección nueva "Preferencias del owner
+  (transversales a la app)" — incluye "aplicar fixes consistentemente
+  a todos los equivalentes" y "máquina dual nvm/fnm". Vive en repo
+  (versionado) para que viaje entre máquinas.
+
+**Decisiones tomadas (con peso):**
+
+- **Wrapper standalone para wizards fuera del mapa** (Opción B): se
+  desacopla del stack del mapa mediante prop `mode`. Coste bajo,
+  patrón reusable para futuros casos (sumisión, técnica si surge).
+  Descartadas: A (stack global a nivel app — refactor cascada, toca
+  `+layout.svelte` vetado), C (Dialog anidado sin abstracción — sin
+  reusabilidad).
+- **Validación de nombre Opción A en TecnicaWizard**: aviso paso 1 +
+  bloqueo paso 3. El UNIQUE es compuesto (no se puede chequear en
+  paso 1 con seguridad).
+- **Enter handler con `closest('[role="radiogroup"]')`**: chips
+  mantienen su semántica de Enter para seleccionar; el resto del
+  wizard intercepta SIEMPRE para evitar que Enter active botones
+  del indicador / footer.
+- **Patrón sticky footer canónico** del proyecto: `Dialog.Content` =
+  `flex max-h-[90vh] flex-col`; body = `flex-1 overflow-y-auto`;
+  footer fuera (`<Dialog.Footer>` propio o `<div>` plano según
+  componente). `min-h-0` en padres flex column para que el overflow
+  respete el alto.
+- **Vínculo top/bottom NO entra en it.1**: se trabaja como primera
+  tarea de it.2 (T-1.it2). Con un mini-ADR previo.
+
+---
+
+## Sesión previa (2026-05-13, sesión 8) — T-10 + T-11
+
+[T-10: editor de TECNICA wizard 7 pasos. T-11: UI de contras
+editable (✕ inline, + Añadir contra con Combobox, + Crear nueva
+técnica inline). Patrones T-8 / T-9 / T-10 establecidos.]
 
 ---
 
@@ -386,34 +511,55 @@ posiciones-problema en wizard de roll (T-12), chips + filtro en
 
 ## Próximo paso
 
-**T-11 — UI de contras.** Permitir definir relaciones "X es contra de Y"
-entre técnicas. Desde el modal de una técnica, botón "+ Añadir contra"
-abre un combobox de técnicas existentes (autocomplete por nombre) con
-"+ Crear nueva técnica" inline (que abre el wizard completo de técnica).
+**T-13 — Visualización de posiciones-problema.** Dos cambios:
 
-**Notas para T-11:**
-- Reutilizar el `Combobox` ya creado en T-10. Ítems = todas las
-  técnicas excepto la actual.
-- "+ Crear nueva técnica" inline: misma mecánica que T-10 con
-  `returnHandler` — el modal de técnica registra un handler, pushea
-  `wizard-tecnica modo crear`, y al guardar recibe el id nuevo y lo
-  añade como contra. Necesita ampliar el `ReturnHandler` type para
-  aceptar `'tecnica'` además de `'posicion'`/`'sumision'`. Cuando se
-  cree la técnica inline, el `posicionOrigenId` puede no estar claro
-  — decidir UX: ¿lo elige el usuario en el wizard nuevo, o se le
-  prefill con la posición de origen de la técnica actual? (Probable:
-  paso 3 del wizard pasa a ser editable normal, sin prefill.)
-- Lista de contras existentes con icono "✕" para quitar — decisión de
-  T-11 (vs solo añadir). Probablemente sí, mismo combobox + lista.
-- Persistencia: `addContra` / `removeContra` ya existen en
-  `src/lib/contras.ts`.
-- Borrar técnica: ya está bloqueado en T-10 si la técnica aparece como
-  contra de otra (vía `countContrasIncoming`). No tocar.
+1. **`/sesion/[id]`**: bajo cada roll, si tiene posiciones-problema,
+   mostrar chips read-only con el nombre de cada posición. Cargar con
+   `getPosicionesProblema(rollId)` (ya existe).
+2. **`/rolls` (tabla)**: filtro nuevo "Posición problema" — multi-select
+   sobre el catálogo de posiciones. Si el filtro tiene N posiciones
+   seleccionadas, mostrar solo rolls cuya relación
+   `roll_posicion_problema` incluya alguna de ellas. Query
+   correspondiente nueva en `rolls.ts` (probable: extender
+   `listRolls()` con un parámetro opcional `posicionProblemaIds[]`).
 
-Después de T-11: T-12 (captura inline de posiciones-problema en
-wizard de roll), T-13 (chips en detalle de sesión + filtro nuevo en
-/rolls), T-14 (semilla real con catálogo BJJ realista + uso real),
-T-15 (cierre con tag `v0.2-it1`).
+**Notas para T-13:**
+- El catálogo de posiciones para el filtro ya se carga en `/rolls` si
+  ya se hizo en T-12 (verificar).
+- Patrón de chips read-only: usar tokens semánticos coherentes con el
+  resto (`bg-muted text-muted-foreground`, `border-border`).
+- Si el roll no tiene posiciones-problema, no renderizar nada (no
+  placeholder).
+
+Después de T-13: **T-14** (semilla real con catálogo BJJ realista +
+uso real) y **T-15** (cierre con tag `v0.2-it1`).
+
+---
+
+## Iteración 2 — entrada confirmada
+
+**T-1.it2 — Vínculo posiciones complementarias (top ↔ bottom) +
+vista del oponente.** Decidido 2026-05-13 (sesión 9) como **primera
+tarea de it.2**, no como T-11.5 dentro de it.1. Razón: la vista del
+oponente es valor visible para el usuario y merece su propia iteración;
+it.1 cierra con scope limpio y tag `v0.2-it1`.
+
+Casos de uso (justificación de la tarea):
+
+1. Vista del oponente en el modal de posición: desde "Mount top" ver
+   "Lo que puede hacer tu oponente desde Mount bottom" (escapes, sweeps,
+   sumisiones).
+2. Prefill correcto al crear una contra inline: hoy T-11 va sin prefill
+   porque la complementaria no es derivable; con el vínculo, prefijar
+   la posición correcta del ejecutor de la contra.
+3. Métricas combinadas a futuro: "tiempo total en mount" = top + bottom.
+4. Rolls bidireccionales / sugerencias automáticas (it.3+).
+
+Antes de implementar, escribir mini-ADR `decisiones/002-vinculo-top-bottom.md`
+con la decisión del modelo (campo autoref `posicion_complementaria_id`
+vs tabla `posicion_par` vs categoría+rol). Schema v3 + migración + UI
+mínima en modal de posición. Retro-vincular pares creados en T-14 a
+mano (1 click por par, ≤6 pares).
 
 ---
 

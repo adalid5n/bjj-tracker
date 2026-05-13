@@ -52,6 +52,7 @@
 
 	const POSICIONES_SEED: PosicionSeed[] = [
 		{ nombre: 'Guardia cerrada bottom', categoria: 'guardia', tipo: 'ofensiva' },
+		{ nombre: 'Guardia cerrada top', categoria: 'guardia', tipo: 'defensiva' },
 		{ nombre: 'Mount top', categoria: 'control_superior', tipo: 'ofensiva' },
 		{ nombre: 'Mount bottom', categoria: 'control_superior', tipo: 'defensiva' }
 	];
@@ -82,13 +83,13 @@
 			nombre: 'Upa',
 			tipo: 'escape',
 			origenNombre: 'Mount bottom',
-			destinoPosicionNombre: 'Guardia cerrada bottom'
+			destinoPosicionNombre: 'Guardia cerrada top'
 		},
 		{
 			nombre: 'Elbow escape',
 			tipo: 'escape',
 			origenNombre: 'Mount bottom',
-			destinoPosicionNombre: 'Guardia cerrada bottom',
+			destinoPosicionNombre: 'Guardia cerrada top',
 			variante: 'clásica'
 		},
 		{

@@ -270,7 +270,7 @@
 
 <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
 	<Dialog.Content
-		class="max-h-[90vh] overflow-y-auto sm:max-w-md"
+		class="flex max-h-[90vh] flex-col sm:max-w-md"
 		onOpenAutoFocus={(e) => e.preventDefault()}
 		onEscapeKeydown={handleAttemptClose}
 		onInteractOutside={handleAttemptClose}
@@ -312,43 +312,80 @@
 				</div>
 			</Dialog.Header>
 
-			<div class="pt-1">
-				{#if top.kind === 'posicion'}
-					{@const pos = posicionesById[top.id]}
+			<!--
+			  `{#key top.id}` fuerza remount del modal-content al navegar
+			  entre entidades del mismo kind (p. ej. técnica → técnica al
+			  clicar una contra). Sin esto, Svelte 5 reutiliza el componente
+			  cambiando la prop `tecnica` pero no re-ejecuta su `onMount`, y
+			  estado interno cargado en `onMount` (lista de contras, otras
+			  variantes, contadores) se queda con el del modal anterior —
+			  bug que producía "Upa como contra de Upa" al navegar de Armbar
+			  a Upa.
+
+			  Wrapper en flex column: `flex-1` ocupa el alto sobrante del
+			  Dialog.Content, `min-h-0` permite que los hijos hagan scroll
+			  (sin esto, `overflow-y-auto` en un flex-1 no hace nada). Los
+			  wizards (PosicionWizard/SumisionWizard/TecnicaWizard) se
+			  estructuran internamente como flex column con body scrollable
+			  y footer sticky al final — por eso ellos usan `flex h-full
+			  flex-col` directamente y NO van envueltos en un div con
+			  `overflow-y-auto`. Los visualizadores (PosicionModalContent y
+			  similares) sí van dentro de un div con `overflow-y-auto`
+			  porque su contenido puede desbordar sin tener footer propio.
+			-->
+			{#if top.kind === 'posicion'}
+				{@const pos = posicionesById[top.id]}
+				<div class="-mx-3 min-h-0 flex-1 overflow-y-auto px-3 pt-1">
 					{#if pos}
-						<PosicionModalContent posicion={pos} onChanged={handleModalChanged} />
+						{#key top.id}
+							<PosicionModalContent posicion={pos} onChanged={handleModalChanged} />
+						{/key}
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando posición…</p>
 					{/if}
-				{:else if top.kind === 'tecnica'}
-					{@const tec = tecnicasById[top.id]}
+				</div>
+			{:else if top.kind === 'tecnica'}
+				{@const tec = tecnicasById[top.id]}
+				<div class="-mx-3 min-h-0 flex-1 overflow-y-auto px-3 pt-1">
 					{#if tec}
-						<TecnicaModalContent tecnica={tec} onChanged={handleModalChanged} />
+						{#key top.id}
+							<TecnicaModalContent tecnica={tec} onChanged={handleModalChanged} />
+						{/key}
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando técnica…</p>
 					{/if}
-				{:else if top.kind === 'sumision'}
-					{@const sum = sumisionesById[top.id]}
+				</div>
+			{:else if top.kind === 'sumision'}
+				{@const sum = sumisionesById[top.id]}
+				<div class="-mx-3 min-h-0 flex-1 overflow-y-auto px-3 pt-1">
 					{#if sum}
-						<SumisionModalContent sumision={sum} onChanged={handleModalChanged} />
+						{#key top.id}
+							<SumisionModalContent sumision={sum} onChanged={handleModalChanged} />
+						{/key}
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando sumisión…</p>
 					{/if}
-				{:else if top.kind === 'wizard-posicion'}
+				</div>
+			{:else if top.kind === 'wizard-posicion'}
+				<div class="flex min-h-0 flex-1 flex-col pt-1">
 					<PosicionWizard
 						modo={top.modo}
 						posicionId={top.modo === 'editar' ? top.id : undefined}
 						onSaved={handlePosicionWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>
-				{:else if top.kind === 'wizard-sumision'}
+				</div>
+			{:else if top.kind === 'wizard-sumision'}
+				<div class="flex min-h-0 flex-1 flex-col pt-1">
 					<SumisionWizard
 						modo={top.modo}
 						sumisionId={top.modo === 'editar' ? top.id : undefined}
 						onSaved={handleSumisionWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>
-				{:else if top.kind === 'wizard-tecnica'}
+				</div>
+			{:else if top.kind === 'wizard-tecnica'}
+				<div class="flex min-h-0 flex-1 flex-col pt-1">
 					<TecnicaWizard
 						modo={top.modo}
 						tecnicaId={top.modo === 'editar' ? top.id : undefined}
@@ -356,8 +393,8 @@
 						onSaved={handleTecnicaWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>
-				{/if}
-			</div>
+				</div>
+			{/if}
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>

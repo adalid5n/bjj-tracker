@@ -2,7 +2,6 @@
  * CRUD de Compañeros sobre la BD de SQLite-WASM.
  * Cliente only — depende de `$lib/db`, que requiere browser.
  */
-
 import { init, query, run } from '$lib/db';
 import type { Companero } from '$lib/types';
 

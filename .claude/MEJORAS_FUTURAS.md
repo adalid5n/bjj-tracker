@@ -103,6 +103,12 @@ La nueva ruta `/companeros` usa FAB consistente con `/`. La página dev `/dev/co
 - **Implicación técnica:** Cytoscape.js debe rendear bien en móvil (touch gestures, zoom). Validarlo cuando se aborde iteración 3.
 - **Cuándo:** iteración 3.
 
+### ~~Vincular posiciones complementarias (top ↔ bottom)~~ — MOVIDA a tarea concreta
+
+Decidido 2026-05-13 (s9) — primera tarea de **it.2** (T-1.it2). Ver
+`ESTADO_ACTUAL.md` sección "Iteración 2 — entrada confirmada".
+Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
+
 ### Una técnica con múltiples destinos posibles
 
 - **Origen:** T-10, feedback Adalid 2026-05-13

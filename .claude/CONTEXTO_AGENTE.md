@@ -105,6 +105,32 @@
   los resuelve. Histórico: bug de refresh resuelto con kit 2.57→2.59.1
   + vite 8.0.7→8.0.12 (commit `8c7c62c`, ADR `decisiones/001-...`).
 
+## Preferencias del owner (transversales a la app)
+
+Estas reglas se vivirían "en memoria del agente" si trabajáramos en una
+sola máquina, pero como el owner alterna entre dos equipos distintos
+viven aquí — en un fichero versionado — para que cualquier sesión (en
+cualquier máquina) las herede.
+
+- **Aplica fixes con consistencia.** Cuando el owner reporta un bug en
+  un wizard/editor concreto (p. ej. "Enter no funciona en el wizard de
+  técnica"), aplica el fix por defecto a TODOS los wizards/editores
+  equivalentes (Posicion, Sumision, Tecnica, RollEditor, SesionEditor,
+  CompaneroEditor). Si tienes duda sobre el alcance, pregunta ANTES; no
+  toques solo el componente nombrado y dejes los demás sin actualizar.
+  En el resumen final lista qué archivos tocaste para que pueda objetar
+  si te pasaste.
+- **Doble entorno (dual machine).** El owner trabaja en dos máquinas:
+  una con `nvm` + bash (paths `~/.nvm/...`), otra con `fnm`. Antes de
+  proponer cambios a `~/.bashrc` o init de shell, verifica qué gestor
+  está realmente instalado (`command -v nvm`, `command -v fnm`).
+- **Reglas que viven en otros sitios** (no aquí):
+  - Convenciones de código del proyecto y restricciones de stack →
+    secciones superiores de este mismo fichero.
+  - Backlog de ideas descartadas → `MEJORAS_FUTURAS.md`.
+  - Plan de iteración actual → `ITERACION_X.md`.
+  - Estado vivo entre sesiones → `ESTADO_ACTUAL.md`.
+
 ## Continuidad entre sesiones
 
 - Existe `ESTADO_ACTUAL.md` con el estado vivo del proyecto.

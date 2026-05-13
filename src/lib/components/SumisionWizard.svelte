@@ -76,6 +76,7 @@
 		// Registra el dirty handler en el stack para que el host lo
 		// consulte antes de cerrar / hacer pop a una entrada anterior.
 		mapaModalStack.setDirtyHandler(() => isDirty);
+		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
 
 		// Carga el catálogo en paralelo con la posible carga de la sumisión
 		// a editar. El catálogo es pequeño (decenas), no merece query
@@ -118,6 +119,7 @@
 
 	onDestroy(() => {
 		mapaModalStack.setDirtyHandler(null);
+		if (typeof document !== 'undefined') document.removeEventListener('keydown', handleDocumentEnter, true);
 	});
 
 	// Hay cambios sin guardar si algún campo difiere del snapshot inicial.
@@ -176,6 +178,54 @@
 			e.preventDefault();
 			tryAdvanceFromStep1();
 		}
+	}
+
+	/**
+	 * Enter en el wizard: dispara la acción primaria del paso actual.
+	 * Listener global para cubrir "foco perdido" y "foco en botón del
+	 * indicador de progreso". Respeta textareas e inputs (que ya tienen
+	 * handler propio).
+	 */
+	function handleWizardKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		const target = e.target as HTMLElement | null;
+		if (target?.tagName === 'TEXTAREA') return;
+		// Si el foco está en un chip (button dentro de un radiogroup),
+		// Enter activa la selección/toggle del chip — semántica propia, no
+		// la pisamos. Para cualquier OTRO target (body, botón del indicador
+		// de progreso, botón del footer, input sin handler propio…) sí
+		// interceptamos para evitar que Enter active el elemento enfocado
+		// (típicamente: el botón 'Paso 1' del indicador, que dispararía
+		// goToStep(1)).
+		if (target?.closest('[role="radiogroup"]')) return;
+		// Intercept inmediato: incluso si NO podemos avanzar (paso obligatorio
+		// vacío), bloqueamos el evento para que no active el botón enfocado.
+		e.preventDefault();
+		e.stopImmediatePropagation();
+		const intercept = () => {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		};
+		if (currentStep === 1) {
+			if (canAdvanceFromStep1) {
+				intercept();
+				tryAdvanceFromStep1();
+			}
+			return;
+		}
+		if (currentStep === totalSteps) {
+			if (!saving && nombre.trim().length > 0) {
+				intercept();
+				handleSave();
+			}
+		}
+	}
+
+	function handleDocumentEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		const target = e.target as HTMLElement | null;
+		if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+		handleWizardKeydown(e);
 	}
 
 	function cancel() {
@@ -271,95 +321,106 @@
 		<pre class="mt-1 text-xs whitespace-pre-wrap text-destructive">{loadError}</pre>
 	</div>
 {:else}
-	<!-- Indicador de progreso (mismo patrón que PosicionWizard). -->
-	<div class="flex items-center gap-1 pt-2">
-		{#each Array(totalSteps) as _, i (i)}
-			{@const step = i + 1}
-			{@const visited = visitedSteps.has(step)}
-			{@const isCurrent = step === currentStep}
-			<button
-				type="button"
-				class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
-					? 'bg-primary'
-					: visited
-						? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
-						: 'bg-muted'}"
-				disabled={!visited || isCurrent}
-				onclick={() => goToStep(step)}
-				aria-label="Ir al paso {step}"
-			></button>
-		{/each}
-	</div>
-	<p class="text-center text-xs text-muted-foreground">
-		Paso {currentStep} de {totalSteps}
-	</p>
-
 	<!--
-	  Todos los pasos viven montados (clave del fix del bug B de T-8). El
-	  paso inactivo se oculta con `hidden`, así Svelte no desmonta/remonta
-	  los bindings `bind:value` y los $state del padre se preservan al
-	  navegar entre pasos.
+	  Estructura flex column: el padre (MapaModalHost) nos da `flex-1` dentro
+	  del Dialog.Content; aquí distribuimos progreso (fijo), body scrollable
+	  y footer (fijo) para que los botones Cancelar / ← Anterior / Continuar
+	  / Guardar siempre se vean al final.
 	-->
-	<div class="space-y-4 py-2">
-		<div class="space-y-3" class:hidden={currentStep !== 1}>
-			<h3 class="text-sm font-semibold">Nombre *</h3>
-			<Input
-				bind:value={nombre}
-				placeholder="p. ej. armbar, mata leão, kimura"
-				onkeydown={handleNombreKeydown}
-				oninput={handleNombreInput}
-				autofocus={currentStep === 1}
-				aria-invalid={nombreError ? 'true' : undefined}
-				aria-describedby={nombreError ? 'sumision-nombre-error' : undefined}
-			/>
-			{#if nombreError}
-				<p id="sumision-nombre-error" class="text-sm text-destructive">{nombreError}</p>
-			{/if}
-			<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
+	<div class="flex h-full min-h-0 flex-col">
+		<!-- Indicador de progreso (mismo patrón que PosicionWizard). -->
+		<div class="flex items-center gap-1 pt-2">
+			{#each Array(totalSteps) as _, i (i)}
+				{@const step = i + 1}
+				{@const visited = visitedSteps.has(step)}
+				{@const isCurrent = step === currentStep}
+				<button
+					type="button"
+					class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
+						? 'bg-primary'
+						: visited
+							? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
+							: 'bg-muted'}"
+					disabled={!visited || isCurrent}
+					onclick={() => goToStep(step)}
+					aria-label="Ir al paso {step}"
+				></button>
+			{/each}
 		</div>
+		<p class="text-center text-xs text-muted-foreground">
+			Paso {currentStep} de {totalSteps}
+		</p>
 
-		<div class="space-y-3" class:hidden={currentStep !== 2}>
-			<h3 class="text-sm font-semibold">Notas (opcional)</h3>
-			<div class="space-y-1.5">
-				<Label for="sumision-notas">Notas</Label>
-				<Textarea
-					id="sumision-notas"
-					bind:value={notas}
-					rows={4}
-					placeholder="Pinta-pega lo que quieras recordar sobre esta sumisión."
+		<!--
+		  Body scrollable. Todos los pasos viven montados (clave del fix del
+		  bug B de T-8); el paso inactivo se oculta con `hidden`, así Svelte
+		  no desmonta/remonta los bindings `bind:value` y los $state del
+		  padre se preservan al navegar entre pasos.
+		-->
+		<div class="-mx-3 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-2">
+			<div class="space-y-3" class:hidden={currentStep !== 1}>
+				<h3 class="text-sm font-semibold">Nombre *</h3>
+				<Input
+					bind:value={nombre}
+					placeholder="p. ej. armbar, mata leão, kimura"
+					onkeydown={handleNombreKeydown}
+					oninput={handleNombreInput}
+					autofocus={currentStep === 1}
+					aria-invalid={nombreError ? 'true' : undefined}
+					aria-describedby={nombreError ? 'sumision-nombre-error' : undefined}
 				/>
+				{#if nombreError}
+					<p id="sumision-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+				{/if}
+				<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
 			</div>
+
+			<div class="space-y-3" class:hidden={currentStep !== 2}>
+				<h3 class="text-sm font-semibold">Notas (opcional)</h3>
+				<div class="space-y-1.5">
+					<Label for="sumision-notas">Notas</Label>
+					<Textarea
+						id="sumision-notas"
+						bind:value={notas}
+						rows={4}
+						placeholder="Pinta-pega lo que quieras recordar sobre esta sumisión."
+					/>
+				</div>
+			</div>
+
+			{#if errorMsg}
+				<p class="text-sm text-destructive">{errorMsg}</p>
+			{/if}
 		</div>
-	</div>
 
-	{#if errorMsg}
-		<p class="text-sm text-destructive">{errorMsg}</p>
-	{/if}
+		<!-- Footer fijo fuera del body scrollable. -->
+		<div
+			class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3"
+		>
+			<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
 
-	<div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-		<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
+			<div class="flex flex-wrap gap-2">
+				{#if currentStep > 1}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => goToStep(currentStep - 1)}
+						disabled={saving}
+					>
+						← Anterior
+					</Button>
+				{/if}
 
-		<div class="flex flex-wrap gap-2">
-			{#if currentStep > 1}
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={() => goToStep(currentStep - 1)}
-					disabled={saving}
-				>
-					← Anterior
-				</Button>
-			{/if}
-
-			{#if currentStep === totalSteps}
-				<Button size="sm" onclick={handleSave} disabled={saving || !nombre.trim()}>
-					{saving ? 'Guardando…' : 'Guardar'}
-				</Button>
-			{:else if currentStep === 1}
-				<Button size="sm" onclick={tryAdvanceFromStep1} disabled={!canAdvanceFromStep1}>
-					Continuar
-				</Button>
-			{/if}
+				{#if currentStep === totalSteps}
+					<Button size="sm" onclick={handleSave} disabled={saving || !nombre.trim()}>
+						{saving ? 'Guardando…' : 'Guardar'}
+					</Button>
+				{:else if currentStep === 1}
+					<Button size="sm" onclick={tryAdvanceFromStep1} disabled={!canAdvanceFromStep1}>
+						Continuar
+					</Button>
+				{/if}
+			</div>
 		</div>
 	</div>
 {/if}

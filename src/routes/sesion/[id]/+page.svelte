@@ -109,14 +109,22 @@
 		que_intente?: string;
 		que_fallo?: string;
 		posiciones_problema?: string;
+		// T-12: posiciones de problema (catálogo). Persiste tras
+		// create/update via `setPosicionesProblema` (idempotente).
+		posicion_problema_ids: string[];
 	}) {
-		const { createRoll, updateRoll } = await import('$lib/rolls');
+		const { createRoll, updateRoll, setPosicionesProblema } = await import('$lib/rolls');
+		const { posicion_problema_ids, ...rollFields } = data;
+		let rollId: string;
 		if (editingRoll) {
-			await updateRoll(data);
+			await updateRoll(rollFields);
+			rollId = rollFields.id;
 		} else {
-			const { id: _id, ...rest } = data;
-			await createRoll(rest);
+			const { id: _id, ...rest } = rollFields;
+			const created = await createRoll(rest);
+			rollId = created.id;
 		}
+		await setPosicionesProblema(rollId, posicion_problema_ids);
 		await refreshRolls();
 	}
 

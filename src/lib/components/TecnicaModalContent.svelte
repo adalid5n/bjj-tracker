@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * Contenido interno del modal de TECNICA (T-6).
+	 * Contenido interno del modal de TECNICA (T-6, ampliado en T-11).
 	 *
 	 * NO es un Dialog en sí — el Dialog lo provee `MapaModalHost`. Aquí
 	 * solo renderizamos: chips (tipo + estado + variante), origen, destino,
@@ -9,6 +9,16 @@
 	 * Cada navegación (origen, destino, contra, otra variante) hace push
 	 * al `mapaModalStack` para que el host renderice el siguiente nivel.
 	 *
+	 * T-11: la sección "Contras conocidas" deja de ser solo lectura. Cada
+	 * contra tiene un botón "✕" para quitarla (con AlertDialog de
+	 * confirmación). Debajo aparece "+ Añadir contra" que despliega un
+	 * Combobox con autocomplete sobre todas las técnicas (excluye la
+	 * actual y las que ya son contra). El Combobox incluye opción
+	 * "+ Crear nueva técnica" inline (sigue el patrón returnHandler de
+	 * T-10: el modal registra un handler, pushea el wizard de técnica, y
+	 * al guardar éste vuelve con el id nuevo — el modal lo añade como
+	 * contra).
+	 *
 	 * Patrón idéntico al de `PosicionModalContent`: carga en paralelo en
 	 * `onMount`, estados loading/ready/error.
 	 */
@@ -16,6 +26,8 @@
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import Combobox from '$lib/components/Combobox.svelte';
+	import XIcon from '@lucide/svelte/icons/x';
 	import type {
 		EstadoTecnica,
 		Posicion,
@@ -23,7 +35,11 @@
 		Tecnica,
 		TipoTecnica
 	} from '$lib/types';
-	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import {
+		mapaModalStack,
+		consumePendingReturnHandlerWork,
+		setPendingReturnHandlerWork
+	} from './mapa-modal-stack.svelte';
 
 	let { tecnica, onChanged }: { tecnica: Tecnica; onChanged?: () => void } = $props();
 
@@ -70,6 +86,8 @@
 	let otrasVariantes = $state<Tecnica[]>([]);
 	// Cache id → nombre para mostrar el origen de cada contra / variante.
 	let posicionesById = $state<Record<string, string>>({});
+	// Catálogo completo de técnicas (para el Combobox de añadir contra).
+	let todasTecnicas = $state<Tecnica[]>([]);
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
 	// Técnicas que tienen ESTA técnica como su contra. Bloquea el borrado
@@ -79,13 +97,43 @@
 	let deleting = $state(false);
 	let mostrarConfirmBorrar = $state(false);
 
+	// --- T-11: estado de UI de contras ---
+	// Si está abierto, mostramos el Combobox para añadir una contra. Si
+	// está cerrado, mostramos el botón "+ Añadir contra".
+	let mostrarAddCombobox = $state(false);
+	// Loading flag para el flujo de añadir (deshabilita el Combobox
+	// durante el insert + reload).
+	let addingContra = $state(false);
+	// AlertDialog "Quitar contra": pre-cargado con la contra concreta.
+	let mostrarConfirmQuitar = $state(false);
+	let contraAQuitar = $state<Tecnica | null>(null);
+	let quitando = $state(false);
+	// Mensaje de error específico para acciones de contras (separado del
+	// `errorMessage` de carga inicial).
+	let contrasErrorMessage = $state('');
+
 	onMount(async () => {
 		try {
+			// T-11: si el modal se está remontando tras un wizard inline de
+			// "+ Crear nueva técnica" que insertó una contra, esperamos a
+			// que ese INSERT termine antes de leer `getContras`. Sin esto
+			// hay una carrera entre el INSERT del addContra y el SELECT
+			// del getContras (ambos van por el mismo worker SQLite, pero
+			// el orden de microtask de Promise.all puede no garantizarlo).
+			const pending = consumePendingReturnHandlerWork();
+			if (pending) {
+				await pending.catch(() => {
+					/* swallow: el error del addContra ya se reportó en su
+					   propio flujo o se manifestará como ausencia del item
+					   en la lista. */
+				});
+			}
+
 			const [
 				{ getPosicion, listPosiciones },
 				{ getSumision },
 				{ getContras, countContrasIncoming },
-				{ getOtrasVariantes }
+				{ getOtrasVariantes, listTecnicas }
 			] = await Promise.all([
 				import('$lib/posiciones'),
 				import('$lib/sumisiones'),
@@ -100,15 +148,23 @@
 						? getPosicion(tecnica.posicion_destino_id)
 						: Promise.resolve(null);
 
-			const [origenRes, destinoRes, contrasRes, variantesRes, todasPos, incomingCount] =
-				await Promise.all([
-					getPosicion(tecnica.posicion_origen_id),
-					destinoPromise,
-					getContras(tecnica.id),
-					getOtrasVariantes(tecnica.nombre, tecnica.id),
-					listPosiciones(),
-					countContrasIncoming(tecnica.id)
-				]);
+			const [
+				origenRes,
+				destinoRes,
+				contrasRes,
+				variantesRes,
+				todasPos,
+				todasTec,
+				incomingCount
+			] = await Promise.all([
+				getPosicion(tecnica.posicion_origen_id),
+				destinoPromise,
+				getContras(tecnica.id),
+				getOtrasVariantes(tecnica.nombre, tecnica.id),
+				listPosiciones(),
+				listTecnicas(),
+				countContrasIncoming(tecnica.id)
+			]);
 
 			origen = origenRes;
 			if (tecnica.tipo === 'sumision') {
@@ -119,6 +175,7 @@
 			contras = contrasRes;
 			otrasVariantes = variantesRes;
 			posicionesById = Object.fromEntries(todasPos.map((p) => [p.id, p.nombre]));
+			todasTecnicas = todasTec;
 			contrasIncomingCount = incomingCount;
 
 			status = 'ready';
@@ -175,6 +232,139 @@
 			status = 'error';
 		} finally {
 			deleting = false;
+		}
+	}
+
+	// --- T-11: helpers de UI de contras ---
+
+	/**
+	 * Recarga la lista de contras + el catálogo de técnicas (que se usa
+	 * para filtrar el Combobox). Se llama tras un add o remove exitoso.
+	 */
+	async function reloadContras() {
+		try {
+			const [{ getContras }, { listTecnicas }] = await Promise.all([
+				import('$lib/contras'),
+				import('$lib/tecnicas')
+			]);
+			[contras, todasTecnicas] = await Promise.all([getContras(tecnica.id), listTecnicas()]);
+		} catch (err) {
+			contrasErrorMessage = err instanceof Error ? err.message : String(err);
+			console.error('[TecnicaModalContent] reloadContras failed:', err);
+		}
+	}
+
+	/**
+	 * Items del Combobox de "+ Añadir contra": catálogo completo de
+	 * técnicas, excluyendo la actual y las que ya están en `contras`.
+	 * Cada item tiene como segunda línea "desde {origen}" — mismo patrón
+	 * que la lista de contras visible y "Otras variantes".
+	 */
+	const contrasYaPorId = $derived(new Set(contras.map((c) => c.id)));
+	const tecnicasComboItems = $derived(
+		todasTecnicas
+			.filter((t) => t.id !== tecnica.id && !contrasYaPorId.has(t.id))
+			.map((t) => {
+				const label = t.variante ? `${t.nombre} (${t.variante})` : t.nombre;
+				const sublabel = `desde ${posicionesById[t.posicion_origen_id] ?? '¿?'}`;
+				return { id: t.id, label, sublabel };
+			})
+	);
+
+	function handleAddContraClick() {
+		contrasErrorMessage = '';
+		mostrarAddCombobox = true;
+	}
+
+	async function handleSelectContra(id: string | null) {
+		if (!id) return;
+		addingContra = true;
+		contrasErrorMessage = '';
+		try {
+			const { addContra } = await import('$lib/contras');
+			await addContra(tecnica.id, id);
+			await reloadContras();
+			mostrarAddCombobox = false;
+		} catch (err) {
+			contrasErrorMessage = err instanceof Error ? err.message : String(err);
+		} finally {
+			addingContra = false;
+		}
+	}
+
+	/**
+	 * "+ Crear nueva técnica" inline desde el Combobox. Patrón T-10:
+	 * registra un return-handler, pushea el wizard de técnica en modo
+	 * crear, y cuando el wizard guarda detecta el handler y vuelve
+	 * (pop + invokeReturnHandler). El handler inicia `addContra` y deja
+	 * la promise en `pendingReturnHandlerWork` para que el `onMount` del
+	 * modal — que se vuelve a montar tras el pop — la espere antes de
+	 * leer la lista actualizada.
+	 *
+	 * Sin prefill de `posicionOrigenId`: la contra la ejecuta el oponente,
+	 * por tanto su origen es típicamente la posición complementaria de la
+	 * técnica actual (mount top vs mount bottom, etc.). El schema no tiene
+	 * forma de saber qué posición es la "complementaria" — el usuario lo
+	 * elige consciente en el paso 3 del wizard. (Si en el futuro vinculamos
+	 * top↔bottom, este es el sitio donde re-introducir el prefill correcto.)
+	 */
+	function handleCreateNuevaTecnica() {
+		mapaModalStack.setReturnHandler(async (newId, kind) => {
+			if (kind !== 'tecnica') return;
+			const { addContra } = await import('$lib/contras');
+			const p = addContra(tecnica.id, newId);
+			// Guarda la promise como "pending": el remount del modal
+			// (orquestado por el host vía `$effect`) la espera en su
+			// `onMount` antes de llamar a `getContras`. Así la lista que
+			// se renderiza ya incluye la nueva contra.
+			setPendingReturnHandlerWork(p);
+			// Best-effort: si por algún motivo el modal no se remontara
+			// (caso teórico — el host siempre remonta el top que cambia),
+			// nos aseguramos de propagar el error a consola.
+			p.catch((err) => {
+				console.error('[TecnicaModalContent] addContra (inline) failed:', err);
+			});
+			// Notifica al padre por si la página `/mapa` u otra vista
+			// quiere refrescar contadores (consistente con `onChanged` de
+			// edit/delete).
+			onChanged?.();
+		});
+		mapaModalStack.push({
+			kind: 'wizard-tecnica',
+			modo: 'crear',
+			nombre: 'Nueva técnica (contra)'
+		});
+	}
+
+	function handleQuitarContraClick(contra: Tecnica) {
+		contraAQuitar = contra;
+		contrasErrorMessage = '';
+		mostrarConfirmQuitar = true;
+	}
+
+	async function handleConfirmQuitarContra() {
+		if (!contraAQuitar) return;
+		quitando = true;
+		try {
+			const { removeContra } = await import('$lib/contras');
+			await removeContra(tecnica.id, contraAQuitar.id);
+			await reloadContras();
+			mostrarConfirmQuitar = false;
+			contraAQuitar = null;
+			onChanged?.();
+		} catch (err) {
+			contrasErrorMessage = err instanceof Error ? err.message : String(err);
+		} finally {
+			quitando = false;
+		}
+	}
+
+	function handleQuitarOpenChange(value: boolean) {
+		// El AlertDialog puede cerrarse por Esc / click fuera / Cancelar.
+		// Limpiamos la contra seleccionada para que no quede colgada.
+		if (!value) {
+			mostrarConfirmQuitar = false;
+			if (!quitando) contraAQuitar = null;
 		}
 	}
 </script>
@@ -272,21 +462,20 @@
 			</div>
 		{/if}
 
-		<!-- Contras conocidas -->
+		<!-- Contras conocidas (T-6 read-only + T-11 editable: ✕ por item, + Añadir contra) -->
 		<div>
 			<h3 class="text-sm font-semibold">
 				Contras conocidas <span class="text-muted-foreground">({contras.length})</span>
 			</h3>
-			{#if contras.length === 0}
-				<p class="mt-1 text-sm text-muted-foreground">Sin contras registradas.</p>
-			{:else}
+
+			{#if contras.length > 0}
 				<div class="mt-2 rounded border border-border">
 					<ul class="divide-y divide-border">
 						{#each contras as c (c.id)}
-							<li>
+							<li class="flex items-stretch">
 								<button
 									type="button"
-									class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+									class="block flex-1 p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 									onclick={() => pushTecnica(c)}
 								>
 									<div class="font-medium">
@@ -298,10 +487,68 @@
 										desde {posicionesById[c.posicion_origen_id] ?? '¿?'}
 									</div>
 								</button>
+								<!--
+								  Botón ✕ para quitar esta contra. stopPropagation evita que
+								  dispare el click del item (push del modal de la contra).
+								-->
+								<button
+									type="button"
+									class="flex items-center justify-center px-3 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:outline-none"
+									onclick={(e) => {
+										e.stopPropagation();
+										handleQuitarContraClick(c);
+									}}
+									aria-label="Quitar contra «{c.nombre}»"
+								>
+									<XIcon class="size-4" aria-hidden="true" />
+								</button>
 							</li>
 						{/each}
 					</ul>
 				</div>
+			{/if}
+
+			<!--
+			  Zona de añadir: si la lista está vacía y el combobox no está
+			  abierto, mostramos el placeholder + el botón; si no, solo el
+			  botón. El combobox sustituye al botón mientras esté abierto.
+			-->
+			<div class="mt-2">
+				{#if mostrarAddCombobox}
+					<div class="space-y-2">
+						<Combobox
+							value={null}
+							onValueChange={handleSelectContra}
+							items={tecnicasComboItems}
+							placeholder={addingContra ? 'Añadiendo…' : 'Selecciona una técnica…'}
+							searchPlaceholder="Buscar técnica…"
+							emptyMessage="Sin técnicas disponibles."
+							onCreateNew={handleCreateNuevaTecnica}
+							createNewLabel="Crear nueva técnica"
+							disabled={addingContra}
+							ariaLabel="Añadir contra"
+						/>
+						<div class="flex justify-end">
+							<Button
+								variant="ghost"
+								size="sm"
+								onclick={() => (mostrarAddCombobox = false)}
+								disabled={addingContra}
+							>
+								Cancelar
+							</Button>
+						</div>
+					</div>
+				{:else}
+					{#if contras.length === 0}
+						<p class="mb-2 text-sm text-muted-foreground">Sin contras registradas.</p>
+					{/if}
+					<Button variant="outline" size="sm" onclick={handleAddContraClick}>+ Añadir contra</Button>
+				{/if}
+			</div>
+
+			{#if contrasErrorMessage}
+				<p class="mt-2 text-sm text-destructive">{contrasErrorMessage}</p>
 			{/if}
 		</div>
 
@@ -375,7 +622,8 @@
 </div>
 
 <!--
-  AlertDialog para confirmar borrado (mismo patrón que las otras entidades).
+  AlertDialog para confirmar borrado de la técnica completa (T-10).
+  Mismo patrón que las otras entidades.
 -->
 <AlertDialog.Root bind:open={mostrarConfirmBorrar}>
 	<AlertDialog.Content>
@@ -393,6 +641,38 @@
 				class={buttonVariants({ variant: 'destructive' })}
 			>
 				{deleting ? 'Borrando…' : 'Borrar'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!--
+  AlertDialog para confirmar quitar una contra (T-11). Controlado (no
+  bind:open) para que el cierre por cualquier vía (Esc / Cancelar /
+  click fuera) limpie `contraAQuitar`. Mismo patrón que el AlertDialog
+  controlado de SumisionWizard (T-9).
+-->
+<AlertDialog.Root open={mostrarConfirmQuitar} onOpenChange={handleQuitarOpenChange}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Quitar contra</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if contraAQuitar}
+					¿Quitar «{contraAQuitar.nombre}» de las contras de «{tecnica.nombre}»? Se borra solo la
+					relación; las técnicas siguen existiendo.
+				{:else}
+					¿Quitar esta contra?
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={quitando}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={handleConfirmQuitarContra}
+				disabled={quitando}
+				class={buttonVariants({ variant: 'destructive' })}
+			>
+				{quitando ? 'Quitando…' : 'Quitar'}
 			</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>

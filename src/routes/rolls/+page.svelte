@@ -90,9 +90,14 @@
 		que_intente?: string;
 		que_fallo?: string;
 		posiciones_problema?: string;
+		// T-12: posiciones de problema (catálogo). Aquí solo aplica modo
+		// editar, así que el id del roll está siempre disponible en data.id.
+		posicion_problema_ids: string[];
 	}) {
-		const { updateRoll } = await import('$lib/rolls');
-		await updateRoll(data);
+		const { updateRoll, setPosicionesProblema } = await import('$lib/rolls');
+		const { posicion_problema_ids, ...rollFields } = data;
+		await updateRoll(rollFields);
+		await setPosicionesProblema(rollFields.id, posicion_problema_ids);
 		await refresh();
 	}
 

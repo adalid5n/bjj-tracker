@@ -22,7 +22,7 @@ export type MapaModalEntry =
 	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string }
 	| { kind: 'wizard-sumision'; modo: 'crear'; nombre: string }
 	| { kind: 'wizard-sumision'; modo: 'editar'; id: string; nombre: string }
-	| { kind: 'wizard-tecnica'; modo: 'crear'; nombre: string; posicionOrigenId: string }
+	| { kind: 'wizard-tecnica'; modo: 'crear'; nombre: string; posicionOrigenId?: string }
 	| { kind: 'wizard-tecnica'; modo: 'editar'; id: string; nombre: string };
 
 /**
@@ -38,25 +38,63 @@ export type MapaModalEntry =
 type DirtyHandler = () => boolean;
 
 /**
- * Return-handler API (T-10):
+ * Return-handler API (T-10, ampliada en T-11):
  *
- * Permite que el wizard de técnica reciba el id de una posición o
- * sumisión recién creada cuando el usuario abre el sub-wizard desde el
- * paso de destino vía "+ Crear nueva". El wizard de técnica registra el
- * handler antes de pushear el sub-wizard al stack; cuando el sub-wizard
- * guarda en modo crear, detecta el handler y lo invoca con el nuevo id
- * (en lugar de hacer su `closeAll + push modal` habitual). El wizard de
- * técnica recibe el id, prefiere el destino, y desregistra el handler.
+ * Permite que un componente padre (wizard de técnica, modal de técnica)
+ * reciba el id de una entidad recién creada cuando el usuario abre un
+ * sub-wizard inline vía "+ Crear nueva". El padre registra el handler
+ * antes de pushear el sub-wizard al stack; cuando el sub-wizard guarda
+ * en modo crear, detecta el handler y lo invoca con el nuevo id (en
+ * lugar de hacer su `closeAll + push modal` habitual). El padre recibe
+ * el id y reacciona (prefill destino, añadir como contra, etc.).
  *
- * El kind del handler ('posicion' | 'sumision') distingue qué campo del
- * wizard de técnica debe rellenarse.
+ * Kinds soportados:
+ *  - 'posicion' / 'sumision' (T-10): paso 5 del wizard de técnica.
+ *  - 'tecnica' (T-11): "+ Añadir contra" del modal de técnica.
+ *
+ * El handler puede ser síncrono o devolver un Promise. Si necesita que
+ * un trabajo asíncrono (p. ej. `addContra`) complete antes de que el
+ * componente padre se remonte y lea de BD, debe registrar el Promise
+ * en `pendingReturnHandlerWork` (ver más abajo).
  */
-type ReturnHandler = (newId: string, kind: 'posicion' | 'sumision') => void;
+type ReturnHandler = (newId: string, kind: 'posicion' | 'sumision' | 'tecnica') => void;
+
+/**
+ * Trabajo asíncrono "pendiente" que un return-handler dejó iniciado y
+ * que el componente padre debería esperar antes de leer estado de BD al
+ * remontarse (T-11).
+ *
+ * Caso de uso: el handler registrado por `TecnicaModalContent` invoca
+ * `addContra(tecnicaActualId, nuevoId)` de forma síncrona (sin
+ * `await`), guarda la Promise aquí, y el modal — que se remonta cuando
+ * el wizard sub-pushed se cierra — lee este Promise en su `onMount` y
+ * lo espera antes de llamar a `getContras`, garantizando que la nueva
+ * contra ya esté en BD cuando se hace la query.
+ *
+ * No es reactivo (no usa `$state`): es una variable de bandera entre
+ * dos ciclos de vida.
+ */
+let pendingReturnHandlerWork: Promise<unknown> | null = null;
+export function setPendingReturnHandlerWork(p: Promise<unknown> | null): void {
+	pendingReturnHandlerWork = p;
+}
+export function consumePendingReturnHandlerWork(): Promise<unknown> | null {
+	const p = pendingReturnHandlerWork;
+	pendingReturnHandlerWork = null;
+	return p;
+}
 
 class MapaModalStack {
 	#stack = $state<MapaModalEntry[]>([]);
 	#dirtyHandler: DirtyHandler | null = null;
-	#returnHandler: ReturnHandler | null = null;
+	/**
+	 * Stack LIFO de return-handlers. Necesario porque los flujos "+ Crear
+	 * nueva inline" se anidan: el modal de técnica registra un handler para
+	 * añadir-como-contra, y el wizard de técnica pushea encima un sub-wizard
+	 * de posición/sumisión que registra OTRO handler para prefill del destino.
+	 * Con un singleton el primero se sobrescribía y se perdía (bug T-11).
+	 */
+	#returnHandlers: ReturnHandler[] = [];
 
 	get stack(): readonly MapaModalEntry[] {
 		return this.#stack;
@@ -97,23 +135,30 @@ class MapaModalStack {
 	}
 
 	setReturnHandler(handler: ReturnHandler | null): void {
-		this.#returnHandler = handler;
+		if (handler === null) return;
+		this.#returnHandlers.push(handler);
 	}
 
 	hasReturnHandler(): boolean {
-		return this.#returnHandler !== null;
+		return this.#returnHandlers.length > 0;
 	}
 
 	/**
-	 * Invoca el handler registrado (si lo hay) y lo desregistra para no
-	 * dispararlo dos veces. Devuelve `true` si había handler y se invocó,
-	 * `false` si no había handler — el caller decide entonces si hace su
-	 * flujo normal de `closeAll + push modal`.
+	 * Invoca el handler del tope del stack y lo desapila. Devuelve `true`
+	 * si había handler y se invocó, `false` si no había — el caller decide
+	 * entonces si hace su flujo normal de `closeAll + push modal`.
+	 *
+	 * Los handlers son LIFO: el más reciente responde primero. Cada handler
+	 * tiene una guardia `if (kind !== 'X') return` para ignorar invocaciones
+	 * que no le correspondan. La invocación SIEMPRE desapila el top, aunque
+	 * la guardia lo ignore — esto evita acumulación pero deja huérfano al
+	 * handler de debajo si los kinds llegan desordenados (caso raro: solo
+	 * ocurre si un wizard se cancela sin invocar su handler, lo que ya
+	 * estaba anotado como pendiente menor).
 	 */
-	invokeReturnHandler(newId: string, kind: 'posicion' | 'sumision'): boolean {
-		const handler = this.#returnHandler;
+	invokeReturnHandler(newId: string, kind: 'posicion' | 'sumision' | 'tecnica'): boolean {
+		const handler = this.#returnHandlers.pop();
 		if (!handler) return false;
-		this.#returnHandler = null;
 		handler(newId, kind);
 		return true;
 	}

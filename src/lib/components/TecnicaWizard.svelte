@@ -141,8 +141,31 @@
 	// es de una sesión anterior del wizard sobre OTRA técnica / modo).
 	const draftKey = $derived(modo === 'crear' ? 'crear' : `editar:${tecnicaId ?? ''}`);
 
+	/**
+	 * Listener global de Enter para cubrir el caso "foco perdido": el
+	 * `onkeydowncapture` del wrapper solo se dispara si el evento se
+	 * origina dentro del subtree del wizard. Al entrar a un paso sin
+	 * hacer click en nada, el foco está en `document.body` y el evento
+	 * NO bubble por el wrapper. Aquí lo recogemos y delegamos al mismo
+	 * handler. Solo intervenimos cuando el target es `body` (foco
+	 * realmente perdido), para no pisar el comportamiento natural de
+	 * inputs, comboboxes abiertos o AlertDialogs.
+	 */
+	function handleDocumentEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		const target = e.target as HTMLElement | null;
+		// Inputs y textareas tienen semántica natural de Enter (submit del
+		// form, newline). Cualquier otra cosa (body con foco perdido, botón
+		// del indicador de progreso del wizard, label, etc.) deja el control
+		// al wizard — handleWizardKeydown hace preventDefault y evita que
+		// se dispare el click sintético del botón enfocado.
+		if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+		handleWizardKeydown(e);
+	}
+
 	onMount(async () => {
 		mapaModalStack.setDirtyHandler(() => isDirty);
+		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
 
 		// Carga catálogos en paralelo para los Comboboxes y la validación
 		// UNIQUE. El catálogo de técnicas se usa solo para detectar
@@ -251,6 +274,7 @@
 
 	onDestroy(() => {
 		mapaModalStack.setDirtyHandler(null);
+		if (typeof document !== 'undefined') document.removeEventListener('keydown', handleDocumentEnter, true);
 		// OJO: NO limpiamos el draft aquí. `onDestroy` se dispara también
 		// cuando el wizard se remonta tras un sub-wizard inline (pop de
 		// `wizard-posicion`/`wizard-sumision` deja al TecnicaWizard como
@@ -360,6 +384,80 @@
 		}
 	}
 
+	/**
+	 * Enter a nivel del wizard, en CAPTURE phase: corre antes que los
+	 * handlers internos de Combobox (Popover/Command de bits-ui) y Chips,
+	 * que de otra forma consumirían el evento o lo enviarían a un Portal
+	 * fuera del wrapper. Textareas se respetan (newline natural). Si
+	 * intercepta y avanza, hace stopImmediatePropagation para que ningún
+	 * otro handler reaccione.
+	 */
+	function handleWizardKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		const target = e.target as HTMLElement | null;
+		if (target?.tagName === 'TEXTAREA') return;
+		// Si el foco está en un chip (button dentro de un radiogroup),
+		// Enter activa la selección/toggle del chip — semántica propia, no
+		// la pisamos. Para cualquier OTRO target (body, botón del indicador
+		// de progreso, botón del footer, input sin handler propio…) sí
+		// interceptamos para evitar que Enter active el elemento enfocado
+		// (típicamente: el botón 'Paso 1' del indicador, que dispararía
+		// goToStep(1)).
+		if (target?.closest('[role="radiogroup"]')) return;
+		// Intercept inmediato: incluso si NO podemos avanzar (paso obligatorio
+		// vacío), bloqueamos el evento para que no active el botón enfocado.
+		e.preventDefault();
+		e.stopImmediatePropagation();
+		const intercept = () => {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		};
+		if (currentStep === 1) {
+			if (canAdvanceFromStep1) {
+				intercept();
+				advance();
+			}
+			return;
+		}
+		if (currentStep === 2) {
+			intercept();
+			advance();
+			return;
+		}
+		if (currentStep === 3) {
+			if (canAdvanceFromStep3) {
+				intercept();
+				tryAdvanceFromStep3();
+			}
+			return;
+		}
+		if (currentStep === 4) {
+			if (tipo !== undefined) {
+				intercept();
+				advance();
+			}
+			return;
+		}
+		if (currentStep === 5) {
+			if (canAdvanceFromStep5) {
+				intercept();
+				advance();
+			}
+			return;
+		}
+		if (currentStep === 6) {
+			intercept();
+			(estado !== undefined ? handleContinueStep6 : handleSkipEstado)();
+			return;
+		}
+		if (currentStep === totalSteps) {
+			if (!saving && nombre.trim().length > 0 && posicionOrigenId && tipo) {
+				intercept();
+				handleSave();
+			}
+		}
+	}
+
 	function handleTipoChange(v: string | null) {
 		const nuevoTipo = (v ?? undefined) as TipoTecnica | undefined;
 		// Coherencia destino-tipo: si cambia la "rama" (sumisión vs no),
@@ -386,6 +484,28 @@
 
 	function handleContinueStep6() {
 		advance();
+	}
+
+	// "+ Crear nueva posición" inline en paso 3 (origen). Mismo patrón
+	// que el paso 5: registra return handler, pushea sub-wizard, al volver
+	// asigna el id al draft y a la variable local del origen.
+	function handleCreateNuevaPosicionOrigen() {
+		mapaModalStack.setReturnHandler((newId, kind) => {
+			if (kind !== 'posicion') return;
+			void import('$lib/posiciones').then(async ({ listPosiciones }) => {
+				posiciones = await listPosiciones();
+			});
+			posicionOrigenId = newId;
+			const current = tecnicaWizardDraft.value;
+			if (current) {
+				tecnicaWizardDraft.set({ ...current, posicionOrigenId: newId });
+			}
+		});
+		mapaModalStack.push({
+			kind: 'wizard-posicion',
+			modo: 'crear',
+			nombre: 'Nueva posición (origen)'
+		});
 	}
 
 	// "+ Crear nueva posición" inline en paso 5 (rama no-sumision).
@@ -467,6 +587,55 @@
 		tipo === 'sumision' ? sumisionDestinoId !== null : posicionDestinoId !== null
 	);
 
+	/**
+	 * Aviso informativo en el paso 1 (Opción A): si hay otra técnica con el
+	 * MISMO nombre (independiente de origen/variante), avisamos para que
+	 * el usuario lo sepa. NO bloquea — la UNIQUE real es compuesta
+	 * (nombre + origen + variante) y se valida al avanzar del paso 3.
+	 * En modo editar no avisa (el match consigo misma es esperable).
+	 */
+	const nombreYaExisteAviso = $derived.by(() => {
+		if (modo === 'editar') return '';
+		const n = nombre.trim().toLowerCase();
+		if (!n) return '';
+		const matches = tecnicasExistentes.filter((t) => t.nombre.toLowerCase() === n);
+		if (matches.length === 0) return '';
+		const ejemplo = matches[0];
+		const origenNombre =
+			posiciones.find((p) => p.id === ejemplo.posicion_origen_id)?.nombre ?? '?';
+		const varianteNota = ejemplo.variante ? ` (${ejemplo.variante})` : '';
+		const otrasNota = matches.length > 1 ? ` y ${matches.length - 1} más` : '';
+		return `Ya existe "${ejemplo.nombre}"${varianteNota} desde ${origenNombre}${otrasNota}. Cambia el nombre o continúa si vas a registrar otra variante / origen distinto.`;
+	});
+
+	/**
+	 * Validación bloqueante al avanzar del paso 3 (origen). Aquí ya tenemos
+	 * los 3 campos del UNIQUE compuesto (nombre + origen + variante), así
+	 * que podemos chequear duplicado exacto y avisar antes de llegar al
+	 * paso 7 (Guardar).
+	 */
+	function tryAdvanceFromStep3() {
+		if (!canAdvanceFromStep3) return;
+		if (modo !== 'editar') {
+			const n = nombre.trim().toLowerCase();
+			const v = variante.trim().toLowerCase();
+			const dup = tecnicasExistentes.some(
+				(t) =>
+					t.nombre.toLowerCase() === n &&
+					t.posicion_origen_id === posicionOrigenId &&
+					(t.variante ?? '').toLowerCase() === v
+			);
+			if (dup) {
+				nombreError =
+					'Ya existe una técnica con ese mismo nombre, origen y variante. Cambia el nombre o la variante.';
+				currentStep = 1;
+				return;
+			}
+		}
+		nombreError = '';
+		advance();
+	}
+
 	function isUniqueError(err: unknown): boolean {
 		const msg = err instanceof Error ? err.message : String(err);
 		return /UNIQUE constraint failed/i.test(msg);
@@ -542,8 +711,20 @@
 				// Draft consumido: limpia para que la próxima vez que se
 				// abra el wizard empiece vacío.
 				tecnicaWizardDraft.clear();
-				mapaModalStack.closeAll();
-				mapaModalStack.push({ kind: 'tecnica', id: nueva.id, nombre: nueva.nombre });
+				// T-11: si hay un return handler registrado (caso típico:
+				// el modal de técnica abrió este wizard desde
+				// "+ Crear nueva técnica" en la sección de contras), salimos
+				// del wizard con `pop` y le pasamos el nuevo id al handler.
+				// En lugar de hacer el `closeAll + push modal` habitual, que
+				// rompería el flujo dejando al usuario en el modal de la
+				// nueva técnica en vez del de la actual.
+				if (mapaModalStack.hasReturnHandler()) {
+					mapaModalStack.pop();
+					mapaModalStack.invokeReturnHandler(nueva.id, 'tecnica');
+				} else {
+					mapaModalStack.closeAll();
+					mapaModalStack.push({ kind: 'tecnica', id: nueva.id, nombre: nueva.nombre });
+				}
 			} else {
 				if (!tecnicaId) {
 					throw new Error('Falta tecnicaId en modo editar.');
@@ -589,31 +770,45 @@
 		<pre class="mt-1 text-xs whitespace-pre-wrap text-destructive">{loadError}</pre>
 	</div>
 {:else}
-	<!-- Indicador de progreso (7 segmentos, mismo patrón que PosicionWizard). -->
-	<div class="flex items-center gap-1 pt-2">
-		{#each Array(totalSteps) as _, i (i)}
-			{@const step = i + 1}
-			{@const visited = visitedSteps.has(step)}
-			{@const isCurrent = step === currentStep}
-			<button
-				type="button"
-				class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
-					? 'bg-primary'
-					: visited
-						? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
-						: 'bg-muted'}"
-				disabled={!visited || isCurrent}
-				onclick={() => goToStep(step)}
-				aria-label="Ir al paso {step}"
-			></button>
-		{/each}
-	</div>
-	<p class="text-center text-xs text-muted-foreground">
-		Paso {currentStep} de {totalSteps}
-	</p>
+	<!--
+	  Estructura flex column: el padre (MapaModalHost) nos da `flex-1` dentro
+	  del Dialog.Content; aquí distribuimos progreso (fijo), body scrollable
+	  y footer (fijo) para que los botones Cancelar / ← Anterior / Continuar
+	  / Guardar siempre se vean al final del Dialog.
+	-->
+	<div class="flex h-full min-h-0 flex-col">
+		<!-- Indicador de progreso (7 segmentos, mismo patrón que PosicionWizard). -->
+		<div class="flex items-center gap-1 pt-2">
+			{#each Array(totalSteps) as _, i (i)}
+				{@const step = i + 1}
+				{@const visited = visitedSteps.has(step)}
+				{@const isCurrent = step === currentStep}
+				<button
+					type="button"
+					class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
+						? 'bg-primary'
+						: visited
+							? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
+							: 'bg-muted'}"
+					disabled={!visited || isCurrent}
+					onclick={() => goToStep(step)}
+					aria-label="Ir al paso {step}"
+				></button>
+			{/each}
+		</div>
+		<p class="text-center text-xs text-muted-foreground">
+			Paso {currentStep} de {totalSteps}
+		</p>
 
-	<!-- Todos los pasos montados (class:hidden); evita el bug de remount T-8. -->
-	<div class="space-y-4 py-2">
+		<!--
+		  Body scrollable. Todos los pasos montados (`class:hidden`); evita
+		  el bug de remount T-8.
+		-->
+		<div
+			class="-mx-3 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-2"
+			onkeydowncapture={handleWizardKeydown}
+			role="presentation"
+		>
 		<!-- Paso 1: Nombre -->
 		<div class="space-y-3" class:hidden={currentStep !== 1}>
 			<h3 class="text-sm font-semibold">Nombre *</h3>
@@ -628,6 +823,14 @@
 			/>
 			{#if nombreError}
 				<p id="tecnica-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+			{:else if nombreYaExisteAviso}
+				<!--
+				  Aviso NO bloqueante (Opción A): el UNIQUE real es compuesto
+				  (nombre + origen + variante), así que aquí solo informamos
+				  de que ya hay otra técnica con ese mismo nombre. La
+				  validación bloqueante ocurre al avanzar del paso 3.
+				-->
+				<p class="text-sm text-warning">{nombreYaExisteAviso}</p>
 			{/if}
 			<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
 		</div>
@@ -658,12 +861,14 @@
 				items={posicionItems}
 				placeholder="Selecciona una posición…"
 				searchPlaceholder="Buscar posición…"
-				emptyMessage="Sin posiciones en el catálogo. Crea una desde /mapa antes."
+				emptyMessage="Sin posiciones en el catálogo."
+				onCreateNew={handleCreateNuevaPosicionOrigen}
+				createNewLabel="Crear nueva posición"
 				ariaLabel="Posición de origen"
 			/>
 			<p class="text-xs text-muted-foreground">
-				La posición desde donde sale esta técnica. Si no existe, crea la posición primero
-				en el mapa y vuelve.
+				La posición desde donde sale esta técnica. Si no existe, pulsa
+				"+ Crear nueva posición".
 			</p>
 		</div>
 
@@ -757,62 +962,68 @@
 				/>
 			</div>
 		</div>
-	</div>
 
-	{#if errorMsg}
-		<p class="text-sm text-destructive">{errorMsg}</p>
-	{/if}
+		{#if errorMsg}
+			<p class="text-sm text-destructive">{errorMsg}</p>
+		{/if}
+		</div>
 
-	<!--
-	  Footer: Cancelar | ← Anterior | Continuar/Saltar/Guardar. Mismo patrón
-	  que PosicionWizard. El "Anterior" navega dentro del wizard; el "← Atrás"
-	  del header del host hace pop del stack (no entra aquí).
-	-->
-	<div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-		<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
+		<!--
+		  Footer: Cancelar | ← Anterior | Continuar/Saltar/Guardar. FUERA del
+		  body scrollable: siempre visible al final del Dialog. El "Anterior"
+		  navega dentro del wizard; el "← Atrás" del header del host hace pop
+		  del stack (no entra aquí).
+		-->
+		<div
+			class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3"
+		>
+			<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
 
-		<div class="flex flex-wrap gap-2">
-			{#if currentStep > 1}
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={() => goToStep(currentStep - 1)}
-					disabled={saving}
-				>
-					← Anterior
-				</Button>
-			{/if}
+			<div class="flex flex-wrap gap-2">
+				{#if currentStep > 1}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => goToStep(currentStep - 1)}
+						disabled={saving}
+					>
+						← Anterior
+					</Button>
+				{/if}
 
-			{#if currentStep === 2}
-				<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
-					Continuar
-				</Button>
-			{:else if currentStep === 6}
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={estado !== undefined ? handleContinueStep6 : handleSkipEstado}
-					disabled={saving}
-				>
-					Continuar
-				</Button>
-			{/if}
+				{#if currentStep === 2}
+					<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
+						Continuar
+					</Button>
+				{:else if currentStep === 6}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={estado !== undefined ? handleContinueStep6 : handleSkipEstado}
+						disabled={saving}
+					>
+						Continuar
+					</Button>
+				{/if}
 
-			{#if currentStep === 1}
-				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep1}>Continuar</Button>
-			{:else if currentStep === 3}
-				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep3}>Continuar</Button>
-			{:else if currentStep === 5}
-				<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep5}>Continuar</Button>
-			{:else if currentStep === totalSteps}
-				<Button
-					size="sm"
-					onclick={handleSave}
-					disabled={saving || !nombre.trim() || !posicionOrigenId || !tipo}
-				>
-					{saving ? 'Guardando…' : 'Guardar'}
-				</Button>
-			{/if}
+				{#if currentStep === 1}
+					<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep1}>Continuar</Button>
+				{:else if currentStep === 3}
+					<Button size="sm" onclick={tryAdvanceFromStep3} disabled={!canAdvanceFromStep3}>Continuar</Button>
+				{:else if currentStep === 4}
+					<Button size="sm" onclick={advance} disabled={!tipo}>Continuar</Button>
+				{:else if currentStep === 5}
+					<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep5}>Continuar</Button>
+				{:else if currentStep === totalSteps}
+					<Button
+						size="sm"
+						onclick={handleSave}
+						disabled={saving || !nombre.trim() || !posicionOrigenId || !tipo}
+					>
+						{saving ? 'Guardando…' : 'Guardar'}
+					</Button>
+				{/if}
+			</div>
 		</div>
 	</div>
 {/if}

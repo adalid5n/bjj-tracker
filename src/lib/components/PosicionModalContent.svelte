@@ -300,7 +300,7 @@
 	{#if status === 'ready'}
 		<div class="pt-1">
 			<Button variant="outline" size="sm" onclick={handleAddTecnica}>
-				+ Añadir técnica desde aquí
+				+ Nueva técnica desde esta posición
 			</Button>
 		</div>
 	{/if}
