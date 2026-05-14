@@ -61,10 +61,6 @@
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-4 p-4 pb-32">
-	<header>
-		<h1 class="text-2xl font-bold">BJJ Tracker</h1>
-	</header>
-
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
@@ -78,10 +74,13 @@
 			<p class="text-sm text-muted-foreground">Empieza creando una con el botón de abajo.</p>
 		</div>
 	{:else}
-		<ul class="divide-y divide-border rounded border border-border">
+		<ul class="space-y-2">
 			{#each sesiones as s (s.id)}
 				<li>
-					<a href={resolve(`/sesion/${s.id}`)} class="block p-3 transition-colors hover:bg-accent">
+					<a
+						href={resolve(`/sesion/${s.id}`)}
+						class="block rounded-lg border border-border bg-card p-3 shadow-xs transition-colors hover:bg-accent"
+					>
 						<div class="flex items-baseline justify-between">
 							<span class="font-medium">{formatFecha(s.fecha)}</span>
 							<span class="text-xs text-muted-foreground">

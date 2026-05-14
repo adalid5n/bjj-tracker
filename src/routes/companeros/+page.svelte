@@ -89,10 +89,6 @@
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-3 p-4 pb-32">
-	<header>
-		<h1 class="text-2xl font-bold">Compañeros</h1>
-	</header>
-
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
@@ -107,9 +103,11 @@
 		</div>
 	{:else}
 		<p class="text-xs text-muted-foreground">{companeros.length} compañero(s)</p>
-		<ul class="divide-y divide-border rounded border border-border">
+		<ul class="space-y-2">
 			{#each companeros as c (c.id)}
-				<li class="flex items-center justify-between gap-3 p-3">
+				<li
+					class="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-xs transition-colors hover:bg-accent"
+				>
 					<button type="button" class="flex-1 text-left" onclick={() => openEdit(c)}>
 						<div class="font-medium">{c.nombre}</div>
 						<div class="mt-0.5 text-xs text-muted-foreground">

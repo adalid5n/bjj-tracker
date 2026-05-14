@@ -150,11 +150,6 @@
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-4 p-4 pb-32">
-	<header class="flex items-center gap-3">
-		<Button variant="outline" size="sm" href={resolve('/')}>← Volver</Button>
-		<h1 class="text-xl font-bold">Editar sesión</h1>
-	</header>
-
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
 	{:else if status === 'notfound'}
@@ -183,12 +178,12 @@
 					Aún no hay rolls en esta sesión. Pulsa el botón de abajo para añadir el primero.
 				</p>
 			{:else}
-				<ul class="divide-y divide-border rounded border border-border">
+				<ul class="space-y-2">
 					{#each rolls as r (r.id)}
 						<li>
 							<button
 								type="button"
-								class="w-full p-3 text-left transition-colors hover:bg-accent"
+								class="w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent"
 								onclick={() => openEditRoll(r)}
 							>
 								<div class="flex items-baseline justify-between gap-2">
