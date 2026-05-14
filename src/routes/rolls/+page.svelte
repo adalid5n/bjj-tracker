@@ -5,7 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Label } from '$lib/components/ui/label';
 	import BottomNav from '$lib/components/BottomNav.svelte';
-	import DateInput from '$lib/components/DateInput.svelte';
+	import DateRangePopover from '$lib/components/DateRangePopover.svelte';
 	import RollEditor from '$lib/components/RollEditor.svelte';
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import type {
@@ -169,10 +169,56 @@
 		await refresh();
 	}
 
-	function formatFecha(iso: string): string {
-		const d = new Date(iso + 'T00:00:00');
-		return d.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short' });
+	// T-13: helpers para agrupar rolls por día. La fecha viene en
+	// `r.sesion_fecha` como ISO `YYYY-MM-DD` (sin hora). Para "Hoy"/"Ayer"
+	// comparamos contra la fecha local del navegador formateada igual.
+	function todayIso(): string {
+		const d = new Date();
+		const y = String(d.getFullYear()).padStart(4, '0');
+		const m = String(d.getMonth() + 1).padStart(2, '0');
+		const day = String(d.getDate()).padStart(2, '0');
+		return `${y}-${m}-${day}`;
 	}
+
+	function yesterdayIso(): string {
+		const d = new Date();
+		d.setDate(d.getDate() - 1);
+		const y = String(d.getFullYear()).padStart(4, '0');
+		const m = String(d.getMonth() + 1).padStart(2, '0');
+		const day = String(d.getDate()).padStart(2, '0');
+		return `${y}-${m}-${day}`;
+	}
+
+	// Formatter de día completo para headers: "lun, 12 may 2026".
+	const headerFmt = new Intl.DateTimeFormat('es-ES', {
+		weekday: 'short',
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric'
+	});
+
+	function dayHeaderLabel(iso: string): string {
+		if (iso === todayIso()) return 'Hoy';
+		if (iso === yesterdayIso()) return 'Ayer';
+		return headerFmt.format(new Date(iso + 'T00:00:00'));
+	}
+
+	// Agrupa los rolls por `sesion_fecha` manteniendo el orden actual. Como
+	// `listAllRolls` ya devuelve `ORDER BY s.fecha DESC, r.orden DESC`, los
+	// grupos salen automáticamente en orden de fecha descendente y los rolls
+	// dentro de cada grupo conservan el orden original.
+	const rollsPorDia = $derived.by(() => {
+		const grupos: { fecha: string; label: string; items: RollWithContext[] }[] = [];
+		let actual: { fecha: string; label: string; items: RollWithContext[] } | null = null;
+		for (const r of rolls) {
+			if (!actual || actual.fecha !== r.sesion_fecha) {
+				actual = { fecha: r.sesion_fecha, label: dayHeaderLabel(r.sesion_fecha), items: [] };
+				grupos.push(actual);
+			}
+			actual.items.push(r);
+		}
+		return grupos;
+	});
 
 	const activeFilterCount = $derived(
 		[from, to, companeroId, resultado, tipoSesion].filter(Boolean).length +
@@ -200,24 +246,29 @@
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-3 p-4 pb-28">
-	<header>
-		<h1 class="text-2xl font-bold">Rolls</h1>
-	</header>
-
+	<!--
+	  Sub-header sticky: el bloque de filtros queda pegado justo debajo del
+	  AppHeader (h-14 → top-14 = 56px) cuando el usuario hace scroll.
+	  `bg-background` opaca el contenido que scrollea por debajo. `pb-2`
+	  añade separación visual del contenido scrolleable. `-mx-4 px-4` para
+	  que la línea inferior llegue de borde a borde del viewport (el `main`
+	  tiene `p-4`). El `details` cerrado se ve compacto (solo summary);
+	  abierto crece y ocupa más espacio sticky — comportamiento aceptado.
+	-->
+	<div class="sticky top-14 z-20 -mx-4 border-b border-border bg-background px-4 pb-2">
 	<details class="rounded border border-border bg-muted">
 		<summary class="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
 			Filtros {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
 		</summary>
 		<div class="space-y-3 border-t border-border p-3">
-			<div class="grid grid-cols-2 gap-2">
-				<div class="space-y-1">
-					<Label for="from" class="text-xs">Desde</Label>
-					<DateInput id="from" bind:value={from} />
-				</div>
-				<div class="space-y-1">
-					<Label for="to" class="text-xs">Hasta</Label>
-					<DateInput id="to" bind:value={to} />
-				</div>
+			<div class="space-y-1">
+				<Label for="filter-fechas" class="text-xs">Fechas</Label>
+				<DateRangePopover
+					id="filter-fechas"
+					bind:from
+					bind:to
+					ariaLabel="Filtrar por rango de fechas"
+				/>
 			</div>
 
 			<div class="space-y-1">
@@ -307,6 +358,7 @@
 			{/if}
 		</div>
 	</details>
+	</div>
 
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
@@ -323,59 +375,63 @@
 		</p>
 	{:else}
 		<p class="text-xs text-muted-foreground">{rolls.length} roll(s)</p>
-		<ul class="divide-y divide-border rounded border border-border">
-			{#each rolls as r (r.id)}
-				<li>
-					<button
-						type="button"
-						class="w-full p-3 text-left transition-colors hover:bg-accent"
-						onclick={() => openEdit(r)}
-					>
-						<div class="flex items-baseline justify-between gap-2">
-							<div class="flex items-baseline gap-2">
-								<span class="text-xs font-semibold text-muted-foreground">
-									{formatFecha(r.sesion_fecha)}
-								</span>
-								{#if r.companero_nombre}
-									<span class="font-medium">{r.companero_nombre}</span>
-								{:else}
-									<span class="text-sm text-muted-foreground italic">Sin compañero</span>
-								{/if}
-							</div>
-							{#if r.resultado}
-								<span class="rounded px-2 py-0.5 text-xs {RESULTADO_BADGE[r.resultado]}">
-									{RESULTADO_LABEL[r.resultado]}
-								</span>
-							{/if}
-						</div>
-						<div class="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-							<span>{TIPO_LABEL[r.sesion_tipo]}</span>
-							<a
-								href={resolve(`/sesion/${r.sesion_id}`)}
-								class="text-primary underline hover:opacity-80"
-								onclick={(e) => e.stopPropagation()}
+		{#each rollsPorDia as grupo (grupo.fecha)}
+			<section class="space-y-2">
+				<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+					{grupo.label}
+				</h2>
+				<ul class="space-y-2">
+					{#each grupo.items as r (r.id)}
+						<li>
+							<button
+								type="button"
+								class="w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent"
+								onclick={() => openEdit(r)}
 							>
-								Ver sesión →
-							</a>
-						</div>
-						{#if r.que_fallo}
-							<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
-						{/if}
-						{#if posicionesProblemaByRoll.get(r.id)?.length}
-							<div class="mt-2 flex flex-wrap gap-1">
-								{#each posicionesProblemaByRoll.get(r.id) ?? [] as p (p.id)}
-									<span
-										class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+								<div class="flex items-baseline justify-between gap-2">
+									<div class="flex items-baseline gap-2">
+										{#if r.companero_nombre}
+											<span class="font-medium">{r.companero_nombre}</span>
+										{:else}
+											<span class="text-sm text-muted-foreground italic">Sin compañero</span>
+										{/if}
+									</div>
+									{#if r.resultado}
+										<span class="rounded px-2 py-0.5 text-xs {RESULTADO_BADGE[r.resultado]}">
+											{RESULTADO_LABEL[r.resultado]}
+										</span>
+									{/if}
+								</div>
+								<div class="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+									<span>{TIPO_LABEL[r.sesion_tipo]}</span>
+									<a
+										href={resolve(`/sesion/${r.sesion_id}`)}
+										class="text-primary underline hover:opacity-80"
+										onclick={(e) => e.stopPropagation()}
 									>
-										{p.nombre}
-									</span>
-								{/each}
-							</div>
-						{/if}
-					</button>
-				</li>
-			{/each}
-		</ul>
+										Ver sesión →
+									</a>
+								</div>
+								{#if r.que_fallo}
+									<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
+								{/if}
+								{#if posicionesProblemaByRoll.get(r.id)?.length}
+									<div class="mt-2 flex flex-wrap gap-1">
+										{#each posicionesProblemaByRoll.get(r.id) ?? [] as p (p.id)}
+											<span
+												class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+											>
+												{p.nombre}
+											</span>
+										{/each}
+									</div>
+								{/if}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/each}
 	{/if}
 </main>
 
