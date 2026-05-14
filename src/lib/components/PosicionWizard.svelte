@@ -69,6 +69,7 @@
 		modo,
 		mode = 'stack',
 		posicionId,
+		parentForComplementaria,
 		onSaved,
 		onRequestClose,
 		onDirtyChange
@@ -78,6 +79,15 @@
 		// `mapaModalStack`; 'standalone' usa solo callbacks.
 		mode?: 'stack' | 'standalone';
 		posicionId?: string;
+		// Si el sub-wizard se abrió desde "+ Crear nueva" del paso de
+		// Complementaria de otro PosicionWizard: id del padre.
+		// Bajo este flag (T-1.it2 fix): (1) se salta el paso 4 del sub
+		// (la complementaria es implícita = padre), (2) la nueva posición
+		// se crea con `posicion_complementaria_id = padre` y la simetría
+		// la aplica `syncComplementaria`, (3) el sub NO usa
+		// `posicionWizardDraft` para no pisar el draft del padre — así
+		// el padre, al remontarse tras el pop, restaura su `currentStep`.
+		parentForComplementaria?: string;
 		// Hook para que el host invalide su cache tras guardar/crear.
 		// id = id de la posición creada/editada; mode permite distinguir.
 		// En `standalone`, además, el padre cierra el Dialog tras esto.
@@ -109,7 +119,13 @@
 		{ value: 'neutral', label: 'Neutral' }
 	];
 
-	const totalSteps = 5;
+	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria, 5=Notas.
+	// Cuando el wizard es un sub-wizard de "+ Crear nueva complementaria" (T-1.it2
+	// fix), el paso 4 se salta — la complementaria es implícita (el padre).
+	const visibleSteps = $derived<number[]>(
+		parentForComplementaria !== undefined ? [1, 2, 3, 5] : [1, 2, 3, 4, 5]
+	);
+	const totalSteps = $derived(visibleSteps.length);
 
 	// `categoria` y `tipo` arrancan como undefined: nos permite distinguir
 	// "el usuario no ha tocado nada" de "el usuario eligió otro/lo que sea".
@@ -195,7 +211,13 @@
 		// cuando el wizard se remonta tras un sub-wizard inline ("+ Crear
 		// nueva posición" en el paso de complementaria). Sin esto el
 		// usuario perdería todo lo que llevaba escrito.
-		const draft = mode === 'stack' ? posicionWizardDraft.value : null;
+		//
+		// El sub-wizard (parentForComplementaria definido) NO lee draft
+		// para no acoplarse al draft del padre (escenarios cruzados).
+		const draft =
+			mode === 'stack' && parentForComplementaria === undefined
+				? posicionWizardDraft.value
+				: null;
 		if (draft && draft.key === draftKey) {
 			nombre = draft.nombre;
 			categoria = draft.categoria;
@@ -204,6 +226,12 @@
 			notas = draft.notas;
 			currentStep = draft.currentStep;
 			visitedSteps = new Set(draft.visitedSteps);
+		}
+
+		// Sub-wizard: fija la complementaria al padre antes de que el
+		// usuario pueda tocar nada. Este valor se persiste hasta el save.
+		if (parentForComplementaria !== undefined) {
+			complementariaId = parentForComplementaria;
 		}
 
 		if (modo !== 'editar') {
@@ -270,8 +298,12 @@
 	// paso de complementaria: el host renderiza solo el top del stack,
 	// así que el PosicionWizard padre se desmonta y luego se remonta al
 	// volver. Sin esto el usuario perdería todo lo escrito.
+	//
+	// El sub-wizard (parentForComplementaria definido) NO escribe el
+	// draft — pisaría el del padre y al remontarse el padre perdería
+	// `currentStep` y demás.
 	$effect(() => {
-		if (mode !== 'stack' || status !== 'ready') return;
+		if (mode !== 'stack' || status !== 'ready' || parentForComplementaria !== undefined) return;
 		posicionWizardDraft.set({
 			key: draftKey,
 			nombre,
@@ -347,10 +379,16 @@
 				posicionWizardDraft.set({ ...current, complementariaId: newId });
 			}
 		});
+		// Si el padre ya está creado (modo editar → tiene posicionId), se
+		// pasa al sub-wizard como `parentForComplementaria`: el sub salta
+		// el paso de complementaria y la vincula automáticamente. Si el
+		// padre todavía no tiene id (modo crear), el sub abre con su flujo
+		// completo de 5 pasos.
 		mapaModalStack.push({
 			kind: 'wizard-posicion',
 			modo: 'crear',
-			nombre: 'Nueva posición'
+			nombre: 'Nueva posición',
+			parentForComplementaria: posicionId
 		});
 	}
 
@@ -366,15 +404,22 @@
 	}
 
 	function goToStep(step: number) {
+		if (!visibleSteps.includes(step)) return;
 		if (step > currentStep && !visitedSteps.has(step)) return;
 		currentStep = step;
 	}
 
 	function advance() {
-		if (currentStep < totalSteps) {
-			currentStep += 1;
+		const idx = visibleSteps.indexOf(currentStep);
+		if (idx >= 0 && idx < visibleSteps.length - 1) {
+			currentStep = visibleSteps[idx + 1];
 			visitedSteps = new Set([...visitedSteps, currentStep]);
 		}
+	}
+
+	function previousStep(): number | null {
+		const idx = visibleSteps.indexOf(currentStep);
+		return idx > 0 ? visibleSteps[idx - 1] : null;
 	}
 
 	function nombreYaExiste(n: string): boolean {
@@ -450,7 +495,7 @@
 			handleContinueComplementaria();
 			return;
 		}
-		if (currentStep === totalSteps && nombre.trim().length > 0 && !saving) {
+		if (currentStep === 5 && nombre.trim().length > 0 && !saving) {
 			intercept();
 			handleSave();
 		}
@@ -545,10 +590,14 @@
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.
 					mapaModalStack.setDirtyHandler(null);
-					// Limpia el draft (si era nuestro). Si este wizard era un
-					// sub-wizard inline, el padre ya leyó/escribió su propio
-					// draft con key distinta y NO se ve afectado.
-					posicionWizardDraft.clear();
+					// Limpia el draft solo si NO somos un sub-wizard inline
+					// — el sub no escribió al draft (para no pisar el del
+					// padre), así que tampoco debe limpiarlo. El draft del
+					// padre tiene que sobrevivir hasta que el padre se
+					// remonte y lo lea.
+					if (parentForComplementaria === undefined) {
+						posicionWizardDraft.clear();
+					}
 					// El callback `onSaved` puede leerse en el host para invalidar
 					// cache. Lo invocamos siempre antes de mover el stack para que
 					// el host trabaje sobre el stack estable.
@@ -636,8 +685,7 @@
 	<div class="flex h-full min-h-0 flex-col">
 		<!-- Indicador de progreso (mismo patrón que RollEditor). -->
 		<div class="flex items-center gap-1 pt-2">
-			{#each Array(totalSteps) as _, i (i)}
-				{@const step = i + 1}
+			{#each visibleSteps as step, i (step)}
 				{@const visited = visitedSteps.has(step)}
 				{@const isCurrent = step === currentStep}
 				<button
@@ -654,7 +702,7 @@
 			{/each}
 		</div>
 		<p class="text-center text-xs text-muted-foreground">
-			Paso {currentStep} de {totalSteps}
+			Paso {visibleSteps.indexOf(currentStep) + 1} de {totalSteps}
 		</p>
 
 		<!--
@@ -762,11 +810,12 @@
 		<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
 
 		<div class="flex flex-wrap gap-2">
-			{#if currentStep > 1}
+			{#if previousStep() !== null}
+				{@const prev = previousStep()}
 				<Button
 					variant="outline"
 					size="sm"
-					onclick={() => goToStep(currentStep - 1)}
+					onclick={() => prev !== null && goToStep(prev)}
 					disabled={saving}
 				>
 					← Anterior
@@ -802,7 +851,7 @@
 				</Button>
 			{/if}
 
-			{#if currentStep === totalSteps}
+			{#if currentStep === 5}
 				<Button size="sm" onclick={handleSave} disabled={saving || !nombre.trim()}>
 					{saving ? 'Guardando…' : 'Guardar'}
 				</Button>

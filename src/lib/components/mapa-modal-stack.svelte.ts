@@ -18,7 +18,20 @@ export type MapaModalEntry =
 	| { kind: 'posicion'; id: string; nombre: string }
 	| { kind: 'tecnica'; id: string; nombre: string }
 	| { kind: 'sumision'; id: string; nombre: string }
-	| { kind: 'wizard-posicion'; modo: 'crear'; nombre: string }
+	| {
+			kind: 'wizard-posicion';
+			modo: 'crear';
+			nombre: string;
+			/**
+			 * Si el sub-wizard se abre desde "+ Crear nueva" del paso
+			 * Complementaria de otro PosicionWizard, este id es el del padre.
+			 * Bajo este flag: (1) se salta el paso de Complementaria del sub
+			 * (es implícita = padre), (2) se vincula bidireccionalmente al
+			 * guardar, (3) el sub no toca `posicionWizardDraft` para no pisar
+			 * el draft del padre. Ver T-1.it2 fix.
+			 */
+			parentForComplementaria?: string;
+	  }
 	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string }
 	| { kind: 'wizard-sumision'; modo: 'crear'; nombre: string }
 	| { kind: 'wizard-sumision'; modo: 'editar'; id: string; nombre: string }

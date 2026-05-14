@@ -269,8 +269,17 @@
   Contenido del modal de posición. Va dentro de Dialog.Content
   (provisto por MapaModalHost). El título usa Dialog.Title fuera
   de este componente, así que aquí solo renderizamos chips + tabs.
+
+  Estructura: flex column con body scrollable (chips, técnicas, vista
+  oponente, CTA "+ Nueva técnica") y footer fijo (Editar/Borrar). El
+  footer fuera del scrollable evita un bug visual sutil — el shadcn
+  Button aplica `active:translate-y-px` al pulsar; si el footer está
+  dentro del scrollable y el contenido llega al borde, el translate
+  empuja el bottom edge fuera del clip y aparece scrollbar + el border
+  del botón queda parcialmente tapado por el clip-edge del wrapper.
 -->
-<div class="space-y-3">
+<div class="flex h-full min-h-0 flex-col">
+	<div class="-mx-3 min-h-0 flex-1 space-y-3 overflow-y-auto px-3">
 	<!-- Chips de tipo + categoría: mismo estilo que /mapa -->
 	<div class="flex flex-wrap gap-1">
 		{#if posicion.tipo}
@@ -428,14 +437,15 @@
 			</Button>
 		</div>
 	{/if}
+	</div>
 
 	<!--
-	  Acciones editar / borrar. Visibles también en móvil (cambio de
-	  scope T-8 fixes D: el stakeholder captura técnicas desde móvil).
-	  El botón Borrar se deshabilita si hay técnicas saliendo o rolls
-	  referenciando la posición como problema; en ese caso un Tooltip
-	  envuelve un `<span>` (los buttons disabled no emiten hover, el
-	  span sí) para mostrar el motivo del bloqueo de forma accesible.
+	  Footer fijo (Editar/Borrar) — FUERA del wrapper scrollable de arriba.
+	  Visibles también en móvil (cambio de scope T-8 fixes D: el stakeholder
+	  captura técnicas desde móvil). El botón Borrar se deshabilita si hay
+	  técnicas saliendo o rolls referenciando la posición como problema;
+	  en ese caso un Tooltip envuelve un `<span>` (los buttons disabled no
+	  emiten hover, el span sí) para mostrar el motivo del bloqueo.
 	-->
 	{#if status === 'ready'}
 		<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">

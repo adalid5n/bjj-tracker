@@ -278,6 +278,26 @@
 		if (top.kind === 'wizard-tecnica' && top.modo === 'crear') return 'Nueva técnica';
 		return top.nombre;
 	});
+
+	// Breadcrumb derivado: solo nodos de lectura, manteniendo el índice
+	// original del stack para que `popTo` siga apuntando a la entrada
+	// correcta. Los wizards no son lugares del grafo — son acciones modales.
+	const breadcrumbItems = $derived(
+		stack
+			.map((entry, originalIndex) => ({ entry, originalIndex }))
+			.filter(
+				({ entry }) =>
+					entry.kind === 'posicion' || entry.kind === 'tecnica' || entry.kind === 'sumision'
+			)
+	);
+
+	// El último item del breadcrumb se destaca solo si el top real del
+	// stack es un nodo de lectura (i.e. el último item es realmente "donde
+	// estás"). Si el top es un wizard, todos los items del breadcrumb son
+	// padres clickables.
+	const topIsReader = $derived(
+		!!top && (top.kind === 'posicion' || top.kind === 'tecnica' || top.kind === 'sumision')
+	);
 </script>
 
 <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
@@ -289,21 +309,32 @@
 	>
 		{#if top}
 			<Dialog.Header>
-				<!-- Breadcrumb solo si stack.length > 1 -->
-				{#if stack.length > 1}
+				<!--
+				  Breadcrumb (T-1.it2 fix): solo muestra nodos de lectura
+				  (posicion/tecnica/sumision), los wizards de creación/edición
+				  se filtran porque son acciones modales sobre un nodo, no
+				  nodos en sí. Si tras filtrar queda solo 1 nivel, no se
+				  muestra (el título del Dialog ya da contexto). El último
+				  item se destaca solo si el top real del stack también es
+				  un nodo de lectura.
+				-->
+				{#if breadcrumbItems.length > 1}
 					<nav aria-label="Ruta navegada" class="text-xs text-muted-foreground">
-						{#each stack as entry, i (i + '-' + entry.kind + '-' + ('id' in entry ? entry.id : entry.modo))}
-							{#if i < stack.length - 1}
+						{#each breadcrumbItems as item, j (item.originalIndex + '-' + item.entry.kind + '-' + ('id' in item.entry ? item.entry.id : item.entry.modo))}
+							{@const isLast = j === breadcrumbItems.length - 1}
+							{#if isLast && topIsReader}
+								<span class="text-foreground">{item.entry.nombre}</span>
+							{:else}
 								<button
 									type="button"
 									class="rounded hover:underline focus-visible:underline focus-visible:outline-none"
-									onclick={() => mapaModalStack.popTo(i)}
+									onclick={() => mapaModalStack.popTo(item.originalIndex)}
 								>
-									{entry.nombre}
+									{item.entry.nombre}
 								</button>
-								<span aria-hidden="true"> → </span>
-							{:else}
-								<span class="text-foreground">{entry.nombre}</span>
+								{#if !isLast}
+									<span aria-hidden="true"> → </span>
+								{/if}
 							{/if}
 						{/each}
 					</nav>
@@ -347,7 +378,14 @@
 			-->
 			{#if top.kind === 'posicion'}
 				{@const pos = posicionesById[top.id]}
-				<div class="-mx-3 min-h-0 flex-1 overflow-y-auto px-3 pt-1">
+				<!--
+				  Wrapper sin `overflow-y-auto`: PosicionModalContent maneja
+				  su propio scroll interno (body) + footer fijo (Editar/Borrar).
+				  Mover el footer fuera del scrollable evita un bug visual del
+				  shadcn Button `active:translate-y-px` que dispara scrollbar
+				  cuando el contenido llega justo al borde del wrapper.
+				-->
+				<div class="flex min-h-0 flex-1 flex-col pt-1">
 					{#if pos}
 						{#key top.id}
 							<PosicionModalContent posicion={pos} onChanged={handleModalChanged} />
@@ -380,12 +418,26 @@
 				</div>
 			{:else if top.kind === 'wizard-posicion'}
 				<div class="flex min-h-0 flex-1 flex-col pt-1">
-					<PosicionWizard
-						modo={top.modo}
-						posicionId={top.modo === 'editar' ? top.id : undefined}
-						onSaved={handlePosicionWizardSaved}
-						onRequestClose={handleWizardRequestClose}
-					/>
+					<!--
+					  {#key} fuerza remount cuando se empuja un wizard-posicion
+					  encima de otro (caso "+ Crear nueva posición" inline desde
+					  el paso de complementaria). Sin esto, Svelte mantiene la
+					  misma instancia y solo actualiza props — el wizard sigue
+					  mostrando los datos del padre con el título cambiado a
+					  "Nueva posición". El `{#if}` de arriba no cambia de rama
+					  porque ambos tops son del mismo `kind`.
+					-->
+					{#key top.modo === 'editar' ? `editar:${top.id}` : 'crear'}
+						<PosicionWizard
+							modo={top.modo}
+							posicionId={top.modo === 'editar' ? top.id : undefined}
+							parentForComplementaria={top.modo === 'crear'
+								? top.parentForComplementaria
+								: undefined}
+							onSaved={handlePosicionWizardSaved}
+							onRequestClose={handleWizardRequestClose}
+						/>
+					{/key}
 				</div>
 			{:else if top.kind === 'wizard-sumision'}
 				<div class="flex min-h-0 flex-1 flex-col pt-1">

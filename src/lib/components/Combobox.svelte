@@ -87,12 +87,19 @@
 		<ChevronsUpDownIcon class="ml-2 size-4 shrink-0 opacity-50" aria-hidden="true" />
 	</Popover.Trigger>
 
-	<Popover.Portal>
-		<Popover.Content
-			align="start"
-			sideOffset={4}
-			class="bg-popover text-popover-foreground z-50 w-(--bits-popover-anchor-width) min-w-(--bits-popover-anchor-width) rounded-lg border border-border shadow-md outline-hidden"
-		>
+	<!--
+	  Sin Popover.Portal a propósito: cuando el Combobox vive dentro de un
+	  Dialog (caso típico en este proyecto), porteár el Content al <body>
+	  provoca que el scroll-lock del Dialog y el del Popover colisionen y
+	  el browser resetee el scrollTop del contenido subyacente (`/mapa`,
+	  `/rolls`). Renderizarlo inline lo mantiene dentro del contexto del
+	  Dialog.Content (que no tiene `overflow: hidden`, así que no recorta).
+	-->
+	<Popover.Content
+		align="start"
+		sideOffset={4}
+		class="bg-popover text-popover-foreground z-50 w-(--bits-popover-anchor-width) min-w-(--bits-popover-anchor-width) rounded-lg border border-border shadow-md outline-hidden"
+	>
 			<Command.Root class="flex w-full flex-col">
 				<div class="border-b border-border px-2 py-1.5">
 					<Command.Input
@@ -140,6 +147,5 @@
 					{/if}
 				</Command.List>
 			</Command.Root>
-		</Popover.Content>
-	</Popover.Portal>
+	</Popover.Content>
 </Popover.Root>

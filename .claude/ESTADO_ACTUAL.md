@@ -84,10 +84,65 @@ ADR-002 (commit `4064638`) escrito antes de tirar. Implementación:
 - **#4**: breadcrumbs infinitos alternando complementarias — fix con
   `closeAll + push` como descrito arriba.
 
+**Fixes post-validación stakeholder** (sesión 13 continuada):
+
+Tras commit `f098a4e` el owner reportó 6 issues sobre el flujo nuevo:
+
+- **#1 sublabel cruda** en combobox de Complementaria
+  (`control_superior` en lugar de `Control superior`). Fix: helper
+  `CATEGORIA_LABEL` derivado de `CATEGORIAS` (single source).
+- **#2 botón "+ Crear nueva" no funcionaba** (faltaba cablear
+  `onCreateNew`). Fix: replicado patrón draft + returnHandler de T-10.
+- **#4 breadcrumbs infinitos** al alternar entre complementarias.
+  Fix: "Ir a {complementaria}" hace `closeAll + push` (reset stack).
+- **Breadcrumb confuso** mostraba wizards como nodos navegables. Fix:
+  filtro en `MapaModalHost` — solo nodos de lectura
+  (posicion/tecnica/sumision) entran al breadcrumb. Si tras filtrar
+  queda 1 nivel, se oculta. Mapeo de índices al `popTo` real.
+- **#A scrollbar al hacer mousedown en Editar.** Causa: shadcn Button
+  aplica `active:not-aria-[haspopup]:translate-y-px` al pulsar; con
+  los botones Editar/Borrar dentro del wrapper scrollable y el
+  contenido al borde, el translate empujaba 1px fuera del clip y
+  disparaba overflow. Fix: footer (Editar/Borrar) fuera del
+  scrollable en `PosicionModalContent` + wrapper de `kind=posicion`
+  en `MapaModalHost` pasa a `flex flex-col` sin `overflow-y-auto`
+  (PosicionModalContent maneja su propio scroll interno).
+- **#B scroll del fondo se reseteaba al abrir el combobox.** Causa
+  raíz: `Popover.Portal` al body colisionaba con el scroll-lock del
+  Dialog y reseteaba `scrollTop`. Fix: eliminado el `Popover.Portal`
+  del `Combobox` — el popover renderiza inline dentro del
+  `Dialog.Content` (que no tiene `overflow: hidden`, así que se ve
+  entero). Aplica a complementaria, contras y cualquier otro uso del
+  `Combobox`.
+- **#C sub-wizard "+ Crear nueva" mostraba paso 4 confuso + se
+  reiniciaba al paso 1 del padre tras guardar.** Fix grande:
+  - Nuevo campo `parentForComplementaria?: string` en la entry
+    `wizard-posicion crear` del stack. Lo pone
+    `handleCreateNewComplementaria` con el id del padre.
+  - `PosicionWizard` con esa prop: salta el paso 4 (visibleSteps
+    derivado `[1,2,3,5]` en lugar de `[1,2,3,4,5]`), indicador de
+    progreso dinámico ("Paso X de 4" en lugar de "5"), asigna
+    `posicion_complementaria_id = parentForComplementaria`
+    automáticamente al crear.
+  - Sub-wizard NO usa `posicionWizardDraft` (ni lee ni escribe ni
+    limpia) → el draft del padre sobrevive el remount y al volver
+    restaura `currentStep` correcto.
+- **Bug del remount**: `<PosicionWizard>` no se remontaba al
+  cambiar el top del stack de `wizard-posicion editar` a
+  `wizard-posicion crear` (mismo `kind`, el `{#if}` no cambia de
+  rama). Fix: `{#key}` derivado de `modo:id` en MapaModalHost para
+  forzar remount.
+
 **Pendiente del owner** (no bloquea cierre técnico):
 
 - Retro-vincular pares ya creados en it.1 desde la UI (1 click por
   par). Datos en su DB local OPFS, no en repo. Ritmo libre.
+
+**Deuda detectada (no aplicada todavía)**: el patrón "footer fuera
+del scrollable" debería replicarse en `TecnicaModalContent` y
+`SumisionModalContent` por consistencia — tienen el mismo bug latente
+del `active:translate-y-px`. Esperando a que aparezca en uso real
+para extender el refactor.
 
 **Decisiones tomadas:**
 
