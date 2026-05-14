@@ -21,6 +21,10 @@ export type RollFilters = {
 	companero_id?: string;
 	resultado?: ResultadoRoll;
 	tipo_sesion?: TipoSesion;
+	// T-13: filtra rolls cuya relación `roll_posicion_problema` incluya al
+	// menos una de las posiciones indicadas. Si está vacío o ausente, no
+	// se aplica ningún filtro por posición-problema.
+	posicion_problema_ids?: string[];
 };
 
 export async function listRolls(sesionId: string): Promise<Roll[]> {
@@ -52,6 +56,20 @@ export async function listAllRolls(filters: RollFilters = {}): Promise<RollWithC
 	if (filters.tipo_sesion) {
 		where.push('s.tipo = ?');
 		params.push(filters.tipo_sesion);
+	}
+	if (filters.posicion_problema_ids && filters.posicion_problema_ids.length > 0) {
+		// T-13: roll válido si tiene AL MENOS una posición-problema entre las
+		// seleccionadas (OR, no AND). Subquery con EXISTS para evitar duplicar
+		// filas de roll por cada match. Placeholders dinámicos según
+		// cardinalidad del array.
+		const placeholders = filters.posicion_problema_ids.map(() => '?').join(', ');
+		where.push(
+			`EXISTS (
+				SELECT 1 FROM roll_posicion_problema rpp
+				WHERE rpp.roll_id = r.id AND rpp.posicion_id IN (${placeholders})
+			)`
+		);
+		params.push(...filters.posicion_problema_ids);
 	}
 
 	const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
@@ -203,4 +221,41 @@ export async function getPosicionesProblema(rollId: string): Promise<Posicion[]>
 		 ORDER BY p.nombre`,
 		[rollId]
 	);
+}
+
+/**
+ * T-13: variante batch de `getPosicionesProblema`. Devuelve un mapa
+ * `rollId → Posicion[]` resolviendo todas las posiciones-problema de un
+ * conjunto de rolls en una sola query. Las posiciones de cada roll
+ * vienen ordenadas por nombre.
+ *
+ * Si `rollIds` está vacío, devuelve un Map vacío sin tocar la BD.
+ */
+export async function getPosicionesProblemaByRolls(
+	rollIds: string[]
+): Promise<Map<string, Posicion[]>> {
+	const resultado = new Map<string, Posicion[]>();
+	if (rollIds.length === 0) return resultado;
+	await init();
+
+	const placeholders = rollIds.map(() => '?').join(', ');
+	const rows = await query<Posicion & { roll_id: string }>(
+		`SELECT p.*, rpp.roll_id AS roll_id
+		 FROM roll_posicion_problema rpp
+		 JOIN posiciones p ON p.id = rpp.posicion_id
+		 WHERE rpp.roll_id IN (${placeholders})
+		 ORDER BY p.nombre`,
+		rollIds
+	);
+
+	for (const row of rows) {
+		const { roll_id, ...posicion } = row;
+		const arr = resultado.get(roll_id);
+		if (arr) {
+			arr.push(posicion as Posicion);
+		} else {
+			resultado.set(roll_id, [posicion as Posicion]);
+		}
+	}
+	return resultado;
 }

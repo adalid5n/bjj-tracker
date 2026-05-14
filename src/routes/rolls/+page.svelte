@@ -7,7 +7,16 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
 	import RollEditor from '$lib/components/RollEditor.svelte';
-	import type { Companero, PesoRelativo, ResultadoRoll, Roll, TipoSesion } from '$lib/types';
+	import MultiChips from '$lib/components/MultiChips.svelte';
+	import type {
+		CategoriaPosicion,
+		Companero,
+		PesoRelativo,
+		Posicion,
+		ResultadoRoll,
+		Roll,
+		TipoSesion
+	} from '$lib/types';
 	import type { RollWithContext } from '$lib/rolls';
 
 	const TIPO_LABEL: Record<TipoSesion, string> = {
@@ -26,6 +35,23 @@
 		me_dominaron: 'bg-destructive/15 text-destructive'
 	};
 
+	// T-13: orden de categorías idéntico al de `/mapa` y `RollEditor`. Si
+	// alguna vez cambia el orden canónico, ese cambio debe replicarse aquí.
+	const CATEGORIAS_ORDEN: CategoriaPosicion[] = [
+		'guardia',
+		'control_superior',
+		'espalda',
+		'transicion',
+		'otro'
+	];
+	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = {
+		guardia: 'Guardia',
+		control_superior: 'Control superior',
+		espalda: 'Espalda',
+		transicion: 'Transición',
+		otro: 'Otro'
+	};
+
 	let rolls = $state<RollWithContext[]>([]);
 	let companeros = $state<Companero[]>([]);
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
@@ -36,6 +62,12 @@
 	let companeroId = $state<string | undefined>(undefined);
 	let resultado = $state<ResultadoRoll | undefined>(undefined);
 	let tipoSesion = $state<TipoSesion | undefined>(undefined);
+	// T-13: filtro multi-select por posición-problema + catálogo agrupado
+	// por categoría para los chips.
+	let posicionProblemaIds = $state<string[]>([]);
+	let posicionesCatalog = $state<Posicion[]>([]);
+	// Mapa rollId → posiciones-problema para chips bajo cada fila.
+	let posicionesProblemaByRoll = $state<Map<string, Posicion[]>>(new Map());
 
 	let editorOpen = $state(false);
 	let editingRoll: Roll | undefined = $state(undefined);
@@ -43,8 +75,13 @@
 
 	onMount(async () => {
 		try {
-			const { listCompaneros } = await import('$lib/companeros');
+			const [{ listCompaneros }, { listPosiciones }] = await Promise.all([
+				import('$lib/companeros'),
+				import('$lib/posiciones')
+			]);
 			companeros = await listCompaneros();
+			// T-13: catálogo para el filtro de posición-problema.
+			posicionesCatalog = await listPosiciones();
 			await refresh();
 			status = 'ready';
 		} catch (err) {
@@ -55,14 +92,17 @@
 	});
 
 	async function refresh() {
-		const { listAllRolls } = await import('$lib/rolls');
+		const { listAllRolls, getPosicionesProblemaByRolls } = await import('$lib/rolls');
 		rolls = await listAllRolls({
 			from: from || undefined,
 			to: to || undefined,
 			companero_id: companeroId,
 			resultado,
-			tipo_sesion: tipoSesion
+			tipo_sesion: tipoSesion,
+			posicion_problema_ids: posicionProblemaIds.length > 0 ? posicionProblemaIds : undefined
 		});
+		// T-13: refrescar chips por fila tras cada refresh.
+		posicionesProblemaByRoll = await getPosicionesProblemaByRolls(rolls.map((r) => r.id));
 	}
 
 	function clearFilters() {
@@ -71,6 +111,27 @@
 		companeroId = undefined;
 		resultado = undefined;
 		tipoSesion = undefined;
+		posicionProblemaIds = [];
+		void refresh();
+	}
+
+	// T-13: agrupa el catálogo por categoría con el orden canónico de
+	// `/mapa`. Solo se renderizan secciones con items para evitar
+	// cabeceras vacías.
+	const posicionesAgrupadas = $derived.by(() => {
+		const grupos: { categoria: CategoriaPosicion; items: Posicion[] }[] = [];
+		for (const cat of CATEGORIAS_ORDEN) {
+			const items = posicionesCatalog
+				.filter((p) => p.categoria === cat)
+				.slice()
+				.sort((a, b) => a.nombre.localeCompare(b.nombre));
+			if (items.length > 0) grupos.push({ categoria: cat, items });
+		}
+		return grupos;
+	});
+
+	function handlePosicionProblemaChange(ids: string[]) {
+		posicionProblemaIds = ids;
 		void refresh();
 	}
 
@@ -114,16 +175,22 @@
 	}
 
 	const activeFilterCount = $derived(
-		[from, to, companeroId, resultado, tipoSesion].filter(Boolean).length
+		[from, to, companeroId, resultado, tipoSesion].filter(Boolean).length +
+			(posicionProblemaIds.length > 0 ? 1 : 0)
 	);
 
 	// `from` y `to` ya no exponen un `onchange` directo (lo hacían los
 	// <Input type="date">). Con `DateInput`, el ISO se propaga sólo cuando
 	// la fecha es válida o queda vacía, así que disparamos refresh aquí.
+	// T-13: también trackeamos `posicionProblemaIds` para reaccionar al
+	// cambio del filtro multi-select (aunque `handlePosicionProblemaChange`
+	// ya llama a `refresh()` explícitamente, mantenerlo aquí cubre cualquier
+	// otra mutación futura del array).
 	$effect(() => {
 		// Tracking explícito.
 		from;
 		to;
+		posicionProblemaIds;
 		if (status === 'ready') void refresh();
 	});
 </script>
@@ -208,6 +275,31 @@
 				</div>
 			</div>
 
+			<div class="space-y-2">
+				<Label class="text-xs">Posición problema</Label>
+				{#if posicionesAgrupadas.length === 0}
+					<p class="text-xs text-muted-foreground italic">
+						Aún no hay posiciones en el catálogo.
+					</p>
+				{:else}
+					<div class="space-y-2">
+						{#each posicionesAgrupadas as grupo (grupo.categoria)}
+							<div class="space-y-1.5">
+								<p class="text-xs font-semibold text-muted-foreground">
+									{CATEGORIA_LABEL[grupo.categoria]}
+								</p>
+								<MultiChips
+									options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
+									value={posicionProblemaIds}
+									onChange={handlePosicionProblemaChange}
+									ariaLabel={`Posiciones-problema de ${CATEGORIA_LABEL[grupo.categoria]}`}
+								/>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
 			{#if activeFilterCount > 0}
 				<Button variant="outline" size="sm" onclick={clearFilters} class="w-full">
 					Limpiar filtros
@@ -268,6 +360,17 @@
 						</div>
 						{#if r.que_fallo}
 							<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
+						{/if}
+						{#if posicionesProblemaByRoll.get(r.id)?.length}
+							<div class="mt-2 flex flex-wrap gap-1">
+								{#each posicionesProblemaByRoll.get(r.id) ?? [] as p (p.id)}
+									<span
+										class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+									>
+										{p.nombre}
+									</span>
+								{/each}
+							</div>
 						{/if}
 					</button>
 				</li>

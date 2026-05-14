@@ -8,7 +8,7 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Fab from '$lib/components/Fab.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import type { Companero, Roll, Sesion, TipoSesion } from '$lib/types';
+	import type { Companero, Posicion, Roll, Sesion, TipoSesion } from '$lib/types';
 
 	const RESULTADO_LABEL = {
 		domine: 'Dominé',
@@ -30,17 +30,22 @@
 
 	let rolls = $state<Roll[]>([]);
 	let companerosById = $state<Map<string, Companero>>(new Map());
+	// T-13: mapa rollId → posiciones-problema asociadas (chips read-only
+	// bajo cada roll). Se rellena tras cargar rolls y se refresca tras
+	// cualquier mutación de roll.
+	let posicionesProblemaByRoll = $state<Map<string, Posicion[]>>(new Map());
 
 	let editorOpen = $state(false);
 	let editingRoll: Roll | undefined = $state(undefined);
 
 	onMount(async () => {
 		try {
-			const [{ getSesion }, { listRolls }, { listCompaneros }] = await Promise.all([
-				import('$lib/sesiones'),
-				import('$lib/rolls'),
-				import('$lib/companeros')
-			]);
+			const [{ getSesion }, { listRolls, getPosicionesProblemaByRolls }, { listCompaneros }] =
+				await Promise.all([
+					import('$lib/sesiones'),
+					import('$lib/rolls'),
+					import('$lib/companeros')
+				]);
 			const found = await getSesion(id);
 			if (!found) {
 				status = 'notfound';
@@ -50,6 +55,8 @@
 			rolls = await listRolls(id);
 			const companeros = await listCompaneros();
 			companerosById = new Map(companeros.map((c) => [c.id, c]));
+			// T-13: cargar posiciones-problema de todos los rolls en batch.
+			posicionesProblemaByRoll = await getPosicionesProblemaByRolls(rolls.map((r) => r.id));
 			status = 'ready';
 		} catch (err) {
 			errorMessage = err instanceof Error ? err.message : String(err);
@@ -59,11 +66,13 @@
 	});
 
 	async function refreshRolls() {
-		const { listRolls } = await import('$lib/rolls');
+		const { listRolls, getPosicionesProblemaByRolls } = await import('$lib/rolls');
 		const { listCompaneros } = await import('$lib/companeros');
 		rolls = await listRolls(id);
 		const companeros = await listCompaneros();
 		companerosById = new Map(companeros.map((c) => [c.id, c]));
+		// T-13: refrescar el mapa tras cualquier mutación de rolls.
+		posicionesProblemaByRoll = await getPosicionesProblemaByRolls(rolls.map((r) => r.id));
 	}
 
 	async function handleSubmitSesion(data: {
@@ -199,6 +208,17 @@
 								</div>
 								{#if r.que_fallo}
 									<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
+								{/if}
+								{#if posicionesProblemaByRoll.get(r.id)?.length}
+									<div class="mt-2 flex flex-wrap gap-1">
+										{#each posicionesProblemaByRoll.get(r.id) ?? [] as p (p.id)}
+											<span
+												class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+											>
+												{p.nombre}
+											</span>
+										{/each}
+									</div>
 								{/if}
 							</button>
 						</li>
