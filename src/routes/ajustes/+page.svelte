@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { theme } from '$lib/theme.svelte';
 
 	let schemaVersion = $state<number | null>(null);
 	let busy = $state<'export' | 'import' | null>(null);
@@ -154,10 +155,6 @@
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-4 p-4 pb-28">
-	<header>
-		<h1 class="text-2xl font-bold">Ajustes</h1>
-	</header>
-
 	<section class="space-y-3 rounded border border-border p-4">
 		<h2 class="text-sm font-semibold text-foreground">Exportar datos</h2>
 		<p class="text-sm text-muted-foreground">
@@ -195,6 +192,60 @@
 			{message.text}
 		</div>
 	{/if}
+
+	<!--
+	  M7: selector de tema. Auto sigue `prefers-color-scheme` del SO. Claro /
+	  Oscuro lo fuerzan. La preferencia se persiste en localStorage (`theme`).
+	  Patrón role="group" con tres botones — el ToggleGroup de bits-ui podría
+	  servir, pero un grupo de 3 botones con estado activo cubre el contrato
+	  sin pasarse de primitive. Tokens semánticos en los estilos: activo usa
+	  `bg-primary text-primary-foreground`, inactivo `bg-muted text-muted-foreground`.
+	-->
+	<section class="space-y-3 rounded border border-border p-4">
+		<h2 class="text-sm font-semibold text-foreground">Apariencia</h2>
+		<p class="text-sm text-muted-foreground">
+			Elige el tema. <strong>Auto</strong> sigue la preferencia del sistema operativo.
+		</p>
+		<div
+			role="group"
+			aria-label="Tema de la app"
+			class="inline-flex rounded-md border border-border bg-muted p-0.5"
+		>
+			<button
+				type="button"
+				aria-pressed={theme.mode === 'auto'}
+				class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {theme.mode ===
+				'auto'
+					? 'bg-primary text-primary-foreground'
+					: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
+				onclick={() => theme.setMode('auto')}
+			>
+				Auto
+			</button>
+			<button
+				type="button"
+				aria-pressed={theme.mode === 'light'}
+				class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {theme.mode ===
+				'light'
+					? 'bg-primary text-primary-foreground'
+					: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
+				onclick={() => theme.setMode('light')}
+			>
+				Claro
+			</button>
+			<button
+				type="button"
+				aria-pressed={theme.mode === 'dark'}
+				class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {theme.mode ===
+				'dark'
+					? 'bg-primary text-primary-foreground'
+					: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
+				onclick={() => theme.setMode('dark')}
+			>
+				Oscuro
+			</button>
+		</div>
+	</section>
 
 	<section class="text-xs text-muted-foreground">
 		<p>Versión BD: {schemaVersion ?? '…'}</p>
