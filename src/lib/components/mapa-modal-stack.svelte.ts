@@ -216,3 +216,43 @@ class TecnicaWizardDraftStore {
 }
 
 export const tecnicaWizardDraft = new TecnicaWizardDraftStore();
+
+/**
+ * Draft store del wizard de posición (T-1.it2).
+ *
+ * Misma razón que `tecnicaWizardDraft`: cuando el usuario pulsa
+ * "+ Crear nueva posición" en el paso "Complementaria" del wizard, el
+ * sub-wizard se pushea encima y el padre se desmonta. Sin draft se
+ * perdería todo lo que llevaba escrito.
+ *
+ * Patrón canónico: `$state` dentro de class field privado.
+ */
+export type PosicionWizardDraftState = {
+	/** Discriminador: 'crear' o 'editar:<id>'. Si no coincide al montar el wizard, se ignora y limpia. */
+	key: string;
+	nombre: string;
+	categoria: 'guardia' | 'control_superior' | 'espalda' | 'transicion' | 'otro' | undefined;
+	tipo: 'ofensiva' | 'defensiva' | 'neutral' | undefined;
+	complementariaId: string | null;
+	notas: string;
+	currentStep: number;
+	visitedSteps: number[];
+};
+
+class PosicionWizardDraftStore {
+	#draft = $state<PosicionWizardDraftState | null>(null);
+
+	get value(): PosicionWizardDraftState | null {
+		return this.#draft;
+	}
+
+	set(draft: PosicionWizardDraftState): void {
+		this.#draft = draft;
+	}
+
+	clear(): void {
+		this.#draft = null;
+	}
+}
+
+export const posicionWizardDraft = new PosicionWizardDraftStore();

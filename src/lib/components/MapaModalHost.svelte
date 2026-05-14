@@ -32,7 +32,7 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import type { Posicion, SumisionTerminal, Tecnica } from '$lib/types';
-	import { mapaModalStack, tecnicaWizardDraft } from './mapa-modal-stack.svelte';
+	import { mapaModalStack, tecnicaWizardDraft, posicionWizardDraft } from './mapa-modal-stack.svelte';
 	import PosicionModalContent from './PosicionModalContent.svelte';
 	import TecnicaModalContent from './TecnicaModalContent.svelte';
 	import SumisionModalContent from './SumisionModalContent.svelte';
@@ -89,6 +89,16 @@
 		const tieneWizardTecnica = stack.some((e) => e.kind === 'wizard-tecnica');
 		if (!tieneWizardTecnica && tecnicaWizardDraft.value !== null) {
 			tecnicaWizardDraft.clear();
+		}
+	});
+
+	// Mismo patrón para el draft del wizard de posición (T-1.it2): sobrevive
+	// el remount por "+ Crear nueva" inline, pero se limpia cuando el wizard
+	// de posición ya no está en el stack.
+	$effect(() => {
+		const tieneWizardPosicion = stack.some((e) => e.kind === 'wizard-posicion');
+		if (!tieneWizardPosicion && posicionWizardDraft.value !== null) {
+			posicionWizardDraft.clear();
 		}
 	});
 
@@ -226,12 +236,14 @@
 	// se recargue de BD con los datos frescos. Además notificamos al page
 	// para que refresque la lista de `/mapa` (creación, edición de nombre,
 	// etc.). Hay un handler por wizard para que cada uno toque su cache.
-	function handlePosicionWizardSaved(id: string) {
-		if (posicionesById[id]) {
-			const next = { ...posicionesById };
-			delete next[id];
-			posicionesById = next;
-		}
+	function handlePosicionWizardSaved(_id: string) {
+		// Invalidamos TODA la cache de posiciones, no solo la editada: el
+		// vínculo `posicion_complementaria_id` (ADR-002) actualiza dos filas
+		// a la vez (la editada y su pareja, y posiblemente una tercera si se
+		// rompió un emparejamiento previo). Invalidación pesimista para
+		// garantizar coherencia con un coste despreciable (las posiciones se
+		// recargan a demanda al volver a abrirlas).
+		posicionesById = {};
 		onCatalogChanged?.();
 	}
 

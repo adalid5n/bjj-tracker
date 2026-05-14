@@ -186,11 +186,35 @@ function migrate1To2(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v3:
- *   { from: 2, to: 3, run: (db) => { ... } }
+ * DDL incremental para subir de schema v2 a v3.
+ *
+ * Añade `posicion_complementaria_id` a `posiciones` como autoref nullable
+ * con `ON DELETE SET NULL`: vincula bidireccionalmente las dos vistas de
+ * una misma situación (p. ej. "Mount top" ↔ "Mount bottom") sin cascadear
+ * borrados. La simetría se mantiene desde la capa TS (transacción doble
+ * UPDATE en `updatePosicion`), no por triggers SQL. Ver ADR-002.
+ *
+ * SQLite restringe ADD COLUMN con REFERENCES a default NULL — cumplido
+ * (la columna no declara DEFAULT, por lo que el default implícito es NULL).
+ */
+export const SCHEMA_V3_MIGRATION = `
+ALTER TABLE posiciones
+  ADD COLUMN posicion_complementaria_id TEXT REFERENCES posiciones(id) ON DELETE SET NULL;
+
+UPDATE schema_meta SET value = '3' WHERE key = 'version';
+`;
+
+function migrate2To3(db: MigrationDb): void {
+	db.exec(SCHEMA_V3_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v4:
+ *   { from: 3, to: 4, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
-	{ from: 1, to: 2, run: migrate1To2 }
+	{ from: 1, to: 2, run: migrate1To2 },
+	{ from: 2, to: 3, run: migrate2To3 }
 ];
 
 /**

@@ -71,6 +71,12 @@
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
 	let activeTipo = $state<TipoTecnica | null>(null);
+	// Vista del oponente (ADR-002): técnicas que el rival puede aplicar desde
+	// la posición complementaria. Si la posición no tiene complementaria,
+	// estos quedan en null/vacío y la sección no se renderiza.
+	let complementaria = $state<Posicion | null>(null);
+	let tecnicasOponente = $state<Tecnica[]>([]);
+	let activeTipoOponente = $state<TipoTecnica | null>(null);
 	// Rolls que referencian esta posición como "problema". Se usa para
 	// decidir si el botón Borrar está habilitado (desktop only).
 	let rollsProblemaCount = $state<number>(0);
@@ -115,6 +121,31 @@
 			// Default tab: el primer tipo (en orden TIPOS_ORDEN) con contenido.
 			const conContenido = TIPOS_ORDEN.filter((tipo) => tecs.some((t) => t.tipo === tipo));
 			activeTipo = conContenido[0] ?? null;
+
+			// Vista del oponente: si la posición tiene complementaria, carga
+			// la posición complementaria y las técnicas que salen de ella.
+			if (posicion.posicion_complementaria_id) {
+				const comp = todasPos.find((p) => p.id === posicion.posicion_complementaria_id) ?? null;
+				complementaria = comp;
+				if (comp) {
+					const tecsOp = await getTecnicasByPosicion(comp.id);
+					tecnicasOponente = tecsOp;
+					const conContenidoOp = TIPOS_ORDEN.filter((tipo) =>
+						tecsOp.some((t) => t.tipo === tipo)
+					);
+					activeTipoOponente = conContenidoOp[0] ?? null;
+					// Extiende `contrasCount` con las técnicas del oponente para
+					// que `contrasLabel` funcione también en esa sección.
+					const countsOp = await Promise.all(
+						tecsOp.map((t) => getContras(t.id).then((c) => c.length))
+					);
+					contrasCount = {
+						...contrasCount,
+						...Object.fromEntries(tecsOp.map((t, i) => [t.id, countsOp[i]]))
+					};
+				}
+			}
+
 			status = 'ready';
 		} catch (err) {
 			errorMessage = err instanceof Error ? err.message : String(err);
@@ -131,6 +162,30 @@
 	const tecnicasDelTab = $derived(
 		activeTipo === null ? [] : tecnicas.filter((t) => t.tipo === activeTipo)
 	);
+
+	// Análogos para la vista del oponente.
+	const tiposConContenidoOponente = $derived(
+		TIPOS_ORDEN.filter((tipo) => tecnicasOponente.some((t) => t.tipo === tipo))
+	);
+	const tecnicasOponenteDelTab = $derived(
+		activeTipoOponente === null
+			? []
+			: tecnicasOponente.filter((t) => t.tipo === activeTipoOponente)
+	);
+
+	function pushComplementaria() {
+		if (!complementaria) return;
+		// "Saltar a la complementaria" = navegar a otro nodo del mapa, NO
+		// abrir un sub-modal encima. Sin reset, alternar A ↔ B ↔ A apila el
+		// breadcrumb indefinidamente. Reiniciamos el stack para que el modal
+		// de la complementaria quede como nivel raíz.
+		mapaModalStack.closeAll();
+		mapaModalStack.push({
+			kind: 'posicion',
+			id: complementaria.id,
+			nombre: complementaria.nombre
+		});
+	}
 
 	function destinoLabel(t: Tecnica): string {
 		if (t.tipo === 'sumision' && t.sumision_destino_id) {
@@ -288,6 +343,75 @@
 					</li>
 				{/each}
 			</ul>
+		</div>
+	{/if}
+
+	<!--
+	  Vista del oponente (ADR-002): si la posición tiene una complementaria
+	  registrada, mostramos qué técnicas puede aplicar el oponente desde
+	  ese otro lado. Patrón visual idéntico a la sección de técnicas propias:
+	  tabs por tipo + lista clickable. Cada item navega al modal de la
+	  técnica del oponente vía el stack — el usuario puede recorrer las dos
+	  vistas del mismo nodo físico sin recargar.
+	-->
+	{#if status === 'ready' && complementaria}
+		<div class="mt-4 border-t border-border pt-3">
+			<div class="mb-2 flex items-center justify-between gap-2">
+				<h3 class="text-sm font-semibold">
+					Vista del oponente <span class="text-muted-foreground">— desde</span>
+					{complementaria.nombre}
+				</h3>
+				<Button variant="outline" size="sm" onclick={pushComplementaria}>
+					Ir a {complementaria.nombre} →
+				</Button>
+			</div>
+
+			{#if tiposConContenidoOponente.length === 0}
+				<p
+					class="rounded border border-dashed border-border p-4 text-center text-sm text-muted-foreground"
+				>
+					Aún no hay técnicas desde {complementaria.nombre}.
+				</p>
+			{:else}
+				<div role="tablist" aria-label="Tipo de técnica del oponente" class="flex flex-wrap gap-2">
+					{#each tiposConContenidoOponente as tipo (tipo)}
+						{@const isActive = tipo === activeTipoOponente}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={isActive}
+							class="inline-flex items-center rounded-full border px-3 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {isActive
+								? 'border-primary bg-primary text-primary-foreground'
+								: 'border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
+							onclick={() => (activeTipoOponente = tipo)}
+						>
+							{TIPO_TECNICA_LABEL[tipo]}
+						</button>
+					{/each}
+				</div>
+
+				<div role="tabpanel" class="mt-2 rounded border border-border">
+					<ul class="divide-y divide-border">
+						{#each tecnicasOponenteDelTab as t (t.id)}
+							<li>
+								<button
+									type="button"
+									class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+									onclick={() => pushTecnica(t)}
+								>
+									<div class="font-medium">
+										{t.nombre}{#if t.variante}<span class="text-muted-foreground"
+												> ({t.variante})</span
+											>{/if}
+									</div>
+									<div class="mt-0.5 text-xs text-muted-foreground">{destinoLabel(t)}</div>
+									<div class="mt-0.5 text-xs text-muted-foreground">{contrasLabel(t)}</div>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 		</div>
 	{/if}
 

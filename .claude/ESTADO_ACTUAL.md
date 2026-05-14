@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-14 (cierre sesión 12)
-**Fase activa:** Iteración 1 ✅ cerrada — preparación de Iteración 2
-**Iteración cerrada:** it.1 (15/15 tareas: T-1 a T-15 + T-2.5 + tab Técnicas extra + pulido UX masivo de sesión 11)
+**Última actualización:** 2026-05-14 (cierre sesión 13)
+**Fase activa:** Iteración 2 — T-1.it2 cerrada, T-2.it2 siguiente
+**Iteración en curso:** it.2 (1/7 tareas previstas cerradas; T-1.it2)
 
 ---
 
@@ -37,7 +37,93 @@ posición. Decidido en sesión 9. Mini-ADR pendiente
 
 ---
 
-## Última sesión (2026-05-14, sesión 12)
+## Última sesión (2026-05-14, sesión 13)
+
+**Hecho — T-1.it2: vínculo top↔bottom + vista del oponente**
+
+ADR-002 (commit `4064638`) escrito antes de tirar. Implementación:
+
+- **Schema v3 + migración v2→v3** (`src/lib/db/schema.ts`): nueva
+  columna autoref `posicion_complementaria_id` con `ON DELETE SET NULL`.
+  Migración encadenada al array `MIGRATIONS` siguiendo el patrón de T-1
+  de it.1.
+- **CRUD de posiciones** (`src/lib/posiciones.ts`): helper
+  `syncComplementaria(aId, newBId)` mantiene la simetría bidireccional
+  via transacción atómica (rompe emparejamientos previos cuando hace
+  falta). `createPosicion` / `updatePosicion` / `deletePosicion` lo
+  invocan. Tipo `Posicion` extendido con `posicion_complementaria_id?`.
+- **Sync** (`src/lib/sync.ts`): `CURRENT_SCHEMA_VERSION → 3`; INSERT
+  de posiciones incluye la columna nueva. Bumpear schema_version
+  rompe import de exports antiguos (comportamiento documentado strict).
+- **PosicionWizard**: paso nuevo "Complementaria" (Combobox de
+  bits-ui) entre Tipo y Notas → wizard pasa de 4 a 5 pasos. Items
+  excluyen la propia posición y las que ya tengan otra complementaria.
+  Item especial "Sin complementaria" al inicio cuando hay vínculo
+  para limpiar. **"+ Crear nueva posición" inline** funcional vía
+  `posicionWizardDraft` (réplica del patrón de T-10): el padre se
+  desmonta al pushear el sub-wizard, el draft preserva su estado, el
+  sub-wizard al guardar hace `pop` + `invokeReturnHandler` con el id,
+  el padre se remonta con la complementaria preseleccionada.
+- **PosicionModalContent**: sección **"Vista del oponente"** con
+  técnicas que salen de la complementaria, agrupadas por tipo (mismo
+  patrón visual que las técnicas propias). Cache `contrasCount`
+  extendido para no mostrar "Sin contras" falso. Botón "Ir a
+  {complementaria}" hace `closeAll + push` (reinicia el contexto, no
+  apila — evita breadcrumbs infinitos al alternar A↔B↔A...).
+- **MapaModalHost**: invalidación pesimista del cache
+  `posicionesById` tras guardar wizard de posición (las ediciones
+  ahora afectan a 2-3 filas via `syncComplementaria`). `$effect` para
+  limpiar `posicionWizardDraft` cuando wizard-posicion deja el stack.
+
+**Fixes post-validación stakeholder** (issues #1, #2, #4):
+
+- **#1**: sublabel del Combobox de complementaria mostraba la clave
+  cruda ("control_superior"). Mapeo vía nuevo `CATEGORIA_LABEL`
+  derivado de `CATEGORIAS` (single source of truth, sin duplicar).
+- **#2**: faltaba "+ Crear nueva" — añadido como descrito arriba.
+- **#4**: breadcrumbs infinitos alternando complementarias — fix con
+  `closeAll + push` como descrito arriba.
+
+**Pendiente del owner** (no bloquea cierre técnico):
+
+- Retro-vincular pares ya creados en it.1 desde la UI (1 click por
+  par). Datos en su DB local OPFS, no en repo. Ritmo libre.
+
+**Decisiones tomadas:**
+
+- **Modelo de complementaria: columna autoref** (no tabla par, no
+  inferencia por categoría+rol). ADR-002.
+- **Simetría en TS, no triggers SQL**. ADR-002.
+- **Ir a complementaria = reset de stack**, no push. Justificación:
+  saltar a la complementaria es navegar a otro nodo del mapa, no
+  abrir un sub-contexto. Sin reset el breadcrumb crece indefinidamente.
+- **Invalidación pesimista de `posicionesById` tras guardar wizard
+  de posición**. Pragmático: el coste de invalidar todo el cache es
+  despreciable (las posiciones se recargan a demanda) y garantiza
+  coherencia frente a edits que tocan 2-3 filas a la vez.
+- **`+ Crear nueva` desde el combobox de complementaria solo cuando
+  `mode === 'stack'`**: la versión `standalone` del wizard (usada
+  desde RollEditor) no tiene acceso al stack del mapa, así que el
+  sub-wizard no funcionaría — `onCreateNew={undefined}` en ese caso.
+
+**Iteración 2 — Ts previstas (plan vivo):**
+
+- T-1.it2 ✅ — vínculo top↔bottom + vista oponente.
+- T-2.it2 — refactor "plano-edit" para los 3 wizards (Pos/Sum/Tec):
+  modo `editar` = formulario único con todos los campos visibles a
+  la vez (como `RollEditor`), modo `crear` sigue siendo stepper.
+- T-3.it2 — linkear rolls a técnicas (entidades, no texto libre).
+  REQUISITOS §6 it.2.
+- T-4.it2 — reescritura del prefill de contras inline (desbloqueado
+  por ADR-002).
+- T-5.it2 — consultas C1/C2 + resumen texto post-sesión.
+  REQUISITOS §3.6.
+- T-6.it2 — pulido UX que aparezca tras uso real.
+- T-7.it2 — cierre + tag `v0.3-it2`.
+
+---
+
+## Sesión previa (2026-05-14, sesión 12)
 
 **Hecho — Cierre de iteración 1**
 
@@ -657,21 +743,34 @@ técnica inline). Patrones T-8 / T-9 / T-10 establecidos.]
 
 ## Próximo paso
 
-**T-1.it2 — Vínculo posiciones complementarias (top ↔ bottom) + vista
-del oponente en el modal de posición.** Primera tarea de iteración 2.
+**T-2.it2 — Refactor "plano-edit" en los 3 wizards
+(Pos/Sum/Tec).** Modo `editar` debe pasar de stepper a formulario
+único con todos los campos visibles a la vez (referencia: `RollEditor`).
+Modo `crear` se queda con stepper (guía al usuario que no sabe qué
+viene). Aplicar consistentemente a `PosicionWizard`, `SumisionWizard`
+y `TecnicaWizard` (regla del proyecto: fixes a wizards aplican a
+TODOS los equivalentes).
 
-Antes de implementar:
-1. **Mini-ADR `decisiones/002-vinculo-top-bottom.md`** — elegir modelo
-   (campo autoref `posicion_complementaria_id` vs tabla
-   `posicion_par` vs categoría+rol). Trade-offs documentados.
-2. **Schema v3 + migración v2→v3** siguiendo el patrón de T-1 de it.1
-   (array `{from,to,run}` extensible, fresh DBs aplican V1 +
-   migraciones siempre).
-3. **UI mínima en modal de posición**: campo "Complementaria" editable
-   + sección "Vista del oponente" derivada (técnicas que tu oponente
-   puede aplicar desde la complementaria).
-4. **Retro-vincular pares ya creados a mano** (1 click por par,
-   probablemente ≤6 pares en el catálogo actual del owner).
+Subtareas previsibles:
+
+1. Decidir estructura: ¿mismo componente con dos ramas internas, o
+   componentes hermanos `*Editor` vs `*Wizard`? Mi inclinación:
+   mismo componente, dos ramas — un solo punto de carga/validación/
+   save.
+2. PosicionWizard: rama editar plana con los 4 campos (nombre,
+   categoría, tipo, complementaria, notas).
+3. SumisionWizard: rama editar plana (nombre, notas).
+4. TecnicaWizard: rama editar plana (nombre, variante, origen, tipo,
+   destino condicional, estado, detalles, errores).
+5. Verificar que el flujo "+ Crear nueva inline" sigue funcionando
+   desde el wizard padre cuando ambos pueden ser planos / stepper
+   mixto.
+6. Verificación en preview + commit + push.
+
+Por hacer pendiente del owner (no bloquea T-2.it2):
+
+- **Retro-vincular pares ya creados en it.1** desde la UI. Datos en
+  DB local OPFS, no en repo.
 
 ---
 

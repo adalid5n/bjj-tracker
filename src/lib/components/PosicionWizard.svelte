@@ -53,9 +53,17 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
+	import Combobox from '$lib/components/Combobox.svelte';
+
+	type ComboboxItem = { id: string; label: string; sublabel?: string };
 	import type { CategoriaPosicion, Posicion, TipoRolPosicion } from '$lib/types';
-	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { mapaModalStack, posicionWizardDraft } from './mapa-modal-stack.svelte';
 	import { capitalizeFirst } from '$lib/utils';
+
+	// Identificador del item "Sin complementaria" en el Combobox. Cuando el
+	// usuario lo selecciona, `complementariaId` se pone a null (limpia el
+	// vínculo).
+	const NONE_ID = '__none__';
 
 	let {
 		modo,
@@ -91,13 +99,17 @@
 		{ value: 'otro', label: 'Otro' }
 	];
 
+	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = Object.fromEntries(
+		CATEGORIAS.map((c) => [c.value, c.label])
+	) as Record<CategoriaPosicion, string>;
+
 	const TIPOS_ROL: { value: TipoRolPosicion; label: string }[] = [
 		{ value: 'ofensiva', label: 'Ofensiva' },
 		{ value: 'defensiva', label: 'Defensiva' },
 		{ value: 'neutral', label: 'Neutral' }
 	];
 
-	const totalSteps = 4;
+	const totalSteps = 5;
 
 	// `categoria` y `tipo` arrancan como undefined: nos permite distinguir
 	// "el usuario no ha tocado nada" de "el usuario eligió otro/lo que sea".
@@ -105,6 +117,7 @@
 	let nombre = $state('');
 	let categoria = $state<CategoriaPosicion | undefined>(undefined);
 	let tipo = $state<TipoRolPosicion | undefined>(undefined);
+	let complementariaId = $state<string | null>(null);
 	let notas = $state('');
 
 	let currentStep = $state(1);
@@ -124,14 +137,21 @@
 	// inline al avanzar del paso 1 (mismo patrón que SumisionWizard).
 	let existentes = $state<Posicion[]>([]);
 
+	// Clave del draft. Discrimina crear/editar y, en editar, por id (no
+	// queremos restaurar el draft de otra posición distinta). El draft
+	// solo se usa en modo `stack` — en `standalone` no hay sub-wizards
+	// inline desde aquí.
+	const draftKey = $derived(modo === 'editar' && posicionId ? `editar:${posicionId}` : 'crear');
+
 	// Snapshot para detectar dirty en modo editar. En modo crear comparamos
 	// contra "vacío" (los defaults de arriba).
 	let snapshot = $state<{
 		nombre: string;
 		categoria: CategoriaPosicion | undefined;
 		tipo: TipoRolPosicion | undefined;
+		complementariaId: string | null;
 		notas: string;
-	}>({ nombre: '', categoria: undefined, tipo: undefined, notas: '' });
+	}>({ nombre: '', categoria: undefined, tipo: undefined, complementariaId: null, notas: '' });
 
 	/**
 	 * Listener global de Enter para cubrir el caso "foco perdido". Ver
@@ -170,6 +190,22 @@
 			console.warn('[PosicionWizard] no se pudo cargar listPosiciones:', err);
 		}
 
+		// Si hay un draft persistido que coincide con la clave del wizard
+		// actual (mismo modo y mismo id en editar), lo restauramos. Pasa
+		// cuando el wizard se remonta tras un sub-wizard inline ("+ Crear
+		// nueva posición" en el paso de complementaria). Sin esto el
+		// usuario perdería todo lo que llevaba escrito.
+		const draft = mode === 'stack' ? posicionWizardDraft.value : null;
+		if (draft && draft.key === draftKey) {
+			nombre = draft.nombre;
+			categoria = draft.categoria;
+			tipo = draft.tipo;
+			complementariaId = draft.complementariaId;
+			notas = draft.notas;
+			currentStep = draft.currentStep;
+			visitedSteps = new Set(draft.visitedSteps);
+		}
+
 		if (modo !== 'editar') {
 			// snapshot ya es el "vacío" inicial.
 			status = 'ready';
@@ -188,14 +224,21 @@
 				status = 'error';
 				return;
 			}
-			nombre = p.nombre;
-			categoria = p.categoria;
-			tipo = p.tipo;
-			notas = p.notas;
+			// El snapshot SIEMPRE refleja el estado guardado en BD (para
+			// dirty detection). El estado del wizard puede venir del draft
+			// (si se restauró arriba) o de la BD si no había draft.
+			if (!draft || draft.key !== draftKey) {
+				nombre = p.nombre;
+				categoria = p.categoria;
+				tipo = p.tipo;
+				complementariaId = p.posicion_complementaria_id ?? null;
+				notas = p.notas;
+			}
 			snapshot = {
 				nombre: p.nombre,
 				categoria: p.categoria,
 				tipo: p.tipo,
+				complementariaId: p.posicion_complementaria_id ?? null,
 				notas: p.notas
 			};
 			status = 'ready';
@@ -222,14 +265,105 @@
 		}
 	});
 
+	// Persiste el draft (modo `stack` solamente) en cada cambio. Permite
+	// sobrevivir el remount cuando se abre "+ Crear nueva" inline en el
+	// paso de complementaria: el host renderiza solo el top del stack,
+	// así que el PosicionWizard padre se desmonta y luego se remonta al
+	// volver. Sin esto el usuario perdería todo lo escrito.
+	$effect(() => {
+		if (mode !== 'stack' || status !== 'ready') return;
+		posicionWizardDraft.set({
+			key: draftKey,
+			nombre,
+			categoria,
+			tipo,
+			complementariaId,
+			notas,
+			currentStep,
+			visitedSteps: Array.from(visitedSteps)
+		});
+	});
+
 	// Hay cambios sin guardar si algún campo difiere del snapshot inicial.
 	// Trim en nombre/notas para no marcar dirty por espacios incidentales.
 	const isDirty = $derived(
 		nombre.trim() !== snapshot.nombre.trim() ||
 			categoria !== snapshot.categoria ||
 			tipo !== snapshot.tipo ||
+			complementariaId !== snapshot.complementariaId ||
 			notas.trim() !== snapshot.notas.trim()
 	);
+
+	// Posiciones disponibles como complementaria: las que NO tengan otra
+	// pareja distinta a la actual (la propia A queda excluida también). En
+	// modo crear, posicionId está undefined → solo las que están sueltas.
+	// En modo editar, si A apunta a B, B sigue siendo seleccionable aunque
+	// "tenga complementaria" (es la actual de A); por simetría, B.complementaria
+	// === A.id.
+	const complementariasDisponibles = $derived.by<ComboboxItem[]>(() => {
+		const items: ComboboxItem[] = existentes
+			.filter((p) => {
+				if (p.id === posicionId) return false;
+				const otraPareja = p.posicion_complementaria_id ?? null;
+				if (otraPareja === null) return true;
+				if (posicionId && otraPareja === posicionId) return true;
+				return false;
+			})
+			.map((p) => ({
+				id: p.id,
+				label: p.nombre,
+				sublabel: CATEGORIA_LABEL[p.categoria]
+			}));
+		// Item especial para limpiar el vínculo. Va al principio para
+		// destacarlo y para que un primer "intento de cambiar" no obligue
+		// a recordar el id.
+		if (complementariaId !== null) {
+			items.unshift({ id: NONE_ID, label: 'Sin complementaria', sublabel: 'limpia el vínculo' });
+		}
+		return items;
+	});
+
+	function handleComplementariaChange(id: string | null) {
+		if (id === NONE_ID || id === null) {
+			complementariaId = null;
+		} else {
+			complementariaId = id;
+		}
+	}
+
+	function handleCreateNewComplementaria() {
+		// Patrón "+ Crear nueva inline" (T-10): registramos un returnHandler
+		// que recibirá el id de la nueva posición cuando el sub-wizard
+		// guarde, y empujamos un wizard-posicion modo crear al stack. El
+		// PosicionWizard padre se desmontará — el draft preserva su estado.
+		// Cuando el sub-wizard hace pop + invokeReturnHandler, este handler
+		// escribe el id de vuelta al draft Y al $state local (por si el
+		// padre sigue montado en algún borde de caso).
+		mapaModalStack.setReturnHandler((newId, kind) => {
+			if (kind !== 'posicion') return;
+			complementariaId = newId;
+			const current = posicionWizardDraft.value;
+			if (current) {
+				posicionWizardDraft.set({ ...current, complementariaId: newId });
+			}
+		});
+		mapaModalStack.push({
+			kind: 'wizard-posicion',
+			modo: 'crear',
+			nombre: 'Nueva posición'
+		});
+	}
+
+	function handleSkipComplementaria() {
+		// "Saltar" del paso de complementaria: si el usuario no había tocado
+		// nada, queda en null. Si había elegido algo, lo conserva (la idea
+		// es que el botón siempre dice "Continuar" — Saltar es semántico).
+		advance();
+	}
+
+	function handleContinueComplementaria() {
+		advance();
+	}
 
 	function goToStep(step: number) {
 		if (step > currentStep && !visitedSteps.has(step)) return;
@@ -309,6 +443,11 @@
 		if (currentStep === 3) {
 			intercept();
 			(tipo !== undefined ? handleContinueStep3 : handleSkipTipo)();
+			return;
+		}
+		if (currentStep === 4) {
+			intercept();
+			handleContinueComplementaria();
 			return;
 		}
 		if (currentStep === totalSteps && nombre.trim().length > 0 && !saving) {
@@ -399,12 +538,17 @@
 					nombre: nombreFinal,
 					categoria: categoriaFinal,
 					tipo,
-					notas: notas.trim()
+					notas: notas.trim(),
+					posicion_complementaria_id: complementariaId
 				});
 				if (mode === 'stack') {
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.
 					mapaModalStack.setDirtyHandler(null);
+					// Limpia el draft (si era nuestro). Si este wizard era un
+					// sub-wizard inline, el padre ya leyó/escribió su propio
+					// draft con key distinta y NO se ve afectado.
+					posicionWizardDraft.clear();
 					// El callback `onSaved` puede leerse en el host para invalidar
 					// cache. Lo invocamos siempre antes de mover el stack para que
 					// el host trabaje sobre el stack estable.
@@ -439,11 +583,13 @@
 					nombre: nombreFinal,
 					categoria: categoriaFinal,
 					tipo,
-					notas: notas.trim()
+					notas: notas.trim(),
+					posicion_complementaria_id: complementariaId
 				};
 				await updatePosicion(update);
 				if (mode === 'stack') {
 					mapaModalStack.setDirtyHandler(null);
+					posicionWizardDraft.clear();
 					onSaved?.(posicionId, 'editar');
 					// Vuelve al modal anterior (la posición que se estaba viendo).
 					mapaModalStack.pop();
@@ -564,6 +710,26 @@
 			</div>
 
 			<div class="space-y-3" class:hidden={currentStep !== 4}>
+				<h3 class="text-sm font-semibold">Complementaria (opcional)</h3>
+				<Combobox
+					value={complementariaId}
+					onValueChange={handleComplementariaChange}
+					items={complementariasDisponibles}
+					placeholder="Selecciona la posición complementaria…"
+					searchPlaceholder="Buscar posición…"
+					emptyMessage="No hay posiciones disponibles."
+					ariaLabel="Posición complementaria"
+					onCreateNew={mode === 'stack' ? handleCreateNewComplementaria : undefined}
+					createNewLabel="Crear nueva posición"
+				/>
+				<p class="text-xs text-muted-foreground">
+					Otra vista de la misma situación (p. ej. "Mount top" ↔ "Mount bottom").
+					Solo aparecen posiciones libres o ya vinculadas a esta. Para liberar una
+					que esté vinculada a otra distinta, edítala primero.
+				</p>
+			</div>
+
+			<div class="space-y-3" class:hidden={currentStep !== 5}>
 				<h3 class="text-sm font-semibold">Notas (opcional)</h3>
 				<div class="space-y-1.5">
 					<Label for="posicion-notas">Notas</Label>
@@ -621,6 +787,15 @@
 					variant="outline"
 					size="sm"
 					onclick={tipo !== undefined ? handleContinueStep3 : handleSkipTipo}
+					disabled={saving}
+				>
+					Continuar
+				</Button>
+			{:else if currentStep === 4}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={complementariaId !== null ? handleContinueComplementaria : handleSkipComplementaria}
 					disabled={saving}
 				>
 					Continuar

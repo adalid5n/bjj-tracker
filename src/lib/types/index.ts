@@ -63,6 +63,7 @@ export interface Posicion {
 	categoria: CategoriaPosicion;
 	tipo?: TipoRolPosicion;
 	notas: string;
+	posicion_complementaria_id?: string | null;
 	created_at: string;
 	updated_at: string;
 }

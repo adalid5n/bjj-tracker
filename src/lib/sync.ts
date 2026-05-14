@@ -19,7 +19,7 @@ import type {
 	TecnicaContra
 } from '$lib/types';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export type RollPosicionProblemaRow = {
 	roll_id: string;
@@ -212,14 +212,15 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 
 	for (const p of payload.posiciones) {
 		await run(
-			`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, posicion_complementaria_id, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				p.id,
 				p.nombre,
 				p.categoria,
 				p.tipo ?? null,
 				p.notas,
+				p.posicion_complementaria_id ?? null,
 				p.created_at,
 				p.updated_at
 			]
