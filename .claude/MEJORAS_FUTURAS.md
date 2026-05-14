@@ -68,20 +68,13 @@ La nueva ruta `/companeros` usa FAB consistente con `/`. La página dev `/dev/co
   que ir a Ajustes del sistema Android → Borrar almacenamiento de Chrome.
 - **Cuándo:** junto con T-8 (auto-update PWA) o inmediatamente después.
 
-### Modo oscuro con toggle en Ajustes
+### ~~Modo oscuro con toggle en Ajustes~~ — HECHO en sesión 11 (commit pendiente)
 
-- **Origen:** Adalid, 2026-05-11 (durante planificación de it.0.5)
-- **Idea:** soportar tema claro/oscuro y exponer un toggle en `/ajustes`.
-  Los tokens shadcn ya están preparados para esto (CSS vars con
-  variantes `:root` y `.dark`), así que el grueso del trabajo es:
-  (1) tener todos los componentes propios pasando por tokens
-  (cubierto por it.0.5), (2) añadir el switch + persistencia de la
-  preferencia en localStorage o BD, (3) respetar `prefers-color-scheme`
-  como default si no hay preferencia guardada.
-- **Por qué:** uso real (la app se abre tras entrenar, a menudo de
-  noche). También accesibilidad.
-- **Cuándo:** post-it.0.5, cuando los tokens ya estén coherentes. Es un
-  añadido pequeño una vez la base de tokens está limpia.
+Implementado en sesión 11 (2026-05-14). `ThemeState` singleton en
+`src/lib/theme.svelte.ts`, toggle 3 botones (Auto/Claro/Oscuro) en
+`/ajustes`, persistencia `localStorage['theme']`, suscripción a
+`matchMedia('(prefers-color-scheme: dark)')`. Decisión documentada en
+`decisiones/003-theme-manager.md`.
 
 ### Sistema de diseño coherente — usar design tokens en lugar de Tailwind raw
 
@@ -135,6 +128,21 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
   cuando llegue iteración 3 (vista grafo) y veamos si las aristas
   hermanas se ven raras.
 
+### Cards en items — revisar "saturación visual" tras uso real
+
+- **Origen:** Adalid, sesión 11 (2026-05-14), tras aplicar M9.
+- **Estado actual:** items de lista (home, rolls, mapa, sesion/[id],
+  companeros) llevan `rounded-lg border border-border bg-card shadow-xs`
+  + `space-y-2` entre items. Adalid reporta que se ve mejor que la
+  versión "pelada" anterior pero "un poco saturado de elementos".
+- **Idea (a evaluar en uso real):** bajar 1 nivel alguna de las
+  señales: quitar `shadow-xs` (border + bg ya da frame), o usar
+  `border-border/60` (borde más sutil), o reducir `space-y-2` →
+  `space-y-1` si el problema es el espaciado.
+- **Cuándo:** tras al menos una semana de uso real con catálogo
+  poblado. Si en escaneo rápido cuesta encontrar lo importante,
+  retocar.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`
@@ -146,6 +154,43 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
 ---
 
 ## Tech debt / dev experience
+
+### FOUC inicial al cargar con tema oscuro persistido
+
+- **Origen:** sesión 11 (2026-05-14), implementación del theme manager.
+- **Síntoma:** al abrir la app con `localStorage['theme'] === 'dark'`
+  (o `'auto'` y sistema en oscuro), la página pinta en claro durante
+  un microsegundo antes de que `onMount` ejecute `theme.init()` y
+  aplique la clase `.dark` en `<html>`. Flash desagradable pero breve.
+- **Mitigación:** script bloqueante en `<head>` de `app.html`:
+  ```html
+  <script>
+    const m = localStorage.getItem('theme');
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (m === 'dark' || (m !== 'light' && sysDark)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  ```
+  Se ejecuta antes del primer paint, evita el FOUC. **Toca
+  `app.html`**, que está fuera de la lista prohibida pero cerca del
+  espíritu de las reglas — pedir confirmación explícita antes.
+- **Cuándo:** si el FOUC molesta en uso real (especialmente nocturno).
+  Hoy aceptado como compromise.
+
+### CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicado en 3 sitios
+
+- **Origen:** T-13, sesión 11 (2026-05-14).
+- **Detalle:** las constantes que definen el orden de categorías de
+  posiciones (`top` / `bottom` / `pie` / `transicion` / `otro`) y sus
+  labels en castellano viven duplicadas en al menos 3 ficheros:
+  `/mapa/+page.svelte`, `RollEditor.svelte`, `/rolls/+page.svelte` (T-13).
+  Si añadimos una categoría hay que tocar las 3.
+- **Idea:** centralizar en `src/lib/categorias.ts` exportando
+  `CATEGORIAS_ORDEN: readonly Categoria[]` y `CATEGORIA_LABEL: Record<Categoria, string>`.
+- **Cuándo:** cuando el coste de la divergencia se note (ej. cuarto
+  sitio que reproduce las mismas constantes), o cuando se añada nueva
+  categoría.
 
 ### ~~Resolver el error preexistente de `virtual:pwa-register` en `+layout.svelte`~~ — HECHO en T-9+T-10 (commit pendiente)
 
