@@ -127,6 +127,12 @@
 	);
 	const totalSteps = $derived(visibleSteps.length);
 
+	// T-2.it2: en modo `editar` el componente renderiza un form plano con
+	// todos los campos visibles a la vez (como `RollEditor` en modo `form`),
+	// no el stepper. Modo `crear` mantiene el wizard porque guía al usuario
+	// que aún no conoce qué viene.
+	const viewMode = $derived<'wizard' | 'form'>(modo === 'editar' ? 'form' : 'wizard');
+
 	// `categoria` y `tipo` arrancan como undefined: nos permite distinguir
 	// "el usuario no ha tocado nada" de "el usuario eligió otro/lo que sea".
 	// Si llegamos al guardado con categoria undefined, lo materializamos a 'otro'.
@@ -683,6 +689,7 @@
 	  siempre quedan visibles aunque el contenido del paso desborde.
 	-->
 	<div class="flex h-full min-h-0 flex-col">
+		{#if viewMode === 'wizard'}
 		<!-- Indicador de progreso (mismo patrón que RollEditor). -->
 		<div class="flex items-center gap-1 pt-2">
 			{#each visibleSteps as step, i (step)}
@@ -785,7 +792,7 @@
 						id="posicion-notas"
 						bind:value={notas}
 						rows={4}
-						placeholder="Pinta-pega lo que quieras recordar sobre esta posición."
+						placeholder="Anota lo que quieras recordar sobre esta posición."
 						oninput={(e) => {
 							notas = capitalizeFirst(e.currentTarget.value);
 						}}
@@ -862,5 +869,93 @@
 			{/if}
 			</div>
 		</div>
+		{:else}
+			<!--
+			  T-2.it2: rama `form` (modo editar) — todos los campos visibles
+			  a la vez en un único formulario. Sin indicador de pasos, sin
+			  Anterior/Continuar; solo Cancelar + Guardar al final.
+			-->
+			<div class="-mx-3 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-2">
+				<div class="space-y-1.5">
+					<Label for="posicion-form-nombre">Nombre *</Label>
+					<Input
+						id="posicion-form-nombre"
+						bind:value={nombre}
+						oninput={handleNombreInput}
+						aria-invalid={nombreError ? 'true' : undefined}
+						aria-describedby={nombreError ? 'posicion-form-nombre-error' : undefined}
+					/>
+					{#if nombreError}
+						<p id="posicion-form-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+					{/if}
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Categoría</Label>
+					<Chips
+						options={CATEGORIAS}
+						value={categoria ?? null}
+						onChange={(v) => (categoria = (v ?? undefined) as CategoriaPosicion | undefined)}
+						ariaLabel="Categoría de la posición"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Tipo de rol</Label>
+					<Chips
+						options={TIPOS_ROL}
+						value={tipo ?? null}
+						onChange={(v) => (tipo = (v ?? undefined) as TipoRolPosicion | undefined)}
+						ariaLabel="Tipo de rol de la posición"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Complementaria</Label>
+					<Combobox
+						value={complementariaId}
+						onValueChange={handleComplementariaChange}
+						items={complementariasDisponibles}
+						placeholder="Selecciona la posición complementaria…"
+						searchPlaceholder="Buscar posición…"
+						emptyMessage="No hay posiciones disponibles."
+						ariaLabel="Posición complementaria"
+						onCreateNew={mode === 'stack' ? handleCreateNewComplementaria : undefined}
+						createNewLabel="Crear nueva posición"
+					/>
+					<p class="text-xs text-muted-foreground">
+						Otra vista de la misma situación (p. ej. "Mount top" ↔ "Mount bottom").
+					</p>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label for="posicion-form-notas">Notas</Label>
+					<Textarea
+						id="posicion-form-notas"
+						bind:value={notas}
+						rows={4}
+						placeholder="Anota lo que quieras recordar sobre esta posición."
+						oninput={(e) => {
+							notas = capitalizeFirst(e.currentTarget.value);
+						}}
+					/>
+				</div>
+
+				{#if errorMsg}
+					<p class="text-sm text-destructive">{errorMsg}</p>
+				{/if}
+			</div>
+
+			<div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+				<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
+				<Button
+					size="sm"
+					onclick={handleSave}
+					disabled={saving || !nombre.trim() || !!nombreError}
+				>
+					{saving ? 'Guardando…' : 'Guardar'}
+				</Button>
+			</div>
+		{/if}
 	</div>
 {/if}

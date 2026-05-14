@@ -84,6 +84,11 @@
 
 	const totalSteps = 7;
 
+	// T-2.it2: en modo `editar` el componente renderiza un form plano con
+	// todos los campos visibles a la vez (mismo patrón que `RollEditor`).
+	// Modo `crear` mantiene el stepper como guía.
+	const viewMode = $derived<'wizard' | 'form'>(modo === 'editar' ? 'form' : 'wizard');
+
 	// Estado del wizard.
 	let nombre = $state('');
 	let variante = $state('');
@@ -778,6 +783,7 @@
 	  / Guardar siempre se vean al final del Dialog.
 	-->
 	<div class="flex h-full min-h-0 flex-col">
+		{#if viewMode === 'wizard'}
 		<!-- Indicador de progreso (7 segmentos, mismo patrón que PosicionWizard). -->
 		<div class="flex items-center gap-1 pt-2">
 			{#each Array(totalSteps) as _, i (i)}
@@ -956,7 +962,7 @@
 					id="tecnica-detalles"
 					bind:value={detalles}
 					rows={4}
-					placeholder="Pinta-pega cómo se ejecuta la técnica, claves del setup, etc."
+					placeholder="Anota cómo se ejecuta la técnica, claves del setup, etc."
 					oninput={(e) => {
 						detalles = capitalizeFirst(e.currentTarget.value);
 					}}
@@ -1038,5 +1044,158 @@
 				{/if}
 			</div>
 		</div>
+		{:else}
+			<!-- T-2.it2: rama `form` (modo editar) — campos visibles a la vez. -->
+			<div class="-mx-3 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-2">
+				<div class="space-y-1.5">
+					<Label for="tecnica-form-nombre">Nombre *</Label>
+					<Input
+						id="tecnica-form-nombre"
+						bind:value={nombre}
+						oninput={(e) => {
+							nombre = capitalizeFirst(e.currentTarget.value);
+							clearNombreError();
+						}}
+						aria-invalid={nombreError ? 'true' : undefined}
+						aria-describedby={nombreError ? 'tecnica-form-nombre-error' : undefined}
+					/>
+					{#if nombreError}
+						<p id="tecnica-form-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+					{:else if nombreYaExisteAviso}
+						<p class="text-sm text-warning">{nombreYaExisteAviso}</p>
+					{/if}
+				</div>
+
+				<div class="space-y-1.5">
+					<Label for="tecnica-form-variante">Variante</Label>
+					<Input
+						id="tecnica-form-variante"
+						bind:value={variante}
+						placeholder='p. ej. "desde guardia", "con grip cruzado"'
+						oninput={(e) => {
+							variante = capitalizeFirst(e.currentTarget.value);
+							clearNombreError();
+						}}
+					/>
+					<p class="text-xs text-muted-foreground">
+						Opcional. Útil si tienes varias versiones de la misma técnica.
+					</p>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Posición de origen *</Label>
+					<Combobox
+						value={posicionOrigenId}
+						onValueChange={(id) => {
+							posicionOrigenId = id;
+							clearNombreError();
+						}}
+						items={posicionItems}
+						placeholder="Selecciona una posición…"
+						searchPlaceholder="Buscar posición…"
+						emptyMessage="Sin posiciones en el catálogo."
+						onCreateNew={handleCreateNuevaPosicionOrigen}
+						createNewLabel="Crear nueva posición"
+						ariaLabel="Posición de origen"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Tipo *</Label>
+					<Chips
+						options={TIPOS}
+						value={tipo ?? null}
+						onChange={handleTipoChange}
+						ariaLabel="Tipo de técnica"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Destino *</Label>
+					{#if tipo === 'sumision'}
+						<Combobox
+							value={sumisionDestinoId}
+							onValueChange={(id) => (sumisionDestinoId = id)}
+							items={sumisionItems}
+							placeholder="Selecciona una sumisión…"
+							searchPlaceholder="Buscar sumisión…"
+							emptyMessage="Sin sumisiones todavía."
+							onCreateNew={handleCreateNuevaSumision}
+							createNewLabel="Crear nueva sumisión"
+							ariaLabel="Sumisión de destino"
+						/>
+					{:else if tipo}
+						<Combobox
+							value={posicionDestinoId}
+							onValueChange={(id) => (posicionDestinoId = id)}
+							items={posicionItems}
+							placeholder="Selecciona una posición…"
+							searchPlaceholder="Buscar posición…"
+							emptyMessage="Sin posiciones en el catálogo."
+							onCreateNew={handleCreateNuevaPosicion}
+							createNewLabel="Crear nueva posición"
+							ariaLabel="Posición de destino"
+						/>
+					{:else}
+						<p class="text-sm text-muted-foreground italic">
+							Selecciona primero el tipo para elegir el destino.
+						</p>
+					{/if}
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Estado</Label>
+					<Chips
+						options={ESTADOS}
+						value={estado ?? null}
+						onChange={handleEstadoChange}
+						ariaLabel="Estado de la técnica"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label for="tecnica-form-detalles">Setup / ejecución</Label>
+					<Textarea
+						id="tecnica-form-detalles"
+						bind:value={detalles}
+						rows={4}
+						placeholder="Anota cómo se ejecuta la técnica, claves del setup, etc."
+						oninput={(e) => {
+							detalles = capitalizeFirst(e.currentTarget.value);
+						}}
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label for="tecnica-form-errores">Errores comunes</Label>
+					<Textarea
+						id="tecnica-form-errores"
+						bind:value={erroresComunes}
+						rows={3}
+						placeholder="Qué falla habitualmente, mistakes que detectas en rolls, etc."
+						oninput={(e) => {
+							erroresComunes = capitalizeFirst(e.currentTarget.value);
+						}}
+					/>
+				</div>
+
+				{#if errorMsg}
+					<p class="text-sm text-destructive">{errorMsg}</p>
+				{/if}
+			</div>
+
+			<div
+				class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3"
+			>
+				<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
+				<Button
+					size="sm"
+					onclick={handleSave}
+					disabled={saving || !nombre.trim() || !posicionOrigenId || !tipo || !!nombreError}
+				>
+					{saving ? 'Guardando…' : 'Guardar'}
+				</Button>
+			</div>
+		{/if}
 	</div>
 {/if}

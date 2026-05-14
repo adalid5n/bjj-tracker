@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-14 (cierre sesión 13)
-**Fase activa:** Iteración 2 — T-1.it2 cerrada, T-2.it2 siguiente
-**Iteración en curso:** it.2 (1/7 tareas previstas cerradas; T-1.it2)
+**Última actualización:** 2026-05-15 (cierre sesión 14)
+**Fase activa:** Iteración 2 — T-2.it2 cerrada, T-3.it2 siguiente
+**Iteración en curso:** it.2 (2/7 tareas previstas cerradas; T-1.it2, T-2.it2)
 
 ---
 
@@ -37,7 +37,67 @@ posición. Decidido en sesión 9. Mini-ADR pendiente
 
 ---
 
-## Última sesión (2026-05-14, sesión 13)
+## Última sesión (2026-05-15, sesión 14)
+
+**Hecho — T-2.it2: refactor "plano-edit" en los 3 wizards**
+
+Patrón canónico (mismo que `RollEditor`): el componente bifurca por
+`modo` en un `$derived viewMode: 'wizard' | 'form'`. Modo `editar`
+renderiza un form único con todos los campos visibles a la vez; modo
+`crear` mantiene el stepper. Mismo componente, dos ramas internas
+(`{#if viewMode === 'wizard'} ... {:else} ... {/if}`) — un solo
+punto de carga/validación/save.
+
+- **PosicionWizard**: rama form con Nombre, Categoría, Tipo,
+  Complementaria (combobox con "+ Crear nueva inline"), Notas. El
+  combobox de complementaria mantiene el flujo de sub-wizard de
+  T-1.it2 (`parentForComplementaria` salta paso 4 cuando el padre
+  está en wizard; en form el sub se abre con sus 5 pasos normales).
+- **SumisionWizard**: rama form con Nombre + Notas.
+- **TecnicaWizard**: rama form con Nombre, Variante, Origen (combobox),
+  Tipo (chips), Destino condicional (combobox de posiciones o
+  sumisiones según tipo), Estado (chips), Detalles, Errores comunes.
+
+**Pulido UX adicional en la sesión:**
+
+- **Placeholder "Pinta-pega" → "Anota"** en los textareas de los 3
+  wizards (wizard + form, 6 ocurrencias). "Pinta-pega" no es
+  expresión natural.
+- **Footer Cancelar izquierda** (patrón "esquinas opuestas",
+  preferencia owner). Decisión: separa la salida segura de la acción
+  primaria, reduce clics accidentales. Aplicado a `CompaneroEditor`
+  (donde el span vacío al inicio dejaba Cancelar centrado) y a
+  `RollEditor` (modo form). El Borrar de RollEditor se agrupa con
+  Cancelar a la izquierda como acciones no-primarias:
+  `[Borrar Cancelar] .... [Guardar]`. Se descartó el patrón
+  Material/shadcn-default (todo agrupado a la derecha).
+
+**Decisiones tomadas:**
+
+- **`viewMode` derivado del `modo` prop**, no de un prop separado.
+  Conserva la API simple del wizard.
+- **Misma instancia de componente para wizard y form**. Alternativa
+  descartada: componentes hermanos (`*Editor` vs `*Wizard`). Coste
+  extra sin valor — toda la lógica de validación/save/dirty se
+  comparte.
+- **Esquinas opuestas para Cancelar/Guardar** (vs agrupado a la
+  derecha). Razón: separación seguridad/acción primaria; convención
+  macOS/GNOME; permite encajar Borrar a la izquierda cuando exista.
+
+**Iteración 2 — plan vivo actualizado:**
+
+- T-1.it2 ✅ (commits `f098a4e`, `4e0b184`).
+- T-2.it2 ✅ refactor plano-edit.
+- T-3.it2 (siguiente) — linkear rolls a técnicas (entidades, no texto
+  libre).
+- T-4.it2 — reescritura del prefill de contras inline.
+- T-5.it2 — consultas C1/C2 + resumen texto post-sesión.
+- T-6.it2 — pulido UX post uso real.
+- T-7.it2 — cierre + tag `v0.3-it2`.
+
+---
+
+## Sesión previa (2026-05-14, sesión 13)
 
 **Hecho — T-1.it2: vínculo top↔bottom + vista del oponente**
 
@@ -798,31 +858,24 @@ técnica inline). Patrones T-8 / T-9 / T-10 establecidos.]
 
 ## Próximo paso
 
-**T-2.it2 — Refactor "plano-edit" en los 3 wizards
-(Pos/Sum/Tec).** Modo `editar` debe pasar de stepper a formulario
-único con todos los campos visibles a la vez (referencia: `RollEditor`).
-Modo `crear` se queda con stepper (guía al usuario que no sabe qué
-viene). Aplicar consistentemente a `PosicionWizard`, `SumisionWizard`
-y `TecnicaWizard` (regla del proyecto: fixes a wizards aplican a
-TODOS los equivalentes).
+**T-3.it2 — Linkear rolls a técnicas (entidades, no texto libre).**
 
-Subtareas previsibles:
+Hoy `RollEditor` captura "qué intenté" y "qué falló" como texto libre
++ posiciones-problema como entidades (T-12). Falta lo que REQUISITOS
+§6 it.2 marca como pieza clave: linkear rolls a TÉCNICAS reales del
+catálogo. Esto desbloquea las consultas C1/C2 (T-5.it2) y el resumen
+post-sesión.
 
-1. Decidir estructura: ¿mismo componente con dos ramas internas, o
-   componentes hermanos `*Editor` vs `*Wizard`? Mi inclinación:
-   mismo componente, dos ramas — un solo punto de carga/validación/
-   save.
-2. PosicionWizard: rama editar plana con los 4 campos (nombre,
-   categoría, tipo, complementaria, notas).
-3. SumisionWizard: rama editar plana (nombre, notas).
-4. TecnicaWizard: rama editar plana (nombre, variante, origen, tipo,
-   destino condicional, estado, detalles, errores).
-5. Verificar que el flujo "+ Crear nueva inline" sigue funcionando
-   desde el wizard padre cuando ambos pueden ser planos / stepper
-   mixto.
-6. Verificación en preview + commit + push.
+Cosas a definir antes de empezar:
 
-Por hacer pendiente del owner (no bloquea T-2.it2):
+1. **Modelo de datos**: nueva tabla `roll_tecnica` (N:M)? ¿Con
+   marcadores tipo `intentada/conseguida/sufrida`?
+2. **UI**: ¿en el wizard de roll (multi-chips de técnicas) o en una
+   vista de detalle del roll?
+3. **Carga del catálogo**: con cientos de técnicas, ¿agrupar por
+   posición de origen? ¿Buscador?
+
+Pendiente del owner (no bloquea T-3.it2):
 
 - **Retro-vincular pares ya creados en it.1** desde la UI. Datos en
   DB local OPFS, no en repo.

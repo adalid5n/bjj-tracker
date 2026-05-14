@@ -837,21 +837,27 @@
 			</div>
 
 			<Dialog.Footer>
-				{#if onDelete}
-					<Button variant="destructive" size="sm" onclick={handleDelete} disabled={saving}>
-						Borrar
+				<!--
+				  Patrón "esquinas opuestas": Cancelar izquierda, acción primaria
+				  derecha. Si hay Borrar, va a la izquierda de Cancelar (acciones
+				  secundarias agrupadas) — Dialog.Footer es justify-between y
+				  reparte los hijos a los extremos.
+				-->
+				<div class="flex gap-2">
+					{#if onDelete}
+						<Button variant="destructive" size="sm" onclick={handleDelete} disabled={saving}>
+							Borrar
+						</Button>
+					{/if}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => (open = false)}
+						disabled={saving}
+					>
+						Cancelar
 					</Button>
-				{:else}
-					<span></span>
-				{/if}
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={() => (open = false)}
-					disabled={saving}
-				>
-					Cancelar
-				</Button>
+				</div>
 				<Button size="sm" onclick={handleSave} disabled={!canSaveForm}>
 					{saving ? 'Guardando…' : 'Guardar'}
 				</Button>

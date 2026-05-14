@@ -49,6 +49,11 @@
 
 	const totalSteps = 2;
 
+	// T-2.it2: en modo `editar` el componente renderiza un form plano con
+	// todos los campos visibles a la vez (mismo patrón que `RollEditor`).
+	// Modo `crear` mantiene el stepper como guía.
+	const viewMode = $derived<'wizard' | 'form'>(modo === 'editar' ? 'form' : 'wizard');
+
 	let nombre = $state('');
 	let notas = $state('');
 
@@ -330,6 +335,7 @@
 	  / Guardar siempre se vean al final.
 	-->
 	<div class="flex h-full min-h-0 flex-col">
+		{#if viewMode === 'wizard'}
 		<!-- Indicador de progreso (mismo patrón que PosicionWizard). -->
 		<div class="flex items-center gap-1 pt-2">
 			{#each Array(totalSteps) as _, i (i)}
@@ -385,7 +391,7 @@
 						id="sumision-notas"
 						bind:value={notas}
 						rows={4}
-						placeholder="Pinta-pega lo que quieras recordar sobre esta sumisión."
+						placeholder="Anota lo que quieras recordar sobre esta sumisión."
 						oninput={(e) => {
 							notas = capitalizeFirst(e.currentTarget.value);
 						}}
@@ -427,5 +433,53 @@
 				{/if}
 			</div>
 		</div>
+		{:else}
+			<!-- T-2.it2: rama `form` (modo editar) — campos visibles a la vez. -->
+			<div class="-mx-3 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-2">
+				<div class="space-y-1.5">
+					<Label for="sumision-form-nombre">Nombre *</Label>
+					<Input
+						id="sumision-form-nombre"
+						bind:value={nombre}
+						oninput={handleNombreInput}
+						aria-invalid={nombreError ? 'true' : undefined}
+						aria-describedby={nombreError ? 'sumision-form-nombre-error' : undefined}
+					/>
+					{#if nombreError}
+						<p id="sumision-form-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+					{/if}
+				</div>
+
+				<div class="space-y-1.5">
+					<Label for="sumision-form-notas">Notas</Label>
+					<Textarea
+						id="sumision-form-notas"
+						bind:value={notas}
+						rows={4}
+						placeholder="Anota lo que quieras recordar sobre esta sumisión."
+						oninput={(e) => {
+							notas = capitalizeFirst(e.currentTarget.value);
+						}}
+					/>
+				</div>
+
+				{#if errorMsg}
+					<p class="text-sm text-destructive">{errorMsg}</p>
+				{/if}
+			</div>
+
+			<div
+				class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3"
+			>
+				<Button variant="outline" size="sm" onclick={cancel} disabled={saving}>Cancelar</Button>
+				<Button
+					size="sm"
+					onclick={handleSave}
+					disabled={saving || !nombre.trim() || !!nombreError}
+				>
+					{saving ? 'Guardando…' : 'Guardar'}
+				</Button>
+			</div>
+		{/if}
 	</div>
 {/if}

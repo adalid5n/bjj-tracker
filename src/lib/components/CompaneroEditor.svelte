@@ -344,7 +344,13 @@
 			</div>
 
 			<Dialog.Footer>
-				<span></span>
+				<!--
+				  Patrón "esquinas opuestas" (preferencia del proyecto): Cancelar
+				  izquierda, acción primaria derecha. Dialog.Footer es
+				  `justify-between`; con 2 hijos se reparten automáticamente a
+				  los extremos. Separa la salida segura de la acción primaria y
+				  evita clics accidentales.
+				-->
 				<Button variant="outline" size="sm" onclick={() => (open = false)} disabled={saving}>
 					Cancelar
 				</Button>
