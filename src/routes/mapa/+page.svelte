@@ -266,10 +266,6 @@
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-3 p-4 pb-28">
-	<header>
-		<h1 class="text-2xl font-bold">Mapa técnico</h1>
-	</header>
-
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
@@ -286,57 +282,78 @@
 		</div>
 	{:else}
 		<!--
-		  Toggle Posiciones / Técnicas. Dos botones tipo "tab" en lugar del
-		  primitive Tabs de bits-ui — Tabs no está instalado en
-		  `lib/components/ui/` y el contrato (dos vistas exclusivas con
-		  switch visual) se cubre sobradamente con buttons + estilo
-		  condicional usando tokens semánticos. role="tablist" + role="tab"
-		  + aria-selected para que asistivos lo lean como tabs reales.
+		  Sub-header sticky: agrupa toggle de vista, buscador y (solo en tab
+		  Técnicas) el filtro de tipo. Queda pegado justo debajo del
+		  AppHeader (h-14 → top-14). `-mx-4 px-4` para que la línea inferior
+		  llegue de borde a borde. El filtro de tipo entra/sale del sticky
+		  cuando se cambia de tab; ocupa más espacio cuando está visible —
+		  comportamiento aceptado.
 		-->
 		<div
-			role="tablist"
-			aria-label="Vista del mapa"
-			class="inline-flex rounded-md border border-border bg-muted p-0.5"
+			class="sticky top-14 z-20 -mx-4 space-y-3 border-b border-border bg-background px-4 pb-2"
 		>
-			<button
-				type="button"
-				role="tab"
-				aria-selected={vistaActiva === 'posiciones'}
-				class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
-				'posiciones'
-					? 'bg-background text-foreground shadow-sm'
-					: 'text-muted-foreground hover:text-foreground'}"
-				onclick={() => (vistaActiva = 'posiciones')}
+			<!--
+			  Toggle Posiciones / Técnicas. Dos botones tipo "tab" en lugar del
+			  primitive Tabs de bits-ui — Tabs no está instalado en
+			  `lib/components/ui/` y el contrato (dos vistas exclusivas con
+			  switch visual) se cubre sobradamente con buttons + estilo
+			  condicional usando tokens semánticos. role="tablist" + role="tab"
+			  + aria-selected para que asistivos lo lean como tabs reales.
+			-->
+			<div
+				role="tablist"
+				aria-label="Vista del mapa"
+				class="inline-flex rounded-md border border-border bg-muted p-0.5"
 			>
-				Posiciones
-			</button>
-			<button
-				type="button"
-				role="tab"
-				aria-selected={vistaActiva === 'tecnicas'}
-				class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
-				'tecnicas'
-					? 'bg-background text-foreground shadow-sm'
-					: 'text-muted-foreground hover:text-foreground'}"
-				onclick={() => (vistaActiva = 'tecnicas')}
-			>
-				Técnicas
-			</button>
-		</div>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={vistaActiva === 'posiciones'}
+					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
+					'posiciones'
+						? 'bg-background text-foreground shadow-sm'
+						: 'text-muted-foreground hover:text-foreground'}"
+					onclick={() => (vistaActiva = 'posiciones')}
+				>
+					Posiciones
+				</button>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={vistaActiva === 'tecnicas'}
+					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
+					'tecnicas'
+						? 'bg-background text-foreground shadow-sm'
+						: 'text-muted-foreground hover:text-foreground'}"
+					onclick={() => (vistaActiva = 'tecnicas')}
+				>
+					Técnicas
+				</button>
+			</div>
 
-		<div class="relative">
-			<SearchIcon
-				class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-			/>
-			<Input
-				type="search"
-				placeholder={vistaActiva === 'tecnicas'
-					? 'Buscar por nombre o variante…'
-					: 'Buscar por nombre…'}
-				bind:value={query}
-				aria-label={vistaActiva === 'tecnicas' ? 'Buscar técnicas' : 'Buscar en el mapa'}
-				class="pl-8"
-			/>
+			<div class="relative">
+				<SearchIcon
+					class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+				/>
+				<Input
+					type="search"
+					placeholder={vistaActiva === 'tecnicas'
+						? 'Buscar por nombre o variante…'
+						: 'Buscar por nombre…'}
+					bind:value={query}
+					aria-label={vistaActiva === 'tecnicas' ? 'Buscar técnicas' : 'Buscar en el mapa'}
+					class="pl-8"
+				/>
+			</div>
+
+			{#if vistaActiva === 'tecnicas'}
+				<MultiChips
+					options={tipoOptions}
+					value={tiposSeleccionados}
+					onChange={(v) => (tiposSeleccionados = v)}
+					ariaLabel="Filtrar técnicas por tipo"
+				/>
+			{/if}
 		</div>
 
 		{#if vistaActiva === 'posiciones'}
@@ -352,12 +369,12 @@
 						<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
 							{CATEGORIA_LABEL[grupo.categoria]}
 						</h2>
-						<ul class="divide-y divide-border rounded border border-border">
+						<ul class="space-y-2">
 							{#each grupo.items as p (p.id)}
 								<li>
 									<button
 										type="button"
-										class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+										class="block w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 										onclick={() => openPosicion(p)}
 									>
 										<div class="font-medium">{p.nombre}</div>
@@ -383,12 +400,12 @@
 						<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
 							Sumisiones
 						</h2>
-						<ul class="divide-y divide-border rounded border border-border">
+						<ul class="space-y-2">
 							{#each sumisionesFiltradas as s (s.id)}
 								<li>
 									<button
 										type="button"
-										class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+										class="block w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 										onclick={() => openSumision(s)}
 									>
 										<div class="font-medium">{s.nombre}</div>
@@ -401,20 +418,13 @@
 			{/if}
 		{:else}
 			<!--
-			  Tab "Técnicas": filtro multi-select por tipo + lista plana
-			  ordenada alfabéticamente. Click en item → push del modal de
-			  técnica al stack del mapa (igual que al entrar desde el modal
-			  de una posición). Creación NO está en esta vista por decisión
-			  de producto (T-10/s8): las técnicas nacen siempre desde una
+			  Tab "Técnicas": el filtro multi-select por tipo vive en el
+			  sub-header sticky de arriba. Aquí solo la lista plana ordenada
+			  alfabéticamente. Click en item → push del modal de técnica al
+			  stack del mapa. Creación NO está en esta vista por decisión de
+			  producto (T-10/s8): las técnicas nacen siempre desde una
 			  posición de origen.
 			-->
-			<MultiChips
-				options={tipoOptions}
-				value={tiposSeleccionados}
-				onChange={(v) => (tiposSeleccionados = v)}
-				ariaLabel="Filtrar técnicas por tipo"
-			/>
-
 			{#if tecnicas.length === 0}
 				<p class="rounded border border-dashed border-border p-8 text-center text-muted-foreground">
 					Sin técnicas en el catálogo. Crea una desde una posición.
@@ -428,12 +438,12 @@
 						: 'Sin técnicas con los tipos seleccionados.'}
 				</p>
 			{:else}
-				<ul class="divide-y divide-border rounded border border-border">
+				<ul class="space-y-2">
 					{#each tecnicasFiltradas as t (t.id)}
 						<li>
 							<button
 								type="button"
-								class="block w-full p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+								class="block w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 								onclick={() => openTecnica(t)}
 							>
 								<div class="flex items-start justify-between gap-2">
