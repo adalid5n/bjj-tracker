@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-14 (cierre sesión 10)
-**Fase activa:** Iteración 1 — Mapa técnico básico
-**Iteración en curso:** it.1 (12.5/15 tareas cerradas: T-1 a T-12 + T-2.5 + tab Técnicas extra)
+**Última actualización:** 2026-05-14 (cierre sesión 12)
+**Fase activa:** Iteración 1 ✅ cerrada — preparación de Iteración 2
+**Iteración cerrada:** it.1 (15/15 tareas: T-1 a T-15 + T-2.5 + tab Técnicas extra + pulido UX masivo de sesión 11)
 
 ---
 
@@ -13,15 +13,22 @@ Iteración 0 ✅ cerrada en `v0.1-it0` (2026-05-10).
 Iteración 0.5 ✅ funcionalmente cerrada. Falta solo T-9 (verificación en
 uso real) y tag `v0.1-it0.5`. Pendiente, no bloquea.
 
-Estamos en **iteración 1** — base estructural del mapa técnico. T-1 a
-T-12 cerradas + T-2.5 + tab "Técnicas" añadido a `/mapa` como mejora
-de UX (no estaba en el plan original). El catálogo está completo
-(crear/editar/borrar posiciones, sumisiones, técnicas con destino
-condicional y "+ Crear nueva inline") y los rolls ya capturan
-posiciones-problema referenciando el catálogo (T-12). Queda **T-13**
-(chips de posiciones-problema en `/sesion/[id]` + filtro en `/rolls`),
-**T-14** (semilla real con catálogo BJJ realista) y **T-15** (cierre
-con tag `v0.2-it1`).
+Iteración 1 ✅ cerrada en `v0.2-it1` (2026-05-14, sesión 12). Mapa
+técnico completo: schema v2 + migración v1→v2 + CRUD de posiciones,
+sumisiones, técnicas (con destino condicional y contras N:N
+asimétricas) + UI completa (`/mapa` con tabs Posiciones/Técnicas,
+modales encadenados, wizards de creación/edición, "+ Crear nueva
+inline") + captura inline de posiciones-problema en rolls + filtro y
+visualización en `/rolls` y `/sesion/[id]` + pulido UX masivo
+(AppHeader global, theme manager, paleta suavizada, card list canónico,
+sticky sub-headers, DateRangePopover, auto-capitalización).
+
+T-14 cerrada como **limpieza manual por el owner** desde la UI
+(eliminó entidades con nombres "test"/"prueba" creadas durante
+validación). El catálogo BJJ real se construirá orgánicamente desde
+`/mapa` cuando capture sesiones reales. T-15 eliminó las rutas dev
+`/dev/seed-mapa` y `/dev/db-migration-smoke` y la rama `/dev/*` de
+`header-title.ts`.
 
 **Iteración 2 confirmada como T-1.it2:** vincular posiciones
 complementarias (top ↔ bottom) + vista del oponente en el modal de
@@ -30,7 +37,146 @@ posición. Decidido en sesión 9. Mini-ADR pendiente
 
 ---
 
-## Última sesión (2026-05-14, sesión 10)
+## Última sesión (2026-05-14, sesión 12)
+
+**Hecho — Cierre de iteración 1**
+
+- **T-14 (limpieza manual)**: el owner purgó desde `/mapa` las entidades
+  con nombres "test"/"prueba" creadas durante la validación de T-4 a
+  T-13. Cero código tocado por esta tarea. El catálogo BJJ real lo
+  construirá orgánicamente desde la UI cuando capture sesiones reales,
+  no desde un seed predefinido (opción c) del híbrido — en la práctica,
+  100 % desde UI tras descartar el seed).
+- **T-15 (cierre técnico)**:
+  - Eliminado `src/routes/dev/` completo (`seed-mapa` y
+    `db-migration-smoke`).
+  - Eliminada la rama `/dev/*` de `deriveHeader()` en
+    `src/lib/header-title.ts` (queda obsoleta sin rutas que la
+    matcheen).
+  - Verificación: `pnpm run check` 0 errors/0 warnings, `pnpm run
+    build` ✓ sin chunks dev en el bundle.
+  - Tag `v0.2-it1`.
+
+**Decisiones tomadas:**
+
+- **Catálogo del mapa = 100 % UI-driven, sin seed.** Opción c) del
+  híbrido se reduce a (a) en la práctica: ningún seed predefinido,
+  todo desde `/mapa`. Razón: el seed solo aportaba data artificial
+  para validar la UI durante it.1, una vez la UI funciona ya no aporta.
+- **Sin uso real verificado como criterio de cierre de T-14.** Lo
+  habría retrasado sin valor (la UI está validada caso a caso por el
+  stakeholder a lo largo de toda it.1, no necesita una "demo de
+  cierre").
+- **Eliminar ambas rutas dev en T-15** (no conservar ninguna como
+  utilidad). El owner lo pidió explícito. Si reaparece la necesidad
+  de un smoke de migraciones o seed de arranque en it.2+, se reabre
+  como tarea propia.
+
+---
+
+## Sesión previa (2026-05-14, sesión 11)
+
+**Hecho — T-13: Visualización de posiciones-problema**
+
+- Helper nuevo `getPosicionesProblemaByRolls(rollIds[])` en `rolls.ts`:
+  una sola query con `IN (?,…)`, devuelve `Map<rollId, Posicion[]>`.
+  Evita N+1.
+- `listAllRolls()` extendido con `posicion_problema_ids?: string[]`
+  (WHERE EXISTS + IN, semántica OR).
+- `/sesion/[id]`: chips read-only `bg-muted text-muted-foreground
+  border-border` bajo cada roll con posiciones-problema.
+- `/rolls`: catálogo cargado en `onMount`, filtro multi-select con
+  `MultiChips` agrupado por categoría, chips read-only bajo cada fila.
+  Commit `e50bbd6`.
+
+**Hecho — Pulido UX masivo (M1–M9, post-T-13)**
+
+A petición del owner tras verificar T-13. Cambios profundos:
+
+- **M1 — Agrupar rolls por día en `/rolls`**. Headers "Hoy/Ayer/`lun, 12
+  may 2026`" con clases de `/mapa`. Fecha eliminada del item individual
+  (queda duplicada con el header).
+- **M2 — Filtro de fechas como `DateRangePopover`** (componente nuevo).
+  Sustituye los dos `DateInput` por un único trigger con texto humano
+  ("Cualquier fecha" / "Desde 1 may" / "1 may – 14 may") que abre un
+  `RangeCalendar` de bits-ui en popover. Botón "Limpiar" interno.
+- **M3 — Auto-capitalización en 22 inputs de texto libre**. Helper
+  `capitalizeFirst()` en `utils.ts`, aplicado vía `oninput` explícito
+  (NO `$effect`) en `PosicionWizard`, `SumisionWizard`, `TecnicaWizard`,
+  `RollEditor`, `SesionEditor`, `SesionForm`, `CompaneroEditor`.
+- **M4 — `AppHeader` global** (`src/lib/components/AppHeader.svelte`,
+  `src/lib/header-title.ts`). Sticky top-0 z-30 h-14. Mapping
+  pathname → título + isTopLevel. Back ← solo en páginas no top-level
+  (hace `history.back()`). `<h1>` propios eliminados de las 5 pages
+  top-level + botón back propio eliminado de `/sesion/[id]`.
+- **M5 — Estilo DateRangePicker** (iteraciones). Bug clave descubierto:
+  bits-ui marca `data-selected` en TODOS los días del rango (incluyendo
+  medios), no solo extremos. Mi regla `data-[selected]:bg-primary`
+  pintaba todos los del rango. Fix: usar `data-[range-start]:bg-primary`
+  + `data-[range-end]:bg-primary` (excluye middles). Visual final:
+  franja translúcida `bg-primary/15` continua con extremos rounded-full
+  + círculos intensos `size-8 m-0.5 rounded-full` en los extremos
+  (2px de halo translúcido alrededor del círculo).
+- **M6 — Sticky sub-headers** en `/rolls` (bloque `<details>` de
+  filtros) y `/mapa` (toggle + buscador + filtro). Patrón `sticky
+  top-14 z-20 bg-background border-b border-border pb-2 -mx-4 px-4`.
+  `/companeros` y `/sesion/[id]` sin controles top → no se tocan.
+- **M7 — Theme manager** (ver `decisiones/003-theme-manager.md`).
+  Singleton `ThemeState` en `theme.svelte.ts` (`$state` en class
+  fields, no module-level). Auto por defecto + override manual en
+  `/ajustes` (sección "Apariencia", 3 botones). Persistencia
+  `localStorage['theme']`. Suscripción a `matchMedia`.
+- **M8 — Paleta suavizada** en `layout.css`. Light off-white
+  (`oklch(0.99 0 0)` background, cards `oklch(1 0 0)` blanco puro
+  encima). Dark gris cálido (`oklch(0.21 0 0)` background,
+  `oklch(0.26 0 0)` cards). Bordes más visibles
+  (`oklch(0.88 0 0)` light, `oklch(1 0 0 / 14%)` dark).
+- **M9 — Cards en items de lista**. Reemplaza el patrón "pelado"
+  (`divide-y` sin frame individual) por `<ul class="space-y-2">` +
+  items con `rounded-lg border border-border bg-card shadow-xs
+  transition-colors hover:bg-accent`. Aplicado a las 5 pantallas
+  (home, rolls, sesion/[id], mapa, companeros).
+
+**Decisiones tomadas (con peso):**
+
+- **Patrón `AppHeader` global** sobre header per-page. Mapping
+  centralizado en `header-title.ts` strippea `paths.base` para
+  funcionar igual en dev (sin base) y prod (con `/bjj-tracker/`).
+  Cualquier nueva ruta requiere actualizar `deriveHeader()` con su
+  título.
+- **`ThemeState` singleton con `$state` en class fields** (cumple
+  regla del proyecto). Sin `mode-watcher` (dep no acordada). ADR-003.
+- **FOUC en primera carga con tema oscuro persistido aceptado**
+  (compromise para no tocar `app.html`). Mitigación documentada en
+  `MEJORAS_FUTURAS.md`.
+- **Paleta retocada para jerarquía visual**. Background ≠ card, cards
+  destacan sobre el fondo. Light off-white con card blanco puro
+  encima; dark gris cálido con card más claro. Bordes con suficiente
+  contraste para enmarcar elementos sin caer en saturación.
+- **Patrón "card list" canónico**: `<ul class="space-y-2">` +
+  `rounded-lg border border-border bg-card shadow-xs
+  transition-colors hover:bg-accent` en cada item. Aplica a las 5
+  listas principales. Anotado follow-up "saturación" en MEJORAS_FUTURAS.
+- **Patrón sticky sub-header canónico**: `sticky top-14 z-20
+  bg-background border-b border-border pb-2 -mx-4 px-4`. `top-14` =
+  altura del AppHeader. Sin overflow ni transform (no rompen el
+  portal del Popover).
+- **Auto-capitalización con `oninput` explícito**, NO `$effect`
+  reactivo (regla del proyecto desde T-10 sesión 8). En wizards con
+  `handleNombreInput` existente, integrar `capitalizeFirst` al inicio
+  de esa función — no añadir `oninput` adicional.
+- **DateRangePicker: bg-primary solo en `data-[range-start]` y
+  `data-[range-end]`**, NUNCA en `data-[selected]` genérico. bits-ui
+  marca `data-selected` en todos los días del rango (incluso medios).
+  Diagnosticado en sesión 11 con Playwright headless.
+- **Verificación con Playwright headless** durante diagnóstico del
+  bug del DateRangePicker. Confirmó que el popover SÍ se abre en
+  todos los viewports — el reporte de "no se abre" del owner se
+  resolvió tras hard refresh (probable Service Worker cacheado).
+
+---
+
+## Sesión previa (2026-05-14, sesión 10)
 
 **Hecho — T-12: Captura inline de posiciones-problema en wizard de roll**
 
@@ -511,28 +657,21 @@ técnica inline). Patrones T-8 / T-9 / T-10 establecidos.]
 
 ## Próximo paso
 
-**T-13 — Visualización de posiciones-problema.** Dos cambios:
+**T-1.it2 — Vínculo posiciones complementarias (top ↔ bottom) + vista
+del oponente en el modal de posición.** Primera tarea de iteración 2.
 
-1. **`/sesion/[id]`**: bajo cada roll, si tiene posiciones-problema,
-   mostrar chips read-only con el nombre de cada posición. Cargar con
-   `getPosicionesProblema(rollId)` (ya existe).
-2. **`/rolls` (tabla)**: filtro nuevo "Posición problema" — multi-select
-   sobre el catálogo de posiciones. Si el filtro tiene N posiciones
-   seleccionadas, mostrar solo rolls cuya relación
-   `roll_posicion_problema` incluya alguna de ellas. Query
-   correspondiente nueva en `rolls.ts` (probable: extender
-   `listRolls()` con un parámetro opcional `posicionProblemaIds[]`).
-
-**Notas para T-13:**
-- El catálogo de posiciones para el filtro ya se carga en `/rolls` si
-  ya se hizo en T-12 (verificar).
-- Patrón de chips read-only: usar tokens semánticos coherentes con el
-  resto (`bg-muted text-muted-foreground`, `border-border`).
-- Si el roll no tiene posiciones-problema, no renderizar nada (no
-  placeholder).
-
-Después de T-13: **T-14** (semilla real con catálogo BJJ realista +
-uso real) y **T-15** (cierre con tag `v0.2-it1`).
+Antes de implementar:
+1. **Mini-ADR `decisiones/002-vinculo-top-bottom.md`** — elegir modelo
+   (campo autoref `posicion_complementaria_id` vs tabla
+   `posicion_par` vs categoría+rol). Trade-offs documentados.
+2. **Schema v3 + migración v2→v3** siguiendo el patrón de T-1 de it.1
+   (array `{from,to,run}` extensible, fresh DBs aplican V1 +
+   migraciones siempre).
+3. **UI mínima en modal de posición**: campo "Complementaria" editable
+   + sección "Vista del oponente" derivada (técnicas que tu oponente
+   puede aplicar desde la complementaria).
+4. **Retro-vincular pares ya creados a mano** (1 click por par,
+   probablemente ≤6 pares en el catálogo actual del owner).
 
 ---
 
@@ -565,6 +704,18 @@ mano (1 click por par, ≤6 pares).
 
 ## Decisiones recientes con peso
 
+- **2026-05-14 (s12) — Catálogo del mapa 100 % UI-driven.** Sin seed
+  predefinido. Razón: el seed era validación de UI para it.1; una vez
+  la UI funciona, el catálogo orgánico desde uso real refleja mejor el
+  BJJ del owner que cualquier lista teórica.
+- **2026-05-14 (s12) — Sin uso real verificado como criterio de
+  cierre.** La validación caso a caso a lo largo de it.1 (T-4 a T-13)
+  ya cubre el "funciona en práctica". Una "demo de cierre" habría sido
+  retrasarse sin valor.
+- **2026-05-14 (s12) — Eliminar ambas rutas dev en T-15.** No
+  conservar ninguna como utilidad. Si reaparece la necesidad (smoke
+  de migración en it.2+, seed de arranque), se trata como tarea
+  nueva con criterio actual.
 - **2026-05-13 (s8) — Patrón "+ Crear nueva inline" con
   `returnHandler` + draft del wizard padre.** Cuando un wizard A
   abre otro wizard B en el stack y necesita el id de B al guardar:
@@ -678,21 +829,17 @@ mano (1 click por par, ≤6 pares).
 ## Notas internas para próxima sesión
 
 - **Node 22 obligatorio** (`.nvmrc`). Asegurar Node 22 activo antes de
-  cualquier comando (la máquina usa `fnm`, no `nvm`: `fnm use 22`).
+  cualquier comando (en una de las dos máquinas se usa `fnm`, en la
+  otra `nvm` — verificar antes de tocar shell init).
 - **pnpm, no npm.** Dev: `pnpm dev -- --host`. Preview: `pnpm preview
   -- --host`. Install: `pnpm install`.
 - **Path quirk de dev:** en `pnpm dev` la app sirve en `/`, no en
   `/bjj-tracker/`. El base path solo aplica en build de producción.
-  Las URLs de smoke/seed durante dev son `/dev/db-migration-smoke` y
-  `/dev/seed-mapa` (sin prefijo).
-- **Seed temporal vigente en `/dev/seed-mapa`** — botones "sembrar" y
-  "limpiar". Ahora siembra también 2 contras + 2 armbars hermanas
-  ("Armbar" con variantes "desde guardia" / "desde mount") para validar
-  T-6/T-7. Se elimina en T-15.
-- **Smoke de migración vigente en `/dev/db-migration-smoke`** — útil
-  para sanidad de schema. Se evalúa mantener o eliminar al cerrar it.1.
-- **Tareas que faltan de it.1:** T-11, T-12, T-13, T-14, T-15.
-  T-10 cerrada esta sesión.
+- **Rutas dev eliminadas en T-15** (`/dev/seed-mapa`,
+  `/dev/db-migration-smoke`). Si reaparece la necesidad en it.2+, se
+  reabre como tarea propia.
+- **It.1 cerrada al 100 %.** Próxima sesión arranca it.2 con mini-ADR
+  `decisiones/002-vinculo-top-bottom.md` antes de tocar código.
 - **Wrappers shadcn disponibles**: `alert-dialog`, `tooltip` (T-8),
   `dropdown-menu` (T-9) y `command`/`popover` (T-10, primitives de
   bits-ui usados via wrapper). Más `Combobox.svelte` propio sobre

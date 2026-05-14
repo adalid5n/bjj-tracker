@@ -40,11 +40,6 @@ export function deriveHeader(pathname: string): { title: string; isTopLevel: boo
 		return { title: 'Detalle de sesión', isTopLevel: false };
 	}
 
-	// Rutas de desarrollo (temporales, se eliminan al cerrar iteración 1).
-	if (logical.startsWith('/dev/')) {
-		return { title: 'Dev', isTopLevel: false };
-	}
-
 	// Cualquier otra ruta: título vacío, back disponible.
 	return { title: '', isTopLevel: false };
 }
