@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+export function capitalizeFirst(s: string): string {
+	if (!s) return s;
+	return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

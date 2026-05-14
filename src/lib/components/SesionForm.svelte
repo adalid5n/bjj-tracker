@@ -6,6 +6,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import DateInput from '$lib/components/DateInput.svelte';
+	import { capitalizeFirst } from '$lib/utils';
 	import type { Sesion, TipoSesion } from '$lib/types';
 
 	const TIPOS: { value: TipoSesion; label: string }[] = [
@@ -82,17 +83,38 @@
 
 	<div class="space-y-1.5">
 		<Label for="foco">Foco que traía</Label>
-		<Input id="foco" bind:value={foco} placeholder="p. ej. trabajar paso de guardia" />
+		<Input
+			id="foco"
+			bind:value={foco}
+			placeholder="p. ej. trabajar paso de guardia"
+			oninput={(e) => {
+				foco = capitalizeFirst(e.currentTarget.value);
+			}}
+		/>
 	</div>
 
 	<div class="space-y-1.5">
 		<Label for="tecnica">Técnica enseñada en clase</Label>
-		<Textarea id="tecnica" bind:value={tecnicaClase} rows={2} />
+		<Textarea
+			id="tecnica"
+			bind:value={tecnicaClase}
+			rows={2}
+			oninput={(e) => {
+				tecnicaClase = capitalizeFirst(e.currentTarget.value);
+			}}
+		/>
 	</div>
 
 	<div class="space-y-1.5">
 		<Label for="obs">Observaciones del profesor</Label>
-		<Textarea id="obs" bind:value={obsProfesor} rows={3} />
+		<Textarea
+			id="obs"
+			bind:value={obsProfesor}
+			rows={3}
+			oninput={(e) => {
+				obsProfesor = capitalizeFirst(e.currentTarget.value);
+			}}
+		/>
 	</div>
 
 	{#if errorMsg}

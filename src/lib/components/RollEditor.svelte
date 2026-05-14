@@ -11,6 +11,7 @@
 	import CompaneroCombobox from '$lib/components/CompaneroCombobox.svelte';
 	import PosicionWizardDialog from '$lib/components/PosicionWizardDialog.svelte';
 	import { listCompaneros, createCompanero, updateCompanero } from '$lib/companeros';
+	import { capitalizeFirst } from '$lib/utils';
 	import type {
 		CategoriaPosicion,
 		Cinturon,
@@ -551,7 +552,14 @@
 								</div>
 								<div class="space-y-1.5">
 									<Label for="extra-notas">Notas</Label>
-									<Textarea id="extra-notas" bind:value={extraNotas} rows={2} />
+									<Textarea
+										id="extra-notas"
+										bind:value={extraNotas}
+										rows={2}
+										oninput={(e) => {
+											extraNotas = capitalizeFirst(e.currentTarget.value);
+										}}
+									/>
 								</div>
 								<Button class="w-full" onclick={handleExtraDataContinue} disabled={saving}>
 									Continuar
@@ -639,11 +647,25 @@
 						<h3 class="text-sm font-semibold">Notas (opcional)</h3>
 						<div class="space-y-1.5">
 							<Label for="intente">Qué intenté</Label>
-							<Textarea id="intente" bind:value={queIntente} rows={2} />
+							<Textarea
+								id="intente"
+								bind:value={queIntente}
+								rows={2}
+								oninput={(e) => {
+									queIntente = capitalizeFirst(e.currentTarget.value);
+								}}
+							/>
 						</div>
 						<div class="space-y-1.5">
 							<Label for="fallo">Qué falló</Label>
-							<Textarea id="fallo" bind:value={queFallo} rows={2} />
+							<Textarea
+								id="fallo"
+								bind:value={queFallo}
+								rows={2}
+								oninput={(e) => {
+									queFallo = capitalizeFirst(e.currentTarget.value);
+								}}
+							/>
 						</div>
 						<div class="space-y-1.5">
 							<Label for="posiciones">Posiciones donde tuve problema (texto libre)</Label>
@@ -777,12 +799,26 @@
 
 				<div class="space-y-1.5">
 					<Label for="intente-form">Qué intenté</Label>
-					<Textarea id="intente-form" bind:value={queIntente} rows={2} />
+					<Textarea
+						id="intente-form"
+						bind:value={queIntente}
+						rows={2}
+						oninput={(e) => {
+							queIntente = capitalizeFirst(e.currentTarget.value);
+						}}
+					/>
 				</div>
 
 				<div class="space-y-1.5">
 					<Label for="fallo-form">Qué falló</Label>
-					<Textarea id="fallo-form" bind:value={queFallo} rows={2} />
+					<Textarea
+						id="fallo-form"
+						bind:value={queFallo}
+						rows={2}
+						oninput={(e) => {
+							queFallo = capitalizeFirst(e.currentTarget.value);
+						}}
+					/>
 				</div>
 
 				<div class="space-y-1.5">

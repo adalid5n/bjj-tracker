@@ -49,6 +49,7 @@
 		TipoTecnica
 	} from '$lib/types';
 	import { mapaModalStack, tecnicaWizardDraft } from './mapa-modal-stack.svelte';
+	import { capitalizeFirst } from '$lib/utils';
 
 	let {
 		modo,
@@ -816,7 +817,10 @@
 				bind:value={nombre}
 				placeholder="p. ej. armbar, hip bump sweep, upa"
 				onkeydown={handleNombreKeydown}
-				oninput={clearNombreError}
+				oninput={(e) => {
+					nombre = capitalizeFirst(e.currentTarget.value);
+					clearNombreError();
+				}}
 				autofocus={currentStep === 1}
 				aria-invalid={nombreError ? 'true' : undefined}
 				aria-describedby={nombreError ? 'tecnica-nombre-error' : undefined}
@@ -842,7 +846,10 @@
 				bind:value={variante}
 				placeholder='p. ej. "desde guardia", "con grip cruzado"'
 				onkeydown={handleVarianteKeydown}
-				oninput={clearNombreError}
+				oninput={(e) => {
+					variante = capitalizeFirst(e.currentTarget.value);
+					clearNombreError();
+				}}
 			/>
 			<p class="text-xs text-muted-foreground">
 				Opcional. Útil si tienes varias versiones de la misma técnica.
@@ -950,6 +957,9 @@
 					bind:value={detalles}
 					rows={4}
 					placeholder="Pinta-pega cómo se ejecuta la técnica, claves del setup, etc."
+					oninput={(e) => {
+						detalles = capitalizeFirst(e.currentTarget.value);
+					}}
 				/>
 			</div>
 			<div class="space-y-1.5">
@@ -959,6 +969,9 @@
 					bind:value={erroresComunes}
 					rows={3}
 					placeholder="Qué falla habitualmente, mistakes que detectas en rolls, etc."
+					oninput={(e) => {
+						erroresComunes = capitalizeFirst(e.currentTarget.value);
+					}}
 				/>
 			</div>
 		</div>

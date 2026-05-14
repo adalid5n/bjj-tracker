@@ -31,6 +31,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import type { SumisionTerminal } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { capitalizeFirst } from '$lib/utils';
 
 	let {
 		modo,
@@ -139,6 +140,7 @@
 	// explícito `handleNombreInput`, cableado en `oninput` del <Input>,
 	// solo limpia el error en respuesta a la edición real del input.
 	function handleNombreInput() {
+		nombre = capitalizeFirst(nombre);
 		if (nombreError) nombreError = '';
 	}
 
@@ -384,6 +386,9 @@
 						bind:value={notas}
 						rows={4}
 						placeholder="Pinta-pega lo que quieras recordar sobre esta sumisión."
+						oninput={(e) => {
+							notas = capitalizeFirst(e.currentTarget.value);
+						}}
 					/>
 				</div>
 			</div>

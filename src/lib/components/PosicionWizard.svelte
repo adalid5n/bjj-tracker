@@ -55,6 +55,7 @@
 	import Chips from '$lib/components/Chips.svelte';
 	import type { CategoriaPosicion, Posicion, TipoRolPosicion } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { capitalizeFirst } from '$lib/utils';
 
 	let {
 		modo,
@@ -322,6 +323,7 @@
 	// hacía que el error apareciera y desapareciera sin que el usuario lo
 	// viera. Patrón establecido en T-10 fixes-1.
 	function handleNombreInput() {
+		nombre = capitalizeFirst(nombre);
 		if (nombreError) nombreError = '';
 	}
 
@@ -570,6 +572,9 @@
 						bind:value={notas}
 						rows={4}
 						placeholder="Pinta-pega lo que quieras recordar sobre esta posición."
+						oninput={(e) => {
+							notas = capitalizeFirst(e.currentTarget.value);
+						}}
 					/>
 				</div>
 			</div>

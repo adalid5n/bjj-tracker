@@ -7,6 +7,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import CinturonChips from '$lib/components/CinturonChips.svelte';
+	import { capitalizeFirst } from '$lib/utils';
 	import type { Cinturon, Companero, PesoRelativo } from '$lib/types';
 
 	const PESOS: { value: PesoRelativo; label: string }[] = [
@@ -215,6 +216,9 @@
 								placeholder="Pepito"
 								autofocus
 								onkeydown={handleNombreKeydown}
+								oninput={(e) => {
+									nombre = capitalizeFirst(e.currentTarget.value);
+								}}
 							/>
 						</div>
 					{/if}
@@ -245,7 +249,14 @@
 					{#if currentStep === 4}
 						<div class="space-y-3">
 							<h3 class="text-sm font-semibold">Notas (opcional)</h3>
-							<Textarea id="notas" bind:value={notas} rows={3} />
+							<Textarea
+								id="notas"
+								bind:value={notas}
+								rows={3}
+								oninput={(e) => {
+									notas = capitalizeFirst(e.currentTarget.value);
+								}}
+							/>
 						</div>
 					{/if}
 				</div>
@@ -285,7 +296,14 @@
 				<div class="space-y-4 py-2">
 					<div class="space-y-1.5">
 						<Label for="nombre-form">Nombre *</Label>
-						<Input id="nombre-form" bind:value={nombre} placeholder="Pepito" />
+						<Input
+							id="nombre-form"
+							bind:value={nombre}
+							placeholder="Pepito"
+							oninput={(e) => {
+								nombre = capitalizeFirst(e.currentTarget.value);
+							}}
+						/>
 					</div>
 
 					<div class="space-y-1.5">
@@ -309,7 +327,14 @@
 
 					<div class="space-y-1.5">
 						<Label for="notas-form">Notas</Label>
-						<Textarea id="notas-form" bind:value={notas} rows={3} />
+						<Textarea
+							id="notas-form"
+							bind:value={notas}
+							rows={3}
+							oninput={(e) => {
+								notas = capitalizeFirst(e.currentTarget.value);
+							}}
+						/>
 					</div>
 
 					{#if errorMsg}

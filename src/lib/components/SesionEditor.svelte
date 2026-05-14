@@ -7,6 +7,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
+	import { capitalizeFirst } from '$lib/utils';
 	import type { TipoSesion } from '$lib/types';
 
 	const TIPOS: { value: TipoSesion; label: string }[] = [
@@ -232,6 +233,9 @@
 							bind:value={foco}
 							placeholder="p. ej. trabajar paso de guardia"
 							onkeydown={handleFocoKeydown}
+							oninput={(e) => {
+								foco = capitalizeFirst(e.currentTarget.value);
+							}}
 						/>
 					</div>
 				{/if}
@@ -240,7 +244,14 @@
 					<div class="space-y-3">
 						<h3 class="text-sm font-semibold">Técnica enseñada en clase</h3>
 						<Label for="tecnica" class="sr-only">Técnica</Label>
-						<Textarea id="tecnica" bind:value={tecnicaClase} rows={3} />
+						<Textarea
+							id="tecnica"
+							bind:value={tecnicaClase}
+							rows={3}
+							oninput={(e) => {
+								tecnicaClase = capitalizeFirst(e.currentTarget.value);
+							}}
+						/>
 					</div>
 				{/if}
 
@@ -248,7 +259,14 @@
 					<div class="space-y-3">
 						<h3 class="text-sm font-semibold">Observaciones del profesor</h3>
 						<Label for="obs" class="sr-only">Observaciones</Label>
-						<Textarea id="obs" bind:value={obsProfesor} rows={3} />
+						<Textarea
+							id="obs"
+							bind:value={obsProfesor}
+							rows={3}
+							oninput={(e) => {
+								obsProfesor = capitalizeFirst(e.currentTarget.value);
+							}}
+						/>
 					</div>
 				{/if}
 			</div>
