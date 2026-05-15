@@ -4,10 +4,19 @@
  */
 
 import { init, query, run } from '$lib/db';
-import type { Posicion, ResultadoRoll, Roll, TipoSesion } from '$lib/types';
+import type { ResultadoRoll, Roll, TipoSesion } from '$lib/types';
 
 export type NewRoll = Omit<Roll, 'id' | 'orden' | 'created_at' | 'updated_at'>;
 export type RollUpdate = Omit<Roll, 'orden' | 'created_at' | 'updated_at'>;
+
+/**
+ * Resultado simétrico de un vínculo de roll con técnica/posición (T-3.it2).
+ * - `fue_bien`: a la hora del roll, la técnica/posición salió bien.
+ * - `fallo`: la técnica/posición no salió o el owner tuvo problemas.
+ * La misma técnica/posición puede aparecer en ambos sets a la vez en un
+ * mismo roll (la PK compuesta incluye `resultado`).
+ */
+export type RolResultado = 'fue_bien' | 'fallo';
 
 export type RollWithContext = Roll & {
 	companero_nombre: string | null;
@@ -21,10 +30,10 @@ export type RollFilters = {
 	companero_id?: string;
 	resultado?: ResultadoRoll;
 	tipo_sesion?: TipoSesion;
-	// T-13: filtra rolls cuya relación `roll_posicion_problema` incluya al
-	// menos una de las posiciones indicadas. Si está vacío o ausente, no
-	// se aplica ningún filtro por posición-problema.
-	posicion_problema_ids?: string[];
+	// T-13: filtra rolls cuya relación `roll_posicion` incluya al menos
+	// una de las posiciones indicadas (cualquier resultado). Si está vacío
+	// o ausente, no se aplica ningún filtro por posición.
+	posicion_ids?: string[];
 };
 
 export async function listRolls(sesionId: string): Promise<Roll[]> {
@@ -57,19 +66,19 @@ export async function listAllRolls(filters: RollFilters = {}): Promise<RollWithC
 		where.push('s.tipo = ?');
 		params.push(filters.tipo_sesion);
 	}
-	if (filters.posicion_problema_ids && filters.posicion_problema_ids.length > 0) {
-		// T-13: roll válido si tiene AL MENOS una posición-problema entre las
-		// seleccionadas (OR, no AND). Subquery con EXISTS para evitar duplicar
-		// filas de roll por cada match. Placeholders dinámicos según
-		// cardinalidad del array.
-		const placeholders = filters.posicion_problema_ids.map(() => '?').join(', ');
+	if (filters.posicion_ids && filters.posicion_ids.length > 0) {
+		// T-13: roll válido si tiene AL MENOS una posición entre las
+		// seleccionadas (OR, no AND), sin importar el resultado. Subquery
+		// con EXISTS para evitar duplicar filas de roll por cada match.
+		// Placeholders dinámicos según cardinalidad del array.
+		const placeholders = filters.posicion_ids.map(() => '?').join(', ');
 		where.push(
 			`EXISTS (
-				SELECT 1 FROM roll_posicion_problema rpp
-				WHERE rpp.roll_id = r.id AND rpp.posicion_id IN (${placeholders})
+				SELECT 1 FROM roll_posicion rp
+				WHERE rp.roll_id = r.id AND rp.posicion_id IN (${placeholders})
 			)`
 		);
-		params.push(...filters.posicion_problema_ids);
+		params.push(...filters.posicion_ids);
 	}
 
 	const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
@@ -158,26 +167,54 @@ export async function deleteRoll(id: string): Promise<void> {
 }
 
 /**
- * Reemplaza el conjunto de posiciones de problema de un roll por las
- * indicadas en `posicionIds`. Operación atómica: envuelta en
- * BEGIN/COMMIT (ROLLBACK si algo falla a mitad).
+ * Cuenta cuántos rolls referencian una posición (en cualquier resultado).
+ * Se usa para decidir si se puede borrar la posición sin orfanizar
+ * referencias en `roll_posicion`.
  *
- * IDs duplicados en el array se ignoran (la PK compuesta lo impediría;
- * de-duplicamos antes para evitar el error y ahorrar inserts).
+ * Convención del proyecto: alias en lowercase (como `rolls_count` en
+ * `sesiones.ts`) — el worker preserva el case del alias tal cual.
  */
-export async function setPosicionesProblema(
+export async function countRollsByPosicion(posicionId: string): Promise<number> {
+	await init();
+	const rows = await query<{ count: number }>(
+		'SELECT COUNT(*) AS count FROM roll_posicion WHERE posicion_id = ?',
+		[posicionId]
+	);
+	return rows[0]?.count ?? 0;
+}
+
+/**
+ * T-3.it2: reemplaza el conjunto de técnicas vinculadas al roll, separadas
+ * por resultado (fue bien / falló). Operación atómica (BEGIN/COMMIT con
+ * ROLLBACK en caso de error). Borrado total + reinserción — patrón simple
+ * y predecible.
+ *
+ * Permite que la misma `tecnica_id` aparezca a la vez en `fueBien` y en
+ * `fallaron` del mismo roll (la PK `(roll_id, tecnica_id, resultado)` lo
+ * tolera porque el resultado difiere). De-duplicamos cada array por
+ * separado para evitar conflictos con la PK dentro de un mismo resultado.
+ */
+export async function setTecnicasDelRoll(
 	rollId: string,
-	posicionIds: string[]
+	fueBien: string[],
+	fallaron: string[]
 ): Promise<void> {
 	await init();
-	const unicos = Array.from(new Set(posicionIds));
+	const fueBienUnicas = Array.from(new Set(fueBien));
+	const fallaronUnicas = Array.from(new Set(fallaron));
 	await run('BEGIN');
 	try {
-		await run('DELETE FROM roll_posicion_problema WHERE roll_id = ?', [rollId]);
-		for (const posicionId of unicos) {
+		await run('DELETE FROM roll_tecnica WHERE roll_id = ?', [rollId]);
+		for (const tecnicaId of fueBienUnicas) {
 			await run(
-				'INSERT INTO roll_posicion_problema (roll_id, posicion_id) VALUES (?, ?)',
-				[rollId, posicionId]
+				'INSERT INTO roll_tecnica (roll_id, tecnica_id, resultado) VALUES (?, ?, ?)',
+				[rollId, tecnicaId, 'fue_bien']
+			);
+		}
+		for (const tecnicaId of fallaronUnicas) {
+			await run(
+				'INSERT INTO roll_tecnica (roll_id, tecnica_id, resultado) VALUES (?, ?, ?)',
+				[rollId, tecnicaId, 'fallo']
 			);
 		}
 		await run('COMMIT');
@@ -191,71 +228,179 @@ export async function setPosicionesProblema(
 }
 
 /**
- * Cuenta cuántos rolls referencian una posición como "problema". Se usa
- * para decidir si se puede borrar la posición sin orfanizar referencias.
- *
- * Convención del proyecto: alias en lowercase (como `rolls_count` en
- * `sesiones.ts`) — el worker preserva el case del alias tal cual.
+ * T-3.it2: devuelve los ids de técnicas vinculados a un roll separados por
+ * resultado. Orden estable por nombre de técnica para que la UI siempre
+ * pinte los chips en el mismo orden entre recargas.
  */
-export async function countRollsByPosicionProblema(posicionId: string): Promise<number> {
+export async function getTecnicasDelRoll(
+	rollId: string
+): Promise<{ fueBien: string[]; fallaron: string[] }> {
 	await init();
-	const rows = await query<{ count: number }>(
-		'SELECT COUNT(*) AS count FROM roll_posicion_problema WHERE posicion_id = ?',
-		[posicionId]
-	);
-	return rows[0]?.count ?? 0;
-}
-
-/**
- * Devuelve las posiciones de problema asociadas a un roll, ordenadas por
- * nombre. JOIN con `posiciones` para devolver el objeto completo y no
- * solo el id.
- */
-export async function getPosicionesProblema(rollId: string): Promise<Posicion[]> {
-	await init();
-	return query<Posicion>(
-		`SELECT p.*
-		 FROM roll_posicion_problema rpp
-		 JOIN posiciones p ON p.id = rpp.posicion_id
-		 WHERE rpp.roll_id = ?
-		 ORDER BY p.nombre`,
+	const rows = await query<{ tecnica_id: string; resultado: RolResultado }>(
+		`SELECT rt.tecnica_id AS tecnica_id, rt.resultado AS resultado
+		 FROM roll_tecnica rt
+		 JOIN tecnicas t ON t.id = rt.tecnica_id
+		 WHERE rt.roll_id = ?
+		 ORDER BY t.nombre`,
 		[rollId]
 	);
+	const fueBien: string[] = [];
+	const fallaron: string[] = [];
+	for (const r of rows) {
+		if (r.resultado === 'fue_bien') fueBien.push(r.tecnica_id);
+		else fallaron.push(r.tecnica_id);
+	}
+	return { fueBien, fallaron };
 }
 
 /**
- * T-13: variante batch de `getPosicionesProblema`. Devuelve un mapa
- * `rollId → Posicion[]` resolviendo todas las posiciones-problema de un
- * conjunto de rolls en una sola query. Las posiciones de cada roll
- * vienen ordenadas por nombre.
+ * T-3.it2: variante batch para listados (`/rolls`, `/sesion/[id]`). Devuelve
+ * un mapa `rollId → { fueBien, fallaron }` con los ids de técnicas
+ * agrupados por resultado. Si `rollIds` está vacío, devuelve un Map vacío
+ * sin tocar la BD.
  *
- * Si `rollIds` está vacío, devuelve un Map vacío sin tocar la BD.
+ * NOTA: devuelve solo ids. La UI hace el lookup contra un catálogo
+ * precargado de `listTecnicas()` para pintar nombres.
  */
-export async function getPosicionesProblemaByRolls(
+export async function getTecnicasDelRollBatch(
 	rollIds: string[]
-): Promise<Map<string, Posicion[]>> {
-	const resultado = new Map<string, Posicion[]>();
+): Promise<Map<string, { fueBien: string[]; fallaron: string[] }>> {
+	const resultado = new Map<string, { fueBien: string[]; fallaron: string[] }>();
 	if (rollIds.length === 0) return resultado;
 	await init();
 
 	const placeholders = rollIds.map(() => '?').join(', ');
-	const rows = await query<Posicion & { roll_id: string }>(
-		`SELECT p.*, rpp.roll_id AS roll_id
-		 FROM roll_posicion_problema rpp
-		 JOIN posiciones p ON p.id = rpp.posicion_id
-		 WHERE rpp.roll_id IN (${placeholders})
+	const rows = await query<{
+		roll_id: string;
+		tecnica_id: string;
+		resultado: RolResultado;
+	}>(
+		`SELECT rt.roll_id AS roll_id, rt.tecnica_id AS tecnica_id, rt.resultado AS resultado
+		 FROM roll_tecnica rt
+		 JOIN tecnicas t ON t.id = rt.tecnica_id
+		 WHERE rt.roll_id IN (${placeholders})
+		 ORDER BY t.nombre`,
+		rollIds
+	);
+
+	for (const r of rows) {
+		let entry = resultado.get(r.roll_id);
+		if (!entry) {
+			entry = { fueBien: [], fallaron: [] };
+			resultado.set(r.roll_id, entry);
+		}
+		if (r.resultado === 'fue_bien') entry.fueBien.push(r.tecnica_id);
+		else entry.fallaron.push(r.tecnica_id);
+	}
+	return resultado;
+}
+
+/**
+ * T-3.it2: reemplaza el conjunto de posiciones vinculadas al roll, separadas
+ * por resultado (fue bien / falló). Misma semántica y patrón que
+ * `setTecnicasDelRoll` (atomic BEGIN/COMMIT, dedupe por set, INSERT por
+ * fila). Una misma posición puede aparecer en ambos sets de un mismo roll
+ * (la PK `(roll_id, posicion_id, resultado)` lo permite).
+ *
+ * Sustituye a la antigua `setPosicionesProblema`, que solo cubría el caso
+ * "donde tuve problema" (ahora representado como `fallaron`).
+ */
+export async function setPosicionesDelRoll(
+	rollId: string,
+	fueBien: string[],
+	fallaron: string[]
+): Promise<void> {
+	await init();
+	const fueBienUnicas = Array.from(new Set(fueBien));
+	const fallaronUnicas = Array.from(new Set(fallaron));
+	await run('BEGIN');
+	try {
+		await run('DELETE FROM roll_posicion WHERE roll_id = ?', [rollId]);
+		for (const posicionId of fueBienUnicas) {
+			await run(
+				'INSERT INTO roll_posicion (roll_id, posicion_id, resultado) VALUES (?, ?, ?)',
+				[rollId, posicionId, 'fue_bien']
+			);
+		}
+		for (const posicionId of fallaronUnicas) {
+			await run(
+				'INSERT INTO roll_posicion (roll_id, posicion_id, resultado) VALUES (?, ?, ?)',
+				[rollId, posicionId, 'fallo']
+			);
+		}
+		await run('COMMIT');
+	} catch (err) {
+		await run('ROLLBACK').catch(() => {
+			// si el ROLLBACK falla (transacción ya cerrada), priorizamos
+			// reportar el error original.
+		});
+		throw err;
+	}
+}
+
+/**
+ * T-3.it2: devuelve los ids de posiciones vinculadas a un roll separados
+ * por resultado. Orden estable por nombre de posición para que los chips
+ * salgan deterministas entre recargas.
+ */
+export async function getPosicionesDelRoll(
+	rollId: string
+): Promise<{ fueBien: string[]; fallaron: string[] }> {
+	await init();
+	const rows = await query<{ posicion_id: string; resultado: RolResultado }>(
+		`SELECT rp.posicion_id AS posicion_id, rp.resultado AS resultado
+		 FROM roll_posicion rp
+		 JOIN posiciones p ON p.id = rp.posicion_id
+		 WHERE rp.roll_id = ?
+		 ORDER BY p.nombre`,
+		[rollId]
+	);
+	const fueBien: string[] = [];
+	const fallaron: string[] = [];
+	for (const r of rows) {
+		if (r.resultado === 'fue_bien') fueBien.push(r.posicion_id);
+		else fallaron.push(r.posicion_id);
+	}
+	return { fueBien, fallaron };
+}
+
+/**
+ * T-3.it2: variante batch para listados. Devuelve un mapa
+ * `rollId → { fueBien, fallaron }` con los ids de posiciones por
+ * resultado. Si `rollIds` está vacío, devuelve un Map vacío sin tocar BD.
+ *
+ * La UI resuelve los ids contra un catálogo precargado (`listPosiciones()`)
+ * para pintar nombres en los chips.
+ */
+export async function getPosicionesDelRollBatch(
+	rollIds: string[]
+): Promise<Map<string, { fueBien: string[]; fallaron: string[] }>> {
+	const resultado = new Map<string, { fueBien: string[]; fallaron: string[] }>();
+	if (rollIds.length === 0) return resultado;
+	await init();
+
+	const placeholders = rollIds.map(() => '?').join(', ');
+	const rows = await query<{
+		roll_id: string;
+		posicion_id: string;
+		resultado: RolResultado;
+	}>(
+		`SELECT rp.roll_id AS roll_id, rp.posicion_id AS posicion_id, rp.resultado AS resultado
+		 FROM roll_posicion rp
+		 JOIN posiciones p ON p.id = rp.posicion_id
+		 WHERE rp.roll_id IN (${placeholders})
 		 ORDER BY p.nombre`,
 		rollIds
 	);
 
-	for (const row of rows) {
-		const { roll_id, ...posicion } = row;
-		const arr = resultado.get(roll_id);
-		if (arr) {
-			arr.push(posicion as Posicion);
-		} else {
-			resultado.set(roll_id, [posicion as Posicion]);
+	for (const r of rows) {
+		let entry = resultado.get(r.roll_id);
+		if (!entry) {
+			entry = { fueBien: [], fallaron: [] };
+			resultado.set(r.roll_id, entry);
 		}
+		if (r.resultado === 'fue_bien') entry.fueBien.push(r.posicion_id);
+		else entry.fallaron.push(r.posicion_id);
 	}
 	return resultado;
 }

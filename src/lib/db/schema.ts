@@ -209,12 +209,73 @@ function migrate2To3(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v4:
- *   { from: 3, to: 4, run: (db) => { ... } }
+ * DDL incremental para subir de schema v3 a v4 (T-3.it2).
+ *
+ * Modelo simétrico para vincular rolls con técnicas y con posiciones,
+ * separando en ambos casos por `resultado` ('fue_bien' | 'fallo'):
+ *
+ *  - `roll_tecnica`: pivot nueva. Sustituye al texto libre
+ *    `rolls.que_intente`/`rolls.que_fallo` desde la UI (las columnas se
+ *    conservan como histórico — no se tocan en esta migración).
+ *  - `roll_posicion`: reemplaza a `roll_posicion_problema` (que solo
+ *    capturaba "donde tuve problema"). Ahora una posición se puede
+ *    vincular como "fue bien" o como "fallo". Se migran las filas
+ *    históricas de `roll_posicion_problema` a `roll_posicion` con
+ *    `resultado = 'fallo'` (preserva la semántica original).
+ *
+ * Decisión de modelado:
+ * - PK compuesta `(roll_id, *_id, resultado)`: la misma técnica/posición
+ *   puede aparecer simultáneamente como `fue_bien` y como `fallo` en un
+ *   mismo roll si el owner así lo registra. El resultado forma parte
+ *   de la clave para permitir esa combinación sin duplicar filas dentro
+ *   del mismo `resultado`.
+ * - CHECK sobre `resultado` para garantizar el dominio
+ *   ('fue_bien'|'fallo') sin necesidad de un ENUM (SQLite no los tiene).
+ * - FKs con `ON DELETE CASCADE` a `rolls`, `tecnicas` y `posiciones`:
+ *   si se borra un roll, sus vínculos desaparecen; si se borra una
+ *   técnica/posición, deja de estar vinculada (no queremos huérfanos).
+ */
+export const SCHEMA_V4_MIGRATION = `
+CREATE TABLE roll_tecnica (
+  roll_id TEXT NOT NULL REFERENCES rolls(id) ON DELETE CASCADE,
+  tecnica_id TEXT NOT NULL REFERENCES tecnicas(id) ON DELETE CASCADE,
+  resultado TEXT NOT NULL CHECK (resultado IN ('fue_bien', 'fallo')),
+  PRIMARY KEY (roll_id, tecnica_id, resultado)
+);
+
+CREATE INDEX idx_roll_tecnica_roll ON roll_tecnica(roll_id);
+CREATE INDEX idx_roll_tecnica_tecnica ON roll_tecnica(tecnica_id);
+
+CREATE TABLE roll_posicion (
+  roll_id TEXT NOT NULL REFERENCES rolls(id) ON DELETE CASCADE,
+  posicion_id TEXT NOT NULL REFERENCES posiciones(id) ON DELETE CASCADE,
+  resultado TEXT NOT NULL CHECK (resultado IN ('fue_bien', 'fallo')),
+  PRIMARY KEY (roll_id, posicion_id, resultado)
+);
+
+CREATE INDEX idx_roll_posicion_roll ON roll_posicion(roll_id);
+CREATE INDEX idx_roll_posicion_posicion ON roll_posicion(posicion_id);
+
+INSERT INTO roll_posicion (roll_id, posicion_id, resultado)
+  SELECT roll_id, posicion_id, 'fallo' FROM roll_posicion_problema;
+
+DROP TABLE roll_posicion_problema;
+
+UPDATE schema_meta SET value = '4' WHERE key = 'version';
+`;
+
+function migrate3To4(db: MigrationDb): void {
+	db.exec(SCHEMA_V4_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v5:
+ *   { from: 4, to: 5, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
-	{ from: 2, to: 3, run: migrate2To3 }
+	{ from: 2, to: 3, run: migrate2To3 },
+	{ from: 3, to: 4, run: migrate3To4 }
 ];
 
 /**

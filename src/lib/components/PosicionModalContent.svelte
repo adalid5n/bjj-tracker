@@ -93,7 +93,7 @@
 				{ listPosiciones },
 				{ listSumisiones },
 				{ getContras },
-				{ countRollsByPosicionProblema }
+				{ countRollsByPosicion }
 			] = await Promise.all([
 				import('$lib/tecnicas'),
 				import('$lib/posiciones'),
@@ -106,7 +106,7 @@
 				getTecnicasByPosicion(posicion.id),
 				listPosiciones(),
 				listSumisiones(),
-				countRollsByPosicionProblema(posicion.id)
+				countRollsByPosicion(posicion.id)
 			]);
 
 			posicionesById = Object.fromEntries(todasPos.map((p) => [p.id, p.nombre]));

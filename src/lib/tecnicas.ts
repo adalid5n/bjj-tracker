@@ -172,7 +172,7 @@ export async function getTecnicasQueLleganASumision(sumisionId: string): Promise
 /**
  * Cuenta cuántas técnicas tienen una sumisión como destino. Se usa para
  * decidir si se puede borrar la sumisión sin orfanizar referencias
- * (análogo a `countRollsByPosicionProblema` en `rolls.ts`).
+ * (análogo a `countRollsByPosicion` en `rolls.ts`).
  *
  * Convención del proyecto: alias en lowercase (el worker preserva el
  * case del alias tal cual).

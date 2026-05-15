@@ -90,6 +90,19 @@
 
   Histórico: T-8 (commit `0a68351` → fix `066321e`).
 
+- **Las migraciones históricas son INMUTABLES.** Una vez que
+  `SCHEMA_V1`, `SCHEMA_V2_MIGRATION`, `SCHEMA_V3_MIGRATION`, etc.
+  existen en el código, NO se modifican retroactivamente — ni para
+  "limpiar", ni para "alinear con el modelo nuevo", ni para borrar
+  tablas que ya no se usan. Cualquier cambio de schema (renombrar
+  tablas, dropear columnas, transformar datos) va SIEMPRE en una
+  migración NUEVA al final del array `MIGRATIONS`. Tocar una vieja
+  rompe a quien ya tenga BD inicializada con la versión vieja del
+  código. Histórico: T-3.it2.b — un subagente cambió
+  `SCHEMA_V2_MIGRATION` para que crease `roll_posicion` (modelo v4)
+  en vez de `roll_posicion_problema` (modelo v2), revertido en
+  sesión 15 tras petar runtime.
+
 - **Antes de pushear cambios que toquen Service Worker, PWA, bundle
   config (`vite.config.ts`) o el layout raíz, verificar con
   `pnpm run preview` Y hacer al menos un refresh** — no basta con

@@ -18,6 +18,7 @@
 	} = $props();
 
 	let query = $state('');
+	let open = $state(false);
 	let lastSyncedValue: string | null = null;
 
 	$effect(() => {
@@ -57,10 +58,13 @@
 	value={value ?? ''}
 	onValueChange={handleValueChange}
 	inputValue={query}
+	bind:open
 >
 	<Combobox.Input
 		{placeholder}
 		oninput={(e) => (query = e.currentTarget.value)}
+		onfocus={() => (open = true)}
+		onclick={() => (open = true)}
 		class="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 	/>
 
@@ -88,7 +92,7 @@
 				{#if showCreate}
 					<Combobox.Item
 						value={`__create__:${query.trim()}`}
-						label={`Crear "${query.trim()}"`}
+						label={query.trim()}
 						class="data-highlighted:bg-accent data-highlighted:text-accent-foreground text-primary relative flex w-full cursor-default items-center rounded-md py-1.5 pl-2 text-sm outline-hidden select-none"
 					>
 						+ Crear nuevo: "{query.trim()}"

@@ -10,6 +10,7 @@
 	import CinturonChips from '$lib/components/CinturonChips.svelte';
 	import CompaneroCombobox from '$lib/components/CompaneroCombobox.svelte';
 	import PosicionWizardDialog from '$lib/components/PosicionWizardDialog.svelte';
+	import TecnicaWizardDialog from '$lib/components/TecnicaWizardDialog.svelte';
 	import { listCompaneros, createCompanero, updateCompanero } from '$lib/companeros';
 	import { capitalizeFirst } from '$lib/utils';
 	import type {
@@ -19,7 +20,8 @@
 		PesoRelativo,
 		Posicion,
 		ResultadoRoll,
-		Roll
+		Roll,
+		Tecnica
 	} from '$lib/types';
 
 	const PESOS: { value: PesoRelativo; label: string }[] = [
@@ -43,14 +45,29 @@
 		tamano_relativo?: PesoRelativo;
 		duracion_min?: number;
 		resultado?: ResultadoRoll;
+		// T-3.it2.b: `que_intente`/`que_fallo`/`posiciones_problema` siguen
+		// existiendo en la BD como histórico pre-relacional, pero el editor
+		// ya no los escribe. El handler reenvía `roll?.que_intente` etc. tal
+		// cual para preservar valores antiguos sin pisarlos con null. En
+		// creación quedan undefined → null. Las relaciones reales viajan en
+		// los arrays de abajo.
 		que_intente?: string;
 		que_fallo?: string;
 		posiciones_problema?: string;
-		// T-12: ids del catálogo de posiciones marcadas como "donde tuve
-		// problema". El callback `onSave` debe llamar a
-		// `setPosicionesProblema(roll.id, posicion_problema_ids)` tras
-		// createRoll/updateRoll para persistirlas en `roll_posicion_problema`.
-		posicion_problema_ids: string[];
+		// T-3.it2.b: ids de posiciones vinculadas al roll separadas por
+		// resultado. El callback `onSave` debe llamar a
+		// `setPosicionesDelRoll(rollId, posiciones_fue_bien_ids, posiciones_fallaron_ids)`
+		// tras createRoll/updateRoll para persistirlas en `roll_posicion`.
+		// Una misma posición puede aparecer en ambos sets.
+		posiciones_fue_bien_ids: string[];
+		posiciones_fallaron_ids: string[];
+		// T-3.it2: ids del catálogo de técnicas que al usuario le salieron
+		// bien o falló en este roll. El callback `onSave` debe llamar a
+		// `setTecnicasDelRoll(rollId, tecnicas_fue_bien_ids, tecnicas_fallaron_ids)`
+		// tras createRoll/updateRoll. Una misma técnica puede aparecer en los
+		// dos arrays a la vez.
+		tecnicas_fue_bien_ids: string[];
+		tecnicas_fallaron_ids: string[];
 	};
 
 	// Orden por categoría (igual que en /mapa) y alfabético dentro de cada
@@ -87,16 +104,30 @@
 	let tamanoRelativo = $state<PesoRelativo | undefined>(undefined);
 	let duracionStr = $state<string>('');
 	let resultado = $state<ResultadoRoll | undefined>(undefined);
-	let queIntente = $state<string>('');
-	let queFallo = $state<string>('');
-	let posicionesProblema = $state<string>('');
 
-	// T-12: catálogo completo de posiciones (recargable) y selección actual.
-	// `posicionesCatalog` lo cargamos al abrir el editor; `posicionProblemaIds`
-	// arranca con `getPosicionesProblema(roll.id)` en modo editar.
+	// T-3.it2.b: catálogo completo de posiciones (recargable) y selecciones
+	// del roll separadas por resultado. Una misma posición puede aparecer en
+	// ambas listas a la vez (PK `(roll_id, posicion_id, resultado)`).
+	// `cualResultadoCrearPosicion` indica a qué lista se añade la posición
+	// recién creada inline desde el sub-wizard.
 	let posicionesCatalog = $state<Posicion[]>([]);
-	let posicionProblemaIds = $state<string[]>([]);
+	let posicionesFueBien = $state<string[]>([]);
+	let posicionesFallaron = $state<string[]>([]);
 	let crearPosicionOpen = $state(false);
+	let cualResultadoCrearPosicion = $state<'fue_bien' | 'fallo'>('fue_bien');
+
+	// T-3.it2: catálogo de técnicas + selecciones por resultado.
+	//  - `tecnicasFueBien`: ids que al usuario le salieron bien en este roll.
+	//  - `tecnicasFallaron`: ids que falló en este roll.
+	// Una misma técnica puede estar en ambas listas a la vez (lo permite la
+	// PK `(roll_id, tecnica_id, resultado)` de `roll_tecnica`).
+	// `cualResultadoCrear` indica a qué lista se añade automáticamente la
+	// técnica recién creada inline desde el sub-wizard.
+	let tecnicasCatalog = $state<Tecnica[]>([]);
+	let tecnicasFueBien = $state<string[]>([]);
+	let tecnicasFallaron = $state<string[]>([]);
+	let crearTecnicaOpen = $state(false);
+	let cualResultadoCrear = $state<'fue_bien' | 'fallo'>('fue_bien');
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -123,15 +154,14 @@
 		if (open) {
 			void loadCompaneros();
 			void loadPosiciones();
-			void loadPosicionesProblemaSeleccion();
+			void loadPosicionesDelRollSeleccion();
+			void loadTecnicas();
+			void loadTecnicasDelRollSeleccion();
 			companeroId = roll?.companero_id ?? null;
 			lastCompaneroId = roll?.companero_id ?? null;
 			tamanoRelativo = roll?.tamano_relativo;
 			duracionStr = roll?.duracion_min?.toString() ?? '';
 			resultado = roll?.resultado;
-			queIntente = roll?.que_intente ?? '';
-			queFallo = roll?.que_fallo ?? '';
-			posicionesProblema = roll?.posiciones_problema ?? '';
 			currentStep = 1;
 			visitedSteps = new Set([1]);
 			showExtraData = false;
@@ -141,6 +171,9 @@
 			extraNotas = '';
 			errorMsg = '';
 			crearPosicionOpen = false;
+			crearTecnicaOpen = false;
+			cualResultadoCrear = 'fue_bien';
+			cualResultadoCrearPosicion = 'fue_bien';
 			pendingSkipTamano = false;
 		}
 	});
@@ -177,19 +210,23 @@
 		}
 	}
 
-	async function loadPosicionesProblemaSeleccion() {
-		// En modo editar precargamos la selección actual; en crear arranca vacía.
+	async function loadPosicionesDelRollSeleccion() {
+		// En modo editar precargamos las posiciones vinculadas (separadas
+		// por resultado); en crear arranca vacío.
 		if (!roll) {
-			posicionProblemaIds = [];
+			posicionesFueBien = [];
+			posicionesFallaron = [];
 			return;
 		}
 		try {
-			const { getPosicionesProblema } = await import('$lib/rolls');
-			const pos = await getPosicionesProblema(roll.id);
-			posicionProblemaIds = pos.map((p) => p.id);
+			const { getPosicionesDelRoll } = await import('$lib/rolls');
+			const sel = await getPosicionesDelRoll(roll.id);
+			posicionesFueBien = sel.fueBien;
+			posicionesFallaron = sel.fallaron;
 		} catch (err) {
-			posicionProblemaIds = [];
-			console.warn('[RollEditor] getPosicionesProblema falló:', err);
+			posicionesFueBien = [];
+			posicionesFallaron = [];
+			console.warn('[RollEditor] getPosicionesDelRoll falló:', err);
 		}
 	}
 
@@ -215,25 +252,102 @@
 		otro: 'Otro'
 	};
 
-	function handlePosicionesChange(ids: string[]) {
-		posicionProblemaIds = ids;
+	function handlePosicionesFueBienChange(ids: string[]) {
+		posicionesFueBien = ids;
 	}
 
-	function abrirCrearPosicion() {
+	function handlePosicionesFallaronChange(ids: string[]) {
+		posicionesFallaron = ids;
+	}
+
+	function abrirCrearPosicion(resultadoTarget: 'fue_bien' | 'fallo') {
+		cualResultadoCrearPosicion = resultadoTarget;
 		crearPosicionOpen = true;
 	}
 
 	async function handlePosicionCreada(p: Posicion) {
-		// Tras crear: añadir a la selección y recargar el catálogo para
-		// que el nuevo chip aparezca en el grupo correcto.
+		// Tras crear: añadir al catálogo y a la lista activa correspondiente
+		// (la rama desde la que se pulsó "+ Crear nueva posición"). Si el
+		// usuario abrió el dialog desde "fue bien" añadimos sólo a ese set —
+		// puede marcarla también en el otro manualmente si quiere.
 		posicionesCatalog = [...posicionesCatalog, p];
-		if (!posicionProblemaIds.includes(p.id)) {
-			posicionProblemaIds = [...posicionProblemaIds, p.id];
+		if (cualResultadoCrearPosicion === 'fue_bien') {
+			if (!posicionesFueBien.includes(p.id)) {
+				posicionesFueBien = [...posicionesFueBien, p.id];
+			}
+		} else {
+			if (!posicionesFallaron.includes(p.id)) {
+				posicionesFallaron = [...posicionesFallaron, p.id];
+			}
 		}
 		// Recarga "real" desde BD (defensivo: cubre el caso de campos
 		// derivados que no traemos aquí, p. ej. orden alfabético tras un
 		// rename, etc.).
 		await loadPosiciones();
+	}
+
+	async function loadTecnicas() {
+		// T-3.it2: catálogo completo de técnicas para los chips de
+		// "Qué intenté / Qué fallé".
+		try {
+			const { listTecnicas } = await import('$lib/tecnicas');
+			tecnicasCatalog = await listTecnicas();
+		} catch (err) {
+			// No rompemos el editor si el catálogo falla — el paso es
+			// opcional y los chips simplemente saldrán vacíos.
+			console.warn('[RollEditor] listTecnicas falló:', err);
+		}
+	}
+
+	async function loadTecnicasDelRollSeleccion() {
+		// En modo editar precargamos las técnicas vinculadas (separadas
+		// por resultado); en crear arranca vacío.
+		if (!roll) {
+			tecnicasFueBien = [];
+			tecnicasFallaron = [];
+			return;
+		}
+		try {
+			const { getTecnicasDelRoll } = await import('$lib/rolls');
+			const sel = await getTecnicasDelRoll(roll.id);
+			tecnicasFueBien = sel.fueBien;
+			tecnicasFallaron = sel.fallaron;
+		} catch (err) {
+			tecnicasFueBien = [];
+			tecnicasFallaron = [];
+			console.warn('[RollEditor] getTecnicasDelRoll falló:', err);
+		}
+	}
+
+	function handleTecnicasFueBienChange(ids: string[]) {
+		tecnicasFueBien = ids;
+	}
+
+	function handleTecnicasFallaronChange(ids: string[]) {
+		tecnicasFallaron = ids;
+	}
+
+	function abrirCrearTecnica(resultadoTarget: 'fue_bien' | 'fallo') {
+		cualResultadoCrear = resultadoTarget;
+		crearTecnicaOpen = true;
+	}
+
+	async function handleTecnicaCreada(t: Tecnica) {
+		// Tras crear: añadir al catálogo y a la lista activa correspondiente
+		// (la rama desde la que se pulsó "+ Crear nueva técnica").
+		tecnicasCatalog = [...tecnicasCatalog, t];
+		if (cualResultadoCrear === 'fue_bien') {
+			if (!tecnicasFueBien.includes(t.id)) {
+				tecnicasFueBien = [...tecnicasFueBien, t.id];
+			}
+		} else {
+			if (!tecnicasFallaron.includes(t.id)) {
+				tecnicasFallaron = [...tecnicasFallaron, t.id];
+			}
+		}
+		// Recarga "real" desde BD (defensivo, p. ej. para que el orden
+		// alfabético del catálogo refleje la inserción de inmediato).
+		await loadTecnicas();
 	}
 
 	function goToStep(step: number) {
@@ -447,10 +561,18 @@
 				tamano_relativo: tamanoRelativo,
 				duracion_min: dur === '' ? undefined : Number(dur),
 				resultado,
-				que_intente: queIntente.trim() || undefined,
-				que_fallo: queFallo.trim() || undefined,
-				posiciones_problema: posicionesProblema.trim() || undefined,
-				posicion_problema_ids: posicionProblemaIds
+				// T-3.it2.b: la UI ya no escribe estos textos libres. Para
+				// preservar el histórico de rolls antiguos, reenviamos el
+				// valor que ya tenía el roll en BD (no se sobrescribe). En
+				// creación quedan undefined → null. Las relaciones reales
+				// viajan en los arrays de IDs de abajo.
+				que_intente: roll?.que_intente,
+				que_fallo: roll?.que_fallo,
+				posiciones_problema: roll?.posiciones_problema,
+				posiciones_fue_bien_ids: posicionesFueBien,
+				posiciones_fallaron_ids: posicionesFallaron,
+				tecnicas_fue_bien_ids: tecnicasFueBien,
+				tecnicas_fallaron_ids: tecnicasFallaron
 			});
 			open = false;
 		} catch (err) {
@@ -474,13 +596,13 @@
 		onOpenAutoFocus={(e) => e.preventDefault()}
 		onInteractOutside={(e) => {
 			const target = e.target as HTMLElement | null;
-			// Clicks dentro del combobox-portal (compañero) o del Dialog
-			// hijo de crear-posición no deben cerrar el RollEditor.
+			// Clicks dentro del combobox-portal (compañero) o de un sub-Dialog
+			// hijo (crear-posición, crear-técnica) no deben cerrar el RollEditor.
 			if (target?.closest('[data-combobox-portal]')) {
 				e.preventDefault();
 				return;
 			}
-			if (crearPosicionOpen) {
+			if (crearPosicionOpen || crearTecnicaOpen) {
 				e.preventDefault();
 			}
 		}}
@@ -570,36 +692,73 @@
 				{/if}
 
 				{#if currentStep === 2}
-					<!-- T-12: paso nuevo. Skippable (no autoavanza). -->
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Posiciones donde tuve problema</h3>
-						{#if posicionesAgrupadas.length === 0}
-							<p class="text-sm text-muted-foreground italic">
-								Aún no hay posiciones en el catálogo. Crea una abajo o continúa para saltar este
-								paso.
-							</p>
-						{:else}
-							<div class="space-y-3">
-								{#each posicionesAgrupadas as grupo (grupo.categoria)}
-									<div class="space-y-1.5">
-										<p class="text-xs font-semibold text-muted-foreground">
-											{CATEGORIA_LABEL[grupo.categoria]}
-										</p>
-										<MultiChips
-											options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-											value={posicionProblemaIds}
-											onChange={handlePosicionesChange}
-											ariaLabel={`Posiciones de ${CATEGORIA_LABEL[grupo.categoria]}`}
-										/>
-									</div>
-								{/each}
+					<!-- T-3.it2.b: paso de posiciones dividido en dos sets
+					     (fue bien / falló). Skippable (no autoavanza). Cada
+					     bloque tiene su propio botón "+ Crear nueva posición"
+					     que añade a su set al guardar. -->
+					<div class="space-y-4">
+						<h3 class="text-sm font-semibold">Posiciones (opcional)</h3>
+
+						<div class="space-y-1.5">
+							<Label>Posiciones que fueron bien</Label>
+							{#if posicionesAgrupadas.length === 0}
+								<p class="text-sm text-muted-foreground italic">
+									Aún no hay posiciones en el catálogo. Crea una abajo o continúa para saltar.
+								</p>
+							{:else}
+								<div class="space-y-3">
+									{#each posicionesAgrupadas as grupo (grupo.categoria)}
+										<div class="space-y-1.5">
+											<p class="text-xs font-semibold text-muted-foreground">
+												{CATEGORIA_LABEL[grupo.categoria]}
+											</p>
+											<MultiChips
+												options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
+												value={posicionesFueBien}
+												onChange={handlePosicionesFueBienChange}
+												ariaLabel={`Posiciones que fueron bien — ${CATEGORIA_LABEL[grupo.categoria]}`}
+											/>
+										</div>
+									{/each}
+								</div>
+							{/if}
+							<div>
+								<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fue_bien')}>
+									+ Crear nueva posición
+								</Button>
 							</div>
-						{/if}
-						<div>
-							<Button variant="outline" size="sm" onclick={abrirCrearPosicion}>
-								+ Crear nueva posición
-							</Button>
 						</div>
+
+						<div class="space-y-1.5">
+							<Label>Posiciones que fallé</Label>
+							{#if posicionesAgrupadas.length === 0}
+								<p class="text-sm text-muted-foreground italic">
+									Aún no hay posiciones en el catálogo.
+								</p>
+							{:else}
+								<div class="space-y-3">
+									{#each posicionesAgrupadas as grupo (grupo.categoria)}
+										<div class="space-y-1.5">
+											<p class="text-xs font-semibold text-muted-foreground">
+												{CATEGORIA_LABEL[grupo.categoria]}
+											</p>
+											<MultiChips
+												options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
+												value={posicionesFallaron}
+												onChange={handlePosicionesFallaronChange}
+												ariaLabel={`Posiciones que fallé — ${CATEGORIA_LABEL[grupo.categoria]}`}
+											/>
+										</div>
+									{/each}
+								</div>
+							{/if}
+							<div>
+								<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fallo')}>
+									+ Crear nueva posición
+								</Button>
+							</div>
+						</div>
+
 						<p class="text-xs text-muted-foreground">
 							Selecciona las que apliquen. Puedes saltar este paso si no aplica.
 						</p>
@@ -643,37 +802,67 @@
 				{/if}
 
 				{#if currentStep === 6}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Notas (opcional)</h3>
+					<!-- T-3.it2.b: técnicas como entidades vinculadas (MultiChips
+					     con catálogo precargado), separadas en dos sets por
+					     resultado. Antes eran textareas libres
+					     `que_intente`/`que_fallo` y un Input de
+					     `posiciones_problema` — todos eliminados de la UI; las
+					     columnas permanecen en BD como histórico. -->
+					<div class="space-y-4">
+						<h3 class="text-sm font-semibold">Técnicas (opcional)</h3>
+
 						<div class="space-y-1.5">
-							<Label for="intente">Qué intenté</Label>
-							<Textarea
-								id="intente"
-								bind:value={queIntente}
-								rows={2}
-								oninput={(e) => {
-									queIntente = capitalizeFirst(e.currentTarget.value);
-								}}
-							/>
+							<Label>Técnicas que fueron bien</Label>
+							{#if tecnicasCatalog.length === 0}
+								<p class="text-sm text-muted-foreground italic">
+									Aún no hay técnicas en el catálogo. Crea una abajo o continúa para saltar.
+								</p>
+							{:else}
+								<MultiChips
+									options={tecnicasCatalog
+										.slice()
+										.sort((a, b) => a.nombre.localeCompare(b.nombre))
+										.map((t) => ({
+											value: t.id,
+											label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+										}))}
+									value={tecnicasFueBien}
+									onChange={handleTecnicasFueBienChange}
+									ariaLabel="Técnicas que fueron bien"
+								/>
+							{/if}
+							<div>
+								<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fue_bien')}>
+									+ Crear nueva técnica
+								</Button>
+							</div>
 						</div>
+
 						<div class="space-y-1.5">
-							<Label for="fallo">Qué falló</Label>
-							<Textarea
-								id="fallo"
-								bind:value={queFallo}
-								rows={2}
-								oninput={(e) => {
-									queFallo = capitalizeFirst(e.currentTarget.value);
-								}}
-							/>
-						</div>
-						<div class="space-y-1.5">
-							<Label for="posiciones">Posiciones donde tuve problema (texto libre)</Label>
-							<Input
-								id="posiciones"
-								bind:value={posicionesProblema}
-								placeholder="p. ej. mount bottom, side control top"
-							/>
+							<Label>Técnicas que fallé</Label>
+							{#if tecnicasCatalog.length === 0}
+								<p class="text-sm text-muted-foreground italic">
+									Aún no hay técnicas en el catálogo.
+								</p>
+							{:else}
+								<MultiChips
+									options={tecnicasCatalog
+										.slice()
+										.sort((a, b) => a.nombre.localeCompare(b.nombre))
+										.map((t) => ({
+											value: t.id,
+											label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+										}))}
+									value={tecnicasFallaron}
+									onChange={handleTecnicasFallaronChange}
+									ariaLabel="Técnicas que fallé"
+								/>
+							{/if}
+							<div>
+								<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fallo')}>
+									+ Crear nueva técnica
+								</Button>
+							</div>
 						</div>
 					</div>
 				{/if}
@@ -733,9 +922,10 @@
 						/>
 					</div>
 
-				<!-- T-12: selección de posiciones de problema (modo editar). -->
+				<!-- T-3.it2.b: posiciones vinculadas al roll separadas por
+				     resultado (modo editar). -->
 				<div class="space-y-1.5">
-					<Label>Posiciones donde tuve problema</Label>
+					<Label>Posiciones que fueron bien</Label>
 					{#if posicionesAgrupadas.length === 0}
 						<p class="text-sm text-muted-foreground italic">
 							Aún no hay posiciones en el catálogo.
@@ -749,16 +939,46 @@
 									</p>
 									<MultiChips
 										options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-										value={posicionProblemaIds}
-										onChange={handlePosicionesChange}
-										ariaLabel={`Posiciones de ${CATEGORIA_LABEL[grupo.categoria]}`}
+										value={posicionesFueBien}
+										onChange={handlePosicionesFueBienChange}
+										ariaLabel={`Posiciones que fueron bien — ${CATEGORIA_LABEL[grupo.categoria]}`}
 									/>
 								</div>
 							{/each}
 						</div>
 					{/if}
 					<div>
-						<Button variant="outline" size="sm" onclick={abrirCrearPosicion}>
+						<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fue_bien')}>
+							+ Crear nueva posición
+						</Button>
+					</div>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Posiciones que fallé</Label>
+					{#if posicionesAgrupadas.length === 0}
+						<p class="text-sm text-muted-foreground italic">
+							Aún no hay posiciones en el catálogo.
+						</p>
+					{:else}
+						<div class="space-y-3">
+							{#each posicionesAgrupadas as grupo (grupo.categoria)}
+								<div class="space-y-1.5">
+									<p class="text-xs font-semibold text-muted-foreground">
+										{CATEGORIA_LABEL[grupo.categoria]}
+									</p>
+									<MultiChips
+										options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
+										value={posicionesFallaron}
+										onChange={handlePosicionesFallaronChange}
+										ariaLabel={`Posiciones que fallé — ${CATEGORIA_LABEL[grupo.categoria]}`}
+									/>
+								</div>
+							{/each}
+						</div>
+					{/if}
+					<div>
+						<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fallo')}>
 							+ Crear nueva posición
 						</Button>
 					</div>
@@ -797,37 +1017,62 @@
 					{/if}
 				</div>
 
+				<!-- T-3.it2.b: técnicas vinculadas (modo editar), separadas
+				     por resultado. El Input legacy de "Posiciones donde tuve
+				     problema" se eliminó — la columna BD se preserva
+				     intacta. -->
 				<div class="space-y-1.5">
-					<Label for="intente-form">Qué intenté</Label>
-					<Textarea
-						id="intente-form"
-						bind:value={queIntente}
-						rows={2}
-						oninput={(e) => {
-							queIntente = capitalizeFirst(e.currentTarget.value);
-						}}
-					/>
+					<Label>Técnicas que fueron bien</Label>
+					{#if tecnicasCatalog.length === 0}
+						<p class="text-sm text-muted-foreground italic">
+							Aún no hay técnicas en el catálogo.
+						</p>
+					{:else}
+						<MultiChips
+							options={tecnicasCatalog
+								.slice()
+								.sort((a, b) => a.nombre.localeCompare(b.nombre))
+								.map((t) => ({
+									value: t.id,
+									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+								}))}
+							value={tecnicasFueBien}
+							onChange={handleTecnicasFueBienChange}
+							ariaLabel="Técnicas que fueron bien"
+						/>
+					{/if}
+					<div>
+						<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fue_bien')}>
+							+ Crear nueva técnica
+						</Button>
+					</div>
 				</div>
 
 				<div class="space-y-1.5">
-					<Label for="fallo-form">Qué falló</Label>
-					<Textarea
-						id="fallo-form"
-						bind:value={queFallo}
-						rows={2}
-						oninput={(e) => {
-							queFallo = capitalizeFirst(e.currentTarget.value);
-						}}
-					/>
-				</div>
-
-				<div class="space-y-1.5">
-					<Label for="posiciones-form">Posiciones donde tuve problema</Label>
-					<Input
-						id="posiciones-form"
-						bind:value={posicionesProblema}
-						placeholder="p. ej. mount bottom, side control top"
-					/>
+					<Label>Técnicas que fallé</Label>
+					{#if tecnicasCatalog.length === 0}
+						<p class="text-sm text-muted-foreground italic">
+							Aún no hay técnicas en el catálogo.
+						</p>
+					{:else}
+						<MultiChips
+							options={tecnicasCatalog
+								.slice()
+								.sort((a, b) => a.nombre.localeCompare(b.nombre))
+								.map((t) => ({
+									value: t.id,
+									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+								}))}
+							value={tecnicasFallaron}
+							onChange={handleTecnicasFallaronChange}
+							ariaLabel="Técnicas que fallé"
+						/>
+					{/if}
+					<div>
+						<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fallo')}>
+							+ Crear nueva técnica
+						</Button>
+					</div>
 				</div>
 
 					{#if errorMsg}
@@ -872,3 +1117,11 @@
   a la infraestructura del mapa.
 -->
 <PosicionWizardDialog bind:open={crearPosicionOpen} onSaved={handlePosicionCreada} />
+
+<!--
+  T-3.it2: Dialog wrapper para crear una técnica desde dentro del editor de
+  roll. Independiente del `mapaModalStack` (modo `standalone` del wizard).
+  La rama (`fue_bien` / `fallo`) se decide al pulsar "+ Crear nueva
+  técnica" — la nueva técnica queda preseleccionada en esa rama.
+-->
+<TecnicaWizardDialog bind:open={crearTecnicaOpen} onSaved={handleTecnicaCreada} />

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
@@ -15,6 +16,7 @@
 		Posicion,
 		ResultadoRoll,
 		Roll,
+		Tecnica,
 		TipoSesion
 	} from '$lib/types';
 	import type { RollWithContext } from '$lib/rolls';
@@ -62,12 +64,21 @@
 	let companeroId = $state<string | undefined>(undefined);
 	let resultado = $state<ResultadoRoll | undefined>(undefined);
 	let tipoSesion = $state<TipoSesion | undefined>(undefined);
-	// T-13: filtro multi-select por posición-problema + catálogo agrupado
-	// por categoría para los chips.
-	let posicionProblemaIds = $state<string[]>([]);
+	// T-3.it2.b: filtro multi-select por posición + catálogo agrupado por
+	// categoría para los chips. El filtro empareja cualquier `resultado`
+	// del vínculo `roll_posicion` (fue_bien o fallo) — semántica "el roll
+	// pasó por esta posición", independientemente de cómo le fue.
+	let posicionIds = $state<string[]>([]);
 	let posicionesCatalog = $state<Posicion[]>([]);
-	// Mapa rollId → posiciones-problema para chips bajo cada fila.
-	let posicionesProblemaByRoll = $state<Map<string, Posicion[]>>(new Map());
+	// T-3.it2.b: índice de posiciones por id (para resolver chips
+	// read-only debajo de cada roll por nombre) + mapa rollId → ids de
+	// posiciones separadas por resultado.
+	let posicionesById = $state<Map<string, Posicion>>(new Map());
+	let posicionesByRoll = $state<Map<string, { fueBien: string[]; fallaron: string[] }>>(new Map());
+	// T-3.it2: catálogo de técnicas + mapa rollId → técnicas vinculadas
+	// (separadas por resultado) para chips read-only bajo cada roll.
+	let tecnicasById = $state<Map<string, Tecnica>>(new Map());
+	let tecnicasByRoll = $state<Map<string, { fueBien: string[]; fallaron: string[] }>>(new Map());
 
 	let editorOpen = $state(false);
 	let editingRoll: Roll | undefined = $state(undefined);
@@ -75,13 +86,19 @@
 
 	onMount(async () => {
 		try {
-			const [{ listCompaneros }, { listPosiciones }] = await Promise.all([
+			const [{ listCompaneros }, { listPosiciones }, { listTecnicas }] = await Promise.all([
 				import('$lib/companeros'),
-				import('$lib/posiciones')
+				import('$lib/posiciones'),
+				import('$lib/tecnicas')
 			]);
 			companeros = await listCompaneros();
-			// T-13: catálogo para el filtro de posición-problema.
+			// T-3.it2.b: catálogo de posiciones (para el filtro y para
+			// resolver chips read-only debajo de cada roll).
 			posicionesCatalog = await listPosiciones();
+			posicionesById = new Map(posicionesCatalog.map((p) => [p.id, p]));
+			// T-3.it2: índice de técnicas para resolver chips read-only.
+			const tecnicas = await listTecnicas();
+			tecnicasById = new Map(tecnicas.map((t) => [t.id, t]));
 			await refresh();
 			status = 'ready';
 		} catch (err) {
@@ -92,17 +109,40 @@
 	});
 
 	async function refresh() {
-		const { listAllRolls, getPosicionesProblemaByRolls } = await import('$lib/rolls');
+		const { listAllRolls, getPosicionesDelRollBatch, getTecnicasDelRollBatch } =
+			await import('$lib/rolls');
 		rolls = await listAllRolls({
 			from: from || undefined,
 			to: to || undefined,
 			companero_id: companeroId,
 			resultado,
 			tipo_sesion: tipoSesion,
-			posicion_problema_ids: posicionProblemaIds.length > 0 ? posicionProblemaIds : undefined
+			posicion_ids: posicionIds.length > 0 ? posicionIds : undefined
 		});
-		// T-13: refrescar chips por fila tras cada refresh.
-		posicionesProblemaByRoll = await getPosicionesProblemaByRolls(rolls.map((r) => r.id));
+		// T-3.it2.b: refrescar chips por fila tras cada refresh — ambos
+		// mapas comparten la misma fuente de IDs de rolls.
+		const rollIds = rolls.map((r) => r.id);
+		posicionesByRoll = await getPosicionesDelRollBatch(rollIds);
+		tecnicasByRoll = await getTecnicasDelRollBatch(rollIds);
+	}
+
+	// T-3.it2.b: helper para resolver el nombre de una posición desde el
+	// índice precargado. Devuelve `null` si la posición fue borrada
+	// (defensivo — no debería pasar con FK CASCADE).
+	function posicionLabel(id: string): string | null {
+		const p = posicionesById.get(id);
+		return p ? p.nombre : null;
+	}
+
+	// T-3.it2: helper para formatear el label de un chip de técnica
+	// (incluye variante entre paréntesis si la hay). Devuelve `null` si el
+	// id no está en el catálogo — eso evita pintar chips fantasma si la
+	// técnica fue borrada (no debería pasar con FK CASCADE, pero es
+	// defensivo). El caller filtra los `null`.
+	function tecnicaLabel(id: string): string | null {
+		const t = tecnicasById.get(id);
+		if (!t) return null;
+		return t.variante ? `${t.nombre} (${t.variante})` : t.nombre;
 	}
 
 	function clearFilters() {
@@ -111,7 +151,7 @@
 		companeroId = undefined;
 		resultado = undefined;
 		tipoSesion = undefined;
-		posicionProblemaIds = [];
+		posicionIds = [];
 		void refresh();
 	}
 
@@ -130,8 +170,8 @@
 		return grupos;
 	});
 
-	function handlePosicionProblemaChange(ids: string[]) {
-		posicionProblemaIds = ids;
+	function handlePosicionFiltroChange(ids: string[]) {
+		posicionIds = ids;
 		void refresh();
 	}
 
@@ -151,14 +191,26 @@
 		que_intente?: string;
 		que_fallo?: string;
 		posiciones_problema?: string;
-		// T-12: posiciones de problema (catálogo). Aquí solo aplica modo
-		// editar, así que el id del roll está siempre disponible en data.id.
-		posicion_problema_ids: string[];
+		// T-3.it2.b: posiciones y técnicas vinculadas, separadas por
+		// resultado. Aquí sólo aplica modo editar (el id del roll viene
+		// siempre poblado en data.id). Persisten tras updateRoll vía
+		// `setPosicionesDelRoll` / `setTecnicasDelRoll` (idempotentes).
+		posiciones_fue_bien_ids: string[];
+		posiciones_fallaron_ids: string[];
+		tecnicas_fue_bien_ids: string[];
+		tecnicas_fallaron_ids: string[];
 	}) {
-		const { updateRoll, setPosicionesProblema } = await import('$lib/rolls');
-		const { posicion_problema_ids, ...rollFields } = data;
+		const { updateRoll, setPosicionesDelRoll, setTecnicasDelRoll } = await import('$lib/rolls');
+		const {
+			posiciones_fue_bien_ids,
+			posiciones_fallaron_ids,
+			tecnicas_fue_bien_ids,
+			tecnicas_fallaron_ids,
+			...rollFields
+		} = data;
 		await updateRoll(rollFields);
-		await setPosicionesProblema(rollFields.id, posicion_problema_ids);
+		await setPosicionesDelRoll(rollFields.id, posiciones_fue_bien_ids, posiciones_fallaron_ids);
+		await setTecnicasDelRoll(rollFields.id, tecnicas_fue_bien_ids, tecnicas_fallaron_ids);
 		await refresh();
 	}
 
@@ -222,21 +274,21 @@
 
 	const activeFilterCount = $derived(
 		[from, to, companeroId, resultado, tipoSesion].filter(Boolean).length +
-			(posicionProblemaIds.length > 0 ? 1 : 0)
+			(posicionIds.length > 0 ? 1 : 0)
 	);
 
 	// `from` y `to` ya no exponen un `onchange` directo (lo hacían los
 	// <Input type="date">). Con `DateInput`, el ISO se propaga sólo cuando
 	// la fecha es válida o queda vacía, así que disparamos refresh aquí.
-	// T-13: también trackeamos `posicionProblemaIds` para reaccionar al
-	// cambio del filtro multi-select (aunque `handlePosicionProblemaChange`
+	// T-3.it2.b: también trackeamos `posicionIds` para reaccionar al
+	// cambio del filtro multi-select (aunque `handlePosicionFiltroChange`
 	// ya llama a `refresh()` explícitamente, mantenerlo aquí cubre cualquier
 	// otra mutación futura del array).
 	$effect(() => {
 		// Tracking explícito.
 		from;
 		to;
-		posicionProblemaIds;
+		posicionIds;
 		if (status === 'ready') void refresh();
 	});
 </script>
@@ -327,7 +379,7 @@
 			</div>
 
 			<div class="space-y-2">
-				<Label class="text-xs">Posición problema</Label>
+				<Label class="text-xs">Posición</Label>
 				{#if posicionesAgrupadas.length === 0}
 					<p class="text-xs text-muted-foreground italic">
 						Aún no hay posiciones en el catálogo.
@@ -341,9 +393,9 @@
 								</p>
 								<MultiChips
 									options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-									value={posicionProblemaIds}
-									onChange={handlePosicionProblemaChange}
-									ariaLabel={`Posiciones-problema de ${CATEGORIA_LABEL[grupo.categoria]}`}
+									value={posicionIds}
+									onChange={handlePosicionFiltroChange}
+									ariaLabel={`Posiciones de ${CATEGORIA_LABEL[grupo.categoria]}`}
 								/>
 							</div>
 						{/each}
@@ -407,7 +459,11 @@
 									<a
 										href={resolve(`/sesion/${r.sesion_id}`)}
 										class="text-primary underline hover:opacity-80"
-										onclick={(e) => e.stopPropagation()}
+										onclick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											void goto(resolve(`/sesion/${r.sesion_id}`));
+										}}
 									>
 										Ver sesión →
 									</a>
@@ -415,14 +471,76 @@
 								{#if r.que_fallo}
 									<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
 								{/if}
-								{#if posicionesProblemaByRoll.get(r.id)?.length}
-									<div class="mt-2 flex flex-wrap gap-1">
-										{#each posicionesProblemaByRoll.get(r.id) ?? [] as p (p.id)}
-											<span
-												class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-											>
-												{p.nombre}
-											</span>
+								<!-- T-3.it2.b: hasta 4 filas read-only de chips
+								     (posiciones fueron bien / fallé, técnicas fueron bien /
+								     fallé). Cada fila se oculta si su lista está vacía.
+								     Los `*Label(id)` devuelven null si el id ya no
+								     existe en el catálogo (defensivo) — filtramos esos. -->
+								{#if posicionesByRoll.get(r.id)?.fueBien.length}
+									<div class="mt-2 flex flex-wrap items-center gap-1">
+										<span class="text-xs font-semibold text-muted-foreground">
+											Posiciones que fueron bien:
+										</span>
+										{#each posicionesByRoll.get(r.id)?.fueBien ?? [] as pid (pid)}
+											{@const label = posicionLabel(pid)}
+											{#if label}
+												<span
+													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+												>
+													{label}
+												</span>
+											{/if}
+										{/each}
+									</div>
+								{/if}
+								{#if posicionesByRoll.get(r.id)?.fallaron.length}
+									<div class="mt-1 flex flex-wrap items-center gap-1">
+										<span class="text-xs font-semibold text-muted-foreground">
+											Posiciones que fallé:
+										</span>
+										{#each posicionesByRoll.get(r.id)?.fallaron ?? [] as pid (pid)}
+											{@const label = posicionLabel(pid)}
+											{#if label}
+												<span
+													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+												>
+													{label}
+												</span>
+											{/if}
+										{/each}
+									</div>
+								{/if}
+								{#if tecnicasByRoll.get(r.id)?.fueBien.length}
+									<div class="mt-1 flex flex-wrap items-center gap-1">
+										<span class="text-xs font-semibold text-muted-foreground">
+											Técnicas que fueron bien:
+										</span>
+										{#each tecnicasByRoll.get(r.id)?.fueBien ?? [] as tid (tid)}
+											{@const label = tecnicaLabel(tid)}
+											{#if label}
+												<span
+													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+												>
+													{label}
+												</span>
+											{/if}
+										{/each}
+									</div>
+								{/if}
+								{#if tecnicasByRoll.get(r.id)?.fallaron.length}
+									<div class="mt-1 flex flex-wrap items-center gap-1">
+										<span class="text-xs font-semibold text-muted-foreground">
+											Técnicas que fallé:
+										</span>
+										{#each tecnicasByRoll.get(r.id)?.fallaron ?? [] as tid (tid)}
+											{@const label = tecnicaLabel(tid)}
+											{#if label}
+												<span
+													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+												>
+													{label}
+												</span>
+											{/if}
 										{/each}
 									</div>
 								{/if}

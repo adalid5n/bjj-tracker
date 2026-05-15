@@ -19,11 +19,22 @@ import type {
 	TecnicaContra
 } from '$lib/types';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
-export type RollPosicionProblemaRow = {
+// T-3.it2: filas de las tablas pivot `roll_tecnica` y `roll_posicion`.
+// `resultado` es 'fue_bien' | 'fallo' (CHECK en SQL). La PK compuesta
+// incluye `resultado` para permitir que una misma técnica/posición
+// aparezca en ambos sets de un roll.
+export type RollTecnicaRow = {
+	roll_id: string;
+	tecnica_id: string;
+	resultado: 'fue_bien' | 'fallo';
+};
+
+export type RollPosicionRow = {
 	roll_id: string;
 	posicion_id: string;
+	resultado: 'fue_bien' | 'fallo';
 };
 
 export type ExportPayload = {
@@ -36,7 +47,8 @@ export type ExportPayload = {
 	sumisiones_terminales: SumisionTerminal[];
 	tecnicas: Tecnica[];
 	tecnica_contras: TecnicaContra[];
-	roll_posicion_problema: RollPosicionProblemaRow[];
+	roll_posicion: RollPosicionRow[];
+	roll_tecnica: RollTecnicaRow[];
 };
 
 export async function exportAll(): Promise<ExportPayload> {
@@ -49,7 +61,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		sumisionesTerminales,
 		tecnicas,
 		tecnicaContras,
-		rollPosicionProblema
+		rollPosicion,
+		rollTecnica
 	] = await Promise.all([
 		query<Companero>('SELECT * FROM companeros ORDER BY created_at'),
 		query<Sesion>('SELECT * FROM sesiones ORDER BY created_at'),
@@ -58,8 +71,11 @@ export async function exportAll(): Promise<ExportPayload> {
 		query<SumisionTerminal>('SELECT * FROM sumisiones_terminales ORDER BY created_at'),
 		query<Tecnica>('SELECT * FROM tecnicas ORDER BY created_at'),
 		query<TecnicaContra>('SELECT * FROM tecnica_contras ORDER BY created_at'),
-		query<RollPosicionProblemaRow>(
-			'SELECT roll_id, posicion_id FROM roll_posicion_problema ORDER BY roll_id, posicion_id'
+		query<RollPosicionRow>(
+			'SELECT roll_id, posicion_id, resultado FROM roll_posicion ORDER BY roll_id, posicion_id, resultado'
+		),
+		query<RollTecnicaRow>(
+			'SELECT roll_id, tecnica_id, resultado FROM roll_tecnica ORDER BY roll_id, tecnica_id, resultado'
 		)
 	]);
 	return {
@@ -72,7 +88,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		sumisiones_terminales: sumisionesTerminales,
 		tecnicas,
 		tecnica_contras: tecnicaContras,
-		roll_posicion_problema: rollPosicionProblema
+		roll_posicion: rollPosicion,
+		roll_tecnica: rollTecnica
 	};
 }
 
@@ -100,7 +117,8 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 		'sumisiones_terminales',
 		'tecnicas',
 		'tecnica_contras',
-		'roll_posicion_problema'
+		'roll_posicion',
+		'roll_tecnica'
 	];
 	for (const key of requiredArrays) {
 		if (!Array.isArray(p[key])) {
@@ -122,7 +140,8 @@ export async function importAll(payload: unknown): Promise<{
 	sumisiones_terminales: number;
 	tecnicas: number;
 	tecnica_contras: number;
-	roll_posicion_problema: number;
+	roll_posicion: number;
+	roll_tecnica: number;
 }> {
 	assertExportShape(payload);
 
@@ -146,7 +165,8 @@ export async function importAll(payload: unknown): Promise<{
 		try {
 			// Wipe en orden FK (hijos antes que padres) — no estrictamente
 			// necesario con FK OFF, pero mantenemos el orden por claridad.
-			await run('DELETE FROM roll_posicion_problema');
+			await run('DELETE FROM roll_tecnica');
+			await run('DELETE FROM roll_posicion');
 			await run('DELETE FROM tecnica_contras');
 			await run('DELETE FROM tecnicas');
 			await run('DELETE FROM rolls');
@@ -186,7 +206,8 @@ export async function importAll(payload: unknown): Promise<{
 		sumisiones_terminales: payload.sumisiones_terminales.length,
 		tecnicas: payload.tecnicas.length,
 		tecnica_contras: payload.tecnica_contras.length,
-		roll_posicion_problema: payload.roll_posicion_problema.length
+		roll_posicion: payload.roll_posicion.length,
+		roll_tecnica: payload.roll_tecnica.length
 	};
 }
 
@@ -308,11 +329,19 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 		);
 	}
 
-	for (const rpp of payload.roll_posicion_problema) {
+	for (const rp of payload.roll_posicion) {
 		await run(
-			`INSERT INTO roll_posicion_problema (roll_id, posicion_id)
-			 VALUES (?, ?)`,
-			[rpp.roll_id, rpp.posicion_id]
+			`INSERT INTO roll_posicion (roll_id, posicion_id, resultado)
+			 VALUES (?, ?, ?)`,
+			[rp.roll_id, rp.posicion_id, rp.resultado]
+		);
+	}
+
+	for (const rt of payload.roll_tecnica) {
+		await run(
+			`INSERT INTO roll_tecnica (roll_id, tecnica_id, resultado)
+			 VALUES (?, ?, ?)`,
+			[rt.roll_id, rt.tecnica_id, rt.resultado]
 		);
 	}
 }

@@ -1,8 +1,94 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-15 (cierre sesión 14)
-**Fase activa:** Iteración 2 — T-2.it2 cerrada, T-3.it2 siguiente
-**Iteración en curso:** it.2 (2/7 tareas previstas cerradas; T-1.it2, T-2.it2)
+**Última actualización:** 2026-05-16 (cierre sesión 15)
+**Fase activa:** Iteración 2 — T-3.it2 cerrada (con T-3.it2.b), T-4.it2 siguiente
+**Iteración en curso:** it.2 (3/7 tareas previstas cerradas; T-1.it2, T-2.it2, T-3.it2)
+
+---
+
+## Última sesión (2026-05-16, sesión 15)
+
+**Hecho — T-3.it2 + T-3.it2.b: rolls↔técnicas/posiciones por entidad con outcome bien/fallé**
+
+Modelo final v4:
+- Tabla nueva `roll_tecnica(roll_id, tecnica_id, resultado)` con
+  `resultado ∈ {'fue_bien','fallo'}` y PK compuesta. Sustituye los
+  TEXT libres `que_intente`/`que_fallo` desde la UI (las columnas
+  quedan en BD como histórico, no se escriben).
+- Tabla `roll_posicion(roll_id, posicion_id, resultado)` reemplaza
+  `roll_posicion_problema` con el mismo modelo. Migración v3→v4
+  copia el histórico previo como `resultado='fallo'` y dropea la
+  tabla antigua. La columna TEXT `posiciones_problema` se queda
+  en `rolls` como histórico.
+
+UI:
+- `RollEditor` con **4 chip-lists** (mismo patrón en wizard y form):
+  Posiciones-fue-bien, Posiciones-fallé, Técnicas-fue-bien,
+  Técnicas-fallé. Cada lista tiene sub-wizard inline para crear
+  nueva entidad. Se descartó el textarea legacy de "Posiciones
+  donde tuve problema (texto libre)".
+- `TecnicaWizardDialog.svelte` nuevo (wrapper de `TecnicaWizard`
+  para uso standalone fuera de `mapaModalStack`). `TecnicaWizard`
+  refactorizado con prop `mode='stack'|'standalone'`, mismo patrón
+  que `PosicionWizard`.
+- `/rolls` y `/sesion/[id]` muestran hasta 4 filas read-only de
+  chips bajo cada roll (ocultas si la lista está vacía).
+
+Sync:
+- `CURRENT_SCHEMA_VERSION = 4`. ExportPayload incluye `roll_posicion`
+  y `roll_tecnica` con `resultado`. Importación valida shape strict.
+
+**Decisión sobre modelo (consensuada con owner):**
+- Exploramos 3 alternativas: eliminar "fallé", outcome ternario
+  (bien/medio/fallé), o dos listas simétricas bien/fallé.
+- Owner eligió 4 listas separadas por eje y resultado.
+- Migración del histórico: lo que estaba en `roll_posicion_problema`
+  se trata como `'fallo'` (lo que era semánticamente).
+
+**Fixes post-validación inmediatos (mismo commit):**
+- `CompaneroCombobox`: bug del label "Crear 'test'" que se quedaba
+  en el input al seleccionar — el label ahora es el nombre real
+  (`query.trim()`), no el texto decorativo.
+- `CompaneroCombobox`: el dropdown abre al click/focus (`bind:open`
+  + `onclick`/`onfocus`). Antes solo abría al escribir.
+- `svelte.config.js`: `paths.relative: false` (cambio aprobado por
+  owner explícitamente — fichero protegido). Sin esto, en rutas
+  profundas (`/sesion/[id]`) el navegador resolvía los assets como
+  relativos al path actual y daban 404.
+- `/rolls/+page.svelte`: el link "Ver sesión" estaba como `<a href>`
+  dentro de un `<button>` (HTML inválido) y disparaba navegación
+  full-page que no era interceptada por SvelteKit → reload completo
+  → Worker nuevo competía por OPFS con el viejo → error de SAH-Pool
+  "Access Handles cannot be created…". Fix: `onclick` con
+  `preventDefault` + `goto(...)` programático para forzar navegación
+  SPA pura.
+
+**Bug del subagente — corrupción de SCHEMA_V2_MIGRATION (revertido):**
+Durante T-3.it2.b un subagente modificó `SCHEMA_V2_MIGRATION`
+reemplazando la tabla histórica `roll_posicion_problema` por
+`roll_posicion`. Eso rompía la inmutabilidad de migraciones (BD
+nuevas no podían inicializarse, BD que pasaban por v2→v3→v4
+fallaban en el INSERT desde tabla inexistente). Revertido a la DDL
+original. **Aprendizaje:** las migraciones históricas son
+inmutables — los cambios de schema van SIEMPRE en una migración
+nueva, nunca retrocediendo a editar una anterior. Anotar como
+restricción explícita para futuros subagentes que toquen BD.
+
+**Iteración 2 — plan vivo actualizado:**
+
+- T-1.it2 ✅ (commits `f098a4e`, `4e0b184`).
+- T-2.it2 ✅ refactor plano-edit (commit `aba8300`).
+- T-3.it2 ✅ rolls↔técnicas/posiciones por entidad + 4 listas.
+- T-4.it2 (siguiente) — reescritura del prefill de contras inline.
+- T-5.it2 — consultas C1/C2 + resumen texto post-sesión.
+- T-6.it2 — pulido UX post uso real.
+- T-7.it2 — cierre + tag `v0.3-it2`.
+
+**Pendientes inmediatos como tareas independientes (no T-4.it2):**
+- Rediseño de `MultiChips`/chip-picker con buscador + scroll
+  horizontal (2 filas máx) + chip "Crear nueva" estilizado. Aplicar
+  tanto en captura (RollEditor) como en read-only de listados.
+  Anotado en `MEJORAS_FUTURAS.md`.
 
 ---
 

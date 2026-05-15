@@ -53,12 +53,25 @@
 
 	let {
 		modo,
+		mode = 'stack',
 		tecnicaId,
 		posicionOrigenId: posicionOrigenIdProp,
 		onSaved,
-		onRequestClose
+		onRequestClose,
+		onDirtyChange
 	}: {
 		modo: 'crear' | 'editar';
+		// T-3.it2: modo de integración con el padre.
+		//  - 'stack' (default): vivimos dentro de `MapaModalHost`. Usa
+		//    `mapaModalStack` para dirty handler, sub-wizards inline, etc.
+		//  - 'standalone': padre es un `Dialog` propio (p. ej.
+		//    `TecnicaWizardDialog` desde `RollEditor`). NO se invoca
+		//    `mapaModalStack` (todas las llamadas están guardadas por
+		//    `mode === 'stack'`). Los sub-wizards inline "+ Crear nueva
+		//    posición/sumisión" se deshabilitan (no se exponen `onCreateNew`).
+		//    El padre debe pasar `onSaved` + `onRequestClose`; el dirty se
+		//    reporta vía `onDirtyChange`.
+		mode?: 'stack' | 'standalone';
 		tecnicaId?: string;
 		/** Id de la posición que el usuario está mirando cuando abre el wizard. Solo modo crear. */
 		posicionOrigenId?: string;
@@ -66,6 +79,9 @@
 		onSaved?: (id: string, modo: 'crear' | 'editar') => void;
 		// Hook para que el host pida cerrar el stack desde aquí (Cancelar).
 		onRequestClose?: () => void;
+		// Solo `standalone`: propaga `isDirty` al padre para que muestre
+		// el confirm de descartar cambios al intentar cerrar el Dialog.
+		onDirtyChange?: (isDirty: boolean) => void;
 	} = $props();
 
 	const TIPOS: { value: TipoTecnica; label: string }[] = [
@@ -170,7 +186,9 @@
 	}
 
 	onMount(async () => {
-		mapaModalStack.setDirtyHandler(() => isDirty);
+		if (mode === 'stack') {
+			mapaModalStack.setDirtyHandler(() => isDirty);
+		}
 		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
 
 		// Carga catálogos en paralelo para los Comboboxes y la validación
@@ -198,7 +216,10 @@
 		// cuando el wizard se remonta tras un sub-wizard inline ("+ Crear
 		// nueva posición/sumisión" en el paso de destino). Sin esto el
 		// usuario perdería todo lo que llevaba escrito.
-		const draft = tecnicaWizardDraft.value;
+		//
+		// En `standalone` no hay sub-wizards inline (no se exponen) y no
+		// queremos pisar el draft del wizard del mapa, así que omitimos.
+		const draft = mode === 'stack' ? tecnicaWizardDraft.value : null;
 		if (draft && draft.key === draftKey) {
 			nombre = draft.nombre;
 			variante = draft.variante;
@@ -279,7 +300,9 @@
 	});
 
 	onDestroy(() => {
-		mapaModalStack.setDirtyHandler(null);
+		if (mode === 'stack') {
+			mapaModalStack.setDirtyHandler(null);
+		}
 		if (typeof document !== 'undefined') document.removeEventListener('keydown', handleDocumentEnter, true);
 		// OJO: NO limpiamos el draft aquí. `onDestroy` se dispara también
 		// cuando el wizard se remonta tras un sub-wizard inline (pop de
@@ -301,7 +324,7 @@
 	// del stack, así que el TecnicaWizard se desmonta y luego se remonta
 	// al volver. Sin esto el usuario perdería todo lo escrito.
 	$effect(() => {
-		if (status !== 'ready') return;
+		if (mode !== 'stack' || status !== 'ready') return;
 		tecnicaWizardDraft.set({
 			key: draftKey,
 			nombre,
@@ -329,6 +352,14 @@
 			detalles.trim() !== snapshot.detalles.trim() ||
 			erroresComunes.trim() !== snapshot.erroresComunes.trim()
 	);
+
+	// En `standalone`, propaga dirty al padre cada vez que cambia. En
+	// `stack` no hace falta — el host pregunta vía `mapaModalStack.isDirty()`.
+	$effect(() => {
+		if (mode === 'standalone') {
+			onDirtyChange?.(isDirty);
+		}
+	});
 
 	// Limpia el error inline al editar nombre/variante/origen. Usamos
 	// handlers explícitos en vez de un `$effect` porque el `$effect` que
@@ -577,9 +608,11 @@
 	function cancel() {
 		if (onRequestClose) {
 			onRequestClose();
-		} else {
+		} else if (mode === 'stack') {
 			mapaModalStack.pop();
 		}
+		// En `standalone` sin `onRequestClose` no hay forma de cerrar —
+		// el padre siempre debería pasar el callback.
 	}
 
 	// Decisión 2026-05-13 (s7): el botón skippable de los wizards siempre
@@ -712,24 +745,31 @@
 					detalles: detalles.trim(),
 					errores_comunes: erroresComunes.trim()
 				});
-				onSaved?.(nueva.id, 'crear');
-				mapaModalStack.setDirtyHandler(null);
-				// Draft consumido: limpia para que la próxima vez que se
-				// abra el wizard empiece vacío.
-				tecnicaWizardDraft.clear();
-				// T-11: si hay un return handler registrado (caso típico:
-				// el modal de técnica abrió este wizard desde
-				// "+ Crear nueva técnica" en la sección de contras), salimos
-				// del wizard con `pop` y le pasamos el nuevo id al handler.
-				// En lugar de hacer el `closeAll + push modal` habitual, que
-				// rompería el flujo dejando al usuario en el modal de la
-				// nueva técnica en vez del de la actual.
-				if (mapaModalStack.hasReturnHandler()) {
-					mapaModalStack.pop();
-					mapaModalStack.invokeReturnHandler(nueva.id, 'tecnica');
+				if (mode === 'stack') {
+					onSaved?.(nueva.id, 'crear');
+					mapaModalStack.setDirtyHandler(null);
+					// Draft consumido: limpia para que la próxima vez que se
+					// abra el wizard empiece vacío.
+					tecnicaWizardDraft.clear();
+					// T-11: si hay un return handler registrado (caso típico:
+					// el modal de técnica abrió este wizard desde
+					// "+ Crear nueva técnica" en la sección de contras), salimos
+					// del wizard con `pop` y le pasamos el nuevo id al handler.
+					// En lugar de hacer el `closeAll + push modal` habitual, que
+					// rompería el flujo dejando al usuario en el modal de la
+					// nueva técnica en vez del de la actual.
+					if (mapaModalStack.hasReturnHandler()) {
+						mapaModalStack.pop();
+						mapaModalStack.invokeReturnHandler(nueva.id, 'tecnica');
+					} else {
+						mapaModalStack.closeAll();
+						mapaModalStack.push({ kind: 'tecnica', id: nueva.id, nombre: nueva.nombre });
+					}
 				} else {
-					mapaModalStack.closeAll();
-					mapaModalStack.push({ kind: 'tecnica', id: nueva.id, nombre: nueva.nombre });
+					// `standalone`: el padre decide qué hacer (cierra su Dialog).
+					// Reportamos no-dirty para suprimir el confirm de descartar.
+					onDirtyChange?.(false);
+					onSaved?.(nueva.id, 'crear');
 				}
 			} else {
 				if (!tecnicaId) {
@@ -748,10 +788,15 @@
 					detalles: detalles.trim(),
 					errores_comunes: erroresComunes.trim()
 				});
-				onSaved?.(tecnicaId, 'editar');
-				mapaModalStack.setDirtyHandler(null);
-				tecnicaWizardDraft.clear();
-				mapaModalStack.pop();
+				if (mode === 'stack') {
+					onSaved?.(tecnicaId, 'editar');
+					mapaModalStack.setDirtyHandler(null);
+					tecnicaWizardDraft.clear();
+					mapaModalStack.pop();
+				} else {
+					onDirtyChange?.(false);
+					onSaved?.(tecnicaId, 'editar');
+				}
 			}
 		} catch (err) {
 			if (isUniqueError(err)) {
@@ -875,7 +920,7 @@
 				placeholder="Selecciona una posición…"
 				searchPlaceholder="Buscar posición…"
 				emptyMessage="Sin posiciones en el catálogo."
-				onCreateNew={handleCreateNuevaPosicionOrigen}
+				onCreateNew={mode === 'stack' ? handleCreateNuevaPosicionOrigen : undefined}
 				createNewLabel="Crear nueva posición"
 				ariaLabel="Posición de origen"
 			/>
@@ -911,7 +956,7 @@
 					placeholder="Selecciona una sumisión…"
 					searchPlaceholder="Buscar sumisión…"
 					emptyMessage="Sin sumisiones todavía."
-					onCreateNew={handleCreateNuevaSumision}
+					onCreateNew={mode === 'stack' ? handleCreateNuevaSumision : undefined}
 					createNewLabel="Crear nueva sumisión"
 					ariaLabel="Sumisión de destino"
 				/>
@@ -926,7 +971,7 @@
 					placeholder="Selecciona una posición…"
 					searchPlaceholder="Buscar posición…"
 					emptyMessage="Sin posiciones en el catálogo."
-					onCreateNew={handleCreateNuevaPosicion}
+					onCreateNew={mode === 'stack' ? handleCreateNuevaPosicion : undefined}
 					createNewLabel="Crear nueva posición"
 					ariaLabel="Posición de destino"
 				/>
@@ -1094,7 +1139,7 @@
 						placeholder="Selecciona una posición…"
 						searchPlaceholder="Buscar posición…"
 						emptyMessage="Sin posiciones en el catálogo."
-						onCreateNew={handleCreateNuevaPosicionOrigen}
+						onCreateNew={mode === 'stack' ? handleCreateNuevaPosicionOrigen : undefined}
 						createNewLabel="Crear nueva posición"
 						ariaLabel="Posición de origen"
 					/>
@@ -1120,7 +1165,7 @@
 							placeholder="Selecciona una sumisión…"
 							searchPlaceholder="Buscar sumisión…"
 							emptyMessage="Sin sumisiones todavía."
-							onCreateNew={handleCreateNuevaSumision}
+							onCreateNew={mode === 'stack' ? handleCreateNuevaSumision : undefined}
 							createNewLabel="Crear nueva sumisión"
 							ariaLabel="Sumisión de destino"
 						/>
@@ -1132,7 +1177,7 @@
 							placeholder="Selecciona una posición…"
 							searchPlaceholder="Buscar posición…"
 							emptyMessage="Sin posiciones en el catálogo."
-							onCreateNew={handleCreateNuevaPosicion}
+							onCreateNew={mode === 'stack' ? handleCreateNuevaPosicion : undefined}
 							createNewLabel="Crear nueva posición"
 							ariaLabel="Posición de destino"
 						/>
