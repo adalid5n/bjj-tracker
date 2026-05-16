@@ -1,8 +1,64 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-16 (cierre sesión 18)
-**Fase activa:** Iteración 2 — T-5.it2 cerrada, T-6.it2 siguiente
-**Iteración en curso:** it.2 (5/7 tareas previstas cerradas + chip-picker como tarea independiente)
+**Última actualización:** 2026-05-16 (cierre sesión 19)
+**Fase activa:** Iteración 2 ✅ cerrada (tag `v0.3-it2`). Sin iteración activa.
+**Iteración en curso:** ninguna — pendiente arrancar planificación de it.3.
+
+---
+
+## Última sesión (2026-05-16, sesión 19)
+
+**Hecho — T-7.it2: cierre de iteración 2**
+
+Cierre formal de la iteración 2 (mapa técnico + captura inline) sin
+ejecutar T-6.it2 (pulido post uso real). El owner decidió saltar el
+pulido al no haber acumulado feedback de uso real todavía; si surgen
+molestias durante el uso, se anotarán sueltas en `MEJORAS_FUTURAS.md`
+o se llevarán a la próxima iteración, sin reabrir T-6.it2.
+
+**Cambios de cierre:**
+
+- `package.json` — bump de versión `0.0.2 → 0.3.0`. Hasta ahora el
+  `package.json` había estado desfasado de los tags (`v0.1-it0` y
+  `v0.2-it1` se crearon sin tocarlo). A partir de este cierre, la
+  versión del paquete se sincroniza con el tag de cierre de iteración
+  (`v0.3-it2` → `0.3.0`). `src/lib/version.ts` lee de `package.json`,
+  así que se actualiza automáticamente.
+- `ESTADO_ACTUAL.md` — esta entrada (sesión 19).
+
+**Decisiones tomadas durante la sesión:**
+
+- **T-6.it2 omitida sin aplazar.** No se mueve a MEJORAS_FUTURAS ni
+  al inicio de it.3 — se cierra it.2 tal cual, y si el uso real
+  destapa molestias se atajan suelto o en it.3.
+- **Alinear `package.json` con tags a partir de ahora.** El convenio
+  pasa a ser: en cada cierre de iteración, bumpear `package.json` al
+  número de la iteración (`v0.X-itX` → `0.X.0`).
+
+**Validación de cierre:**
+- `pnpm check` limpio (0 errors / 0 warnings).
+- `pnpm build` limpio (build OK, 9.4s, sin warnings de plugins
+  nuevos).
+- Sin rutas `/dev/*` que limpiar (eso pasó en T-15 de it.1).
+
+**Iteración 2 — resumen final:**
+
+- T-1.it2 ✅ vínculo top↔bottom + vista del oponente (`f098a4e`, `4e0b184`).
+- T-2.it2 ✅ refactor plano-edit en wizards (`aba8300`).
+- T-3.it2 ✅ rolls↔técnicas/posiciones por entidad + 4 listas (`6d3751b`).
+- Chip-picker ✅ rediseño (`8b03e86`, tarea independiente).
+- T-4.it2 ✅ prefill de contras inline con complementaria del origen (`00e0eb6`).
+- T-5.it2 ✅ panel de análisis C1 + C2 en /rolls (`0a3bf13`).
+- T-6.it2 ⏭ omitida (pulido post uso real, sin acumular feedback).
+- T-7.it2 ✅ cierre + tag `v0.3-it2` (esta sesión).
+
+**ADRs creados en it.2:** `001-bump-deps-fix-refresh.md`,
+`002-vinculo-top-bottom.md`, `003-theme-manager.md`.
+
+**Próximo paso concreto:** sin trabajo de código planificado.
+Pendiente arrancar planificación de iteración 3 cuando el owner
+acumule feedback de uso real o quiera abordar entradas de
+`MEJORAS_FUTURAS.md`.
 
 ---
 
