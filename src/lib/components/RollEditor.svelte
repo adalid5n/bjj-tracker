@@ -6,7 +6,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
-	import MultiChips from '$lib/components/MultiChips.svelte';
+	import ChipPicker from '$lib/components/ChipPicker.svelte';
 	import CinturonChips from '$lib/components/CinturonChips.svelte';
 	import CompaneroCombobox from '$lib/components/CompaneroCombobox.svelte';
 	import PosicionWizardDialog from '$lib/components/PosicionWizardDialog.svelte';
@@ -129,6 +129,16 @@
 	let crearTecnicaOpen = $state(false);
 	let cualResultadoCrear = $state<'fue_bien' | 'fallo'>('fue_bien');
 
+	// T-3.it2.c: UX unificada para los bloques posición/técnica. Un único
+	// buscador por bloque (compartido entre los dos tabs "Fue bien" / "Fue
+	// mal") y un único ChipPicker que muestra el set del tab activo. El
+	// estado se comparte entre wizard y form porque en ambos hay una sola
+	// instancia activa del editor a la vez.
+	let posicionQuery = $state('');
+	let activePosicionTab = $state<'fue_bien' | 'fallo'>('fue_bien');
+	let tecnicaQuery = $state('');
+	let activeTecnicaTab = $state<'fue_bien' | 'fallo'>('fue_bien');
+
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
 
@@ -175,6 +185,13 @@
 			cualResultadoCrear = 'fue_bien';
 			cualResultadoCrearPosicion = 'fue_bien';
 			pendingSkipTamano = false;
+			// Reset de tabs/buscadores para que al abrir el editor siempre
+			// arranquemos en "Fue bien" sin texto residual de una sesión
+			// anterior del Dialog.
+			posicionQuery = '';
+			activePosicionTab = 'fue_bien';
+			tecnicaQuery = '';
+			activeTecnicaTab = 'fue_bien';
 		}
 	});
 
@@ -251,6 +268,30 @@
 		transicion: 'Transición',
 		otro: 'Otro'
 	};
+
+	// T-3.it2.c: catálogos pre-filtrados por la query del buscador unificado
+	// del bloque. El ChipPicker se monta con `showSearch={false}` y consume
+	// estos derivados. Si la query está vacía devolvemos la lista entera.
+	const posicionesAgrupadasFiltradas = $derived.by(() => {
+		const q = posicionQuery.trim().toLocaleLowerCase();
+		if (!q) return posicionesAgrupadas;
+		return posicionesAgrupadas
+			.map((g) => ({
+				...g,
+				items: g.items.filter((p) => p.nombre.toLocaleLowerCase().includes(q))
+			}))
+			.filter((g) => g.items.length > 0);
+	});
+
+	const tecnicasFiltradas = $derived.by(() => {
+		const q = tecnicaQuery.trim().toLocaleLowerCase();
+		const all = tecnicasCatalog.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+		if (!q) return all;
+		return all.filter((t) => {
+			const label = t.variante ? `${t.nombre} (${t.variante})` : t.nombre;
+			return label.toLocaleLowerCase().includes(q);
+		});
+	});
 
 	function handlePosicionesFueBienChange(ids: string[]) {
 		posicionesFueBien = ids;
@@ -692,72 +733,92 @@
 				{/if}
 
 				{#if currentStep === 2}
-					<!-- T-3.it2.b: paso de posiciones dividido en dos sets
-					     (fue bien / falló). Skippable (no autoavanza). Cada
-					     bloque tiene su propio botón "+ Crear nueva posición"
-					     que añade a su set al guardar. -->
+					<!-- T-3.it2.c: paso de posiciones unificado en un solo
+					     buscador + tabs "Fue bien" / "Fue mal". Skippable.
+					     El chip "+ Crear nueva" interno del ChipPicker añade
+					     al set del tab activo. -->
 					<div class="space-y-4">
 						<h3 class="text-sm font-semibold">Posiciones (opcional)</h3>
 
-						<div class="space-y-1.5">
-							<Label>Posiciones que fueron bien</Label>
-							{#if posicionesAgrupadas.length === 0}
-								<p class="text-sm text-muted-foreground italic">
-									Aún no hay posiciones en el catálogo. Crea una abajo o continúa para saltar.
-								</p>
-							{:else}
-								<div class="space-y-3">
-									{#each posicionesAgrupadas as grupo (grupo.categoria)}
-										<div class="space-y-1.5">
-											<p class="text-xs font-semibold text-muted-foreground">
-												{CATEGORIA_LABEL[grupo.categoria]}
-											</p>
-											<MultiChips
-												options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-												value={posicionesFueBien}
-												onChange={handlePosicionesFueBienChange}
-												ariaLabel={`Posiciones que fueron bien — ${CATEGORIA_LABEL[grupo.categoria]}`}
-											/>
-										</div>
-									{/each}
-								</div>
-							{/if}
-							<div>
-								<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fue_bien')}>
-									+ Crear nueva posición
-								</Button>
-							</div>
+						<Input
+							type="search"
+							bind:value={posicionQuery}
+							placeholder="Buscar posición…"
+							aria-label="Buscar posición"
+						/>
+
+						<div
+							role="tablist"
+							aria-label="Resultado a editar"
+							class="inline-flex rounded-md border border-border bg-muted p-0.5"
+						>
+							<button
+								type="button"
+								role="tab"
+								aria-selected={activePosicionTab === 'fue_bien'}
+								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activePosicionTab ===
+								'fue_bien'
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => (activePosicionTab = 'fue_bien')}
+							>
+								Fue bien ({posicionesFueBien.length})
+							</button>
+							<button
+								type="button"
+								role="tab"
+								aria-selected={activePosicionTab === 'fallo'}
+								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activePosicionTab ===
+								'fallo'
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => (activePosicionTab = 'fallo')}
+							>
+								Fue mal ({posicionesFallaron.length})
+							</button>
 						</div>
 
-						<div class="space-y-1.5">
-							<Label>Posiciones que fallé</Label>
-							{#if posicionesAgrupadas.length === 0}
-								<p class="text-sm text-muted-foreground italic">
-									Aún no hay posiciones en el catálogo.
-								</p>
-							{:else}
-								<div class="space-y-3">
-									{#each posicionesAgrupadas as grupo (grupo.categoria)}
-										<div class="space-y-1.5">
-											<p class="text-xs font-semibold text-muted-foreground">
-												{CATEGORIA_LABEL[grupo.categoria]}
-											</p>
-											<MultiChips
-												options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-												value={posicionesFallaron}
-												onChange={handlePosicionesFallaronChange}
-												ariaLabel={`Posiciones que fallé — ${CATEGORIA_LABEL[grupo.categoria]}`}
-											/>
-										</div>
-									{/each}
-								</div>
-							{/if}
-							<div>
-								<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fallo')}>
-									+ Crear nueva posición
-								</Button>
-							</div>
-						</div>
+						{#if posicionesAgrupadas.length === 0}
+							<p class="text-sm text-muted-foreground italic">
+								Aún no hay posiciones en el catálogo. Crea una abajo o continúa para saltar.
+							</p>
+						{/if}
+
+						{#if activePosicionTab === 'fue_bien'}
+							<ChipPicker
+								mode="select"
+								showSearch={false}
+								groups={posicionesAgrupadasFiltradas.map((g) => ({
+									key: g.categoria,
+									label: CATEGORIA_LABEL[g.categoria],
+									items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+								}))}
+								value={posicionesFueBien}
+								onChange={handlePosicionesFueBienChange}
+								onCreateNew={() => abrirCrearPosicion('fue_bien')}
+								emptyText=""
+								filteredEmptyText="No hay posiciones que coincidan."
+								ariaLabel="Posiciones que fueron bien"
+								accent="success"
+							/>
+						{:else}
+							<ChipPicker
+								mode="select"
+								showSearch={false}
+								groups={posicionesAgrupadasFiltradas.map((g) => ({
+									key: g.categoria,
+									label: CATEGORIA_LABEL[g.categoria],
+									items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+								}))}
+								value={posicionesFallaron}
+								onChange={handlePosicionesFallaronChange}
+								onCreateNew={() => abrirCrearPosicion('fallo')}
+								emptyText=""
+								filteredEmptyText="No hay posiciones que coincidan."
+								ariaLabel="Posiciones que fallé"
+								accent="warning"
+							/>
+						{/if}
 
 						<p class="text-xs text-muted-foreground">
 							Selecciona las que apliquen. Puedes saltar este paso si no aplica.
@@ -802,68 +863,89 @@
 				{/if}
 
 				{#if currentStep === 6}
-					<!-- T-3.it2.b: técnicas como entidades vinculadas (MultiChips
-					     con catálogo precargado), separadas en dos sets por
-					     resultado. Antes eran textareas libres
-					     `que_intente`/`que_fallo` y un Input de
-					     `posiciones_problema` — todos eliminados de la UI; las
-					     columnas permanecen en BD como histórico. -->
+					<!-- T-3.it2.c: técnicas unificadas en un solo buscador +
+					     tabs "Fue bien" / "Fue mal". El chip "+ Crear nueva"
+					     interno añade al set del tab activo. -->
 					<div class="space-y-4">
 						<h3 class="text-sm font-semibold">Técnicas (opcional)</h3>
 
-						<div class="space-y-1.5">
-							<Label>Técnicas que fueron bien</Label>
-							{#if tecnicasCatalog.length === 0}
-								<p class="text-sm text-muted-foreground italic">
-									Aún no hay técnicas en el catálogo. Crea una abajo o continúa para saltar.
-								</p>
-							{:else}
-								<MultiChips
-									options={tecnicasCatalog
-										.slice()
-										.sort((a, b) => a.nombre.localeCompare(b.nombre))
-										.map((t) => ({
-											value: t.id,
-											label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
-										}))}
-									value={tecnicasFueBien}
-									onChange={handleTecnicasFueBienChange}
-									ariaLabel="Técnicas que fueron bien"
-								/>
-							{/if}
-							<div>
-								<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fue_bien')}>
-									+ Crear nueva técnica
-								</Button>
-							</div>
+						<Input
+							type="search"
+							bind:value={tecnicaQuery}
+							placeholder="Buscar técnica…"
+							aria-label="Buscar técnica"
+						/>
+
+						<div
+							role="tablist"
+							aria-label="Resultado a editar"
+							class="inline-flex rounded-md border border-border bg-muted p-0.5"
+						>
+							<button
+								type="button"
+								role="tab"
+								aria-selected={activeTecnicaTab === 'fue_bien'}
+								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activeTecnicaTab ===
+								'fue_bien'
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => (activeTecnicaTab = 'fue_bien')}
+							>
+								Fue bien ({tecnicasFueBien.length})
+							</button>
+							<button
+								type="button"
+								role="tab"
+								aria-selected={activeTecnicaTab === 'fallo'}
+								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activeTecnicaTab ===
+								'fallo'
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => (activeTecnicaTab = 'fallo')}
+							>
+								Fue mal ({tecnicasFallaron.length})
+							</button>
 						</div>
 
-						<div class="space-y-1.5">
-							<Label>Técnicas que fallé</Label>
-							{#if tecnicasCatalog.length === 0}
-								<p class="text-sm text-muted-foreground italic">
-									Aún no hay técnicas en el catálogo.
-								</p>
-							{:else}
-								<MultiChips
-									options={tecnicasCatalog
-										.slice()
-										.sort((a, b) => a.nombre.localeCompare(b.nombre))
-										.map((t) => ({
-											value: t.id,
-											label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
-										}))}
-									value={tecnicasFallaron}
-									onChange={handleTecnicasFallaronChange}
-									ariaLabel="Técnicas que fallé"
-								/>
-							{/if}
-							<div>
-								<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fallo')}>
-									+ Crear nueva técnica
-								</Button>
-							</div>
-						</div>
+						{#if tecnicasCatalog.length === 0}
+							<p class="text-sm text-muted-foreground italic">
+								Aún no hay técnicas en el catálogo. Crea una abajo o continúa para saltar.
+							</p>
+						{/if}
+
+						{#if activeTecnicaTab === 'fue_bien'}
+							<ChipPicker
+								mode="select"
+								showSearch={false}
+								items={tecnicasFiltradas.map((t) => ({
+									value: t.id,
+									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+								}))}
+								value={tecnicasFueBien}
+								onChange={handleTecnicasFueBienChange}
+								onCreateNew={() => abrirCrearTecnica('fue_bien')}
+								emptyText=""
+								filteredEmptyText="No hay técnicas que coincidan."
+								ariaLabel="Técnicas que fueron bien"
+								accent="success"
+							/>
+						{:else}
+							<ChipPicker
+								mode="select"
+								showSearch={false}
+								items={tecnicasFiltradas.map((t) => ({
+									value: t.id,
+									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+								}))}
+								value={tecnicasFallaron}
+								onChange={handleTecnicasFallaronChange}
+								onCreateNew={() => abrirCrearTecnica('fallo')}
+								emptyText=""
+								filteredEmptyText="No hay técnicas que coincidan."
+								ariaLabel="Técnicas que fallé"
+								accent="warning"
+							/>
+						{/if}
 					</div>
 				{/if}
 				</div>
@@ -922,66 +1004,91 @@
 						/>
 					</div>
 
-				<!-- T-3.it2.b: posiciones vinculadas al roll separadas por
-				     resultado (modo editar). -->
-				<div class="space-y-1.5">
-					<Label>Posiciones que fueron bien</Label>
-					{#if posicionesAgrupadas.length === 0}
-						<p class="text-sm text-muted-foreground italic">
-							Aún no hay posiciones en el catálogo.
-						</p>
-					{:else}
-						<div class="space-y-3">
-							{#each posicionesAgrupadas as grupo (grupo.categoria)}
-								<div class="space-y-1.5">
-									<p class="text-xs font-semibold text-muted-foreground">
-										{CATEGORIA_LABEL[grupo.categoria]}
-									</p>
-									<MultiChips
-										options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-										value={posicionesFueBien}
-										onChange={handlePosicionesFueBienChange}
-										ariaLabel={`Posiciones que fueron bien — ${CATEGORIA_LABEL[grupo.categoria]}`}
-									/>
-								</div>
-							{/each}
-						</div>
-					{/if}
-					<div>
-						<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fue_bien')}>
-							+ Crear nueva posición
-						</Button>
-					</div>
-				</div>
+				<!-- T-3.it2.c: posiciones unificadas (modo editar). Mismo
+				     patrón que el paso 2 del wizard: un buscador + tabs +
+				     un único ChipPicker. -->
+				<div class="space-y-4">
+					<h3 class="text-sm font-semibold">Posiciones</h3>
 
-				<div class="space-y-1.5">
-					<Label>Posiciones que fallé</Label>
+					<Input
+						type="search"
+						bind:value={posicionQuery}
+						placeholder="Buscar posición…"
+						aria-label="Buscar posición"
+					/>
+
+					<div
+						role="tablist"
+						aria-label="Resultado a editar"
+						class="inline-flex rounded-md border border-border bg-muted p-0.5"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={activePosicionTab === 'fue_bien'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activePosicionTab ===
+							'fue_bien'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (activePosicionTab = 'fue_bien')}
+						>
+							Fue bien ({posicionesFueBien.length})
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={activePosicionTab === 'fallo'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activePosicionTab ===
+							'fallo'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (activePosicionTab = 'fallo')}
+						>
+							Fue mal ({posicionesFallaron.length})
+						</button>
+					</div>
+
 					{#if posicionesAgrupadas.length === 0}
 						<p class="text-sm text-muted-foreground italic">
-							Aún no hay posiciones en el catálogo.
+							Aún no hay posiciones en el catálogo. Crea una abajo.
 						</p>
-					{:else}
-						<div class="space-y-3">
-							{#each posicionesAgrupadas as grupo (grupo.categoria)}
-								<div class="space-y-1.5">
-									<p class="text-xs font-semibold text-muted-foreground">
-										{CATEGORIA_LABEL[grupo.categoria]}
-									</p>
-									<MultiChips
-										options={grupo.items.map((p) => ({ value: p.id, label: p.nombre }))}
-										value={posicionesFallaron}
-										onChange={handlePosicionesFallaronChange}
-										ariaLabel={`Posiciones que fallé — ${CATEGORIA_LABEL[grupo.categoria]}`}
-									/>
-								</div>
-							{/each}
-						</div>
 					{/if}
-					<div>
-						<Button variant="outline" size="sm" onclick={() => abrirCrearPosicion('fallo')}>
-							+ Crear nueva posición
-						</Button>
-					</div>
+
+					{#if activePosicionTab === 'fue_bien'}
+						<ChipPicker
+							mode="select"
+							showSearch={false}
+							groups={posicionesAgrupadasFiltradas.map((g) => ({
+								key: g.categoria,
+								label: CATEGORIA_LABEL[g.categoria],
+								items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+							}))}
+							value={posicionesFueBien}
+							onChange={handlePosicionesFueBienChange}
+							onCreateNew={() => abrirCrearPosicion('fue_bien')}
+							emptyText=""
+							filteredEmptyText="No hay posiciones que coincidan."
+							ariaLabel="Posiciones que fueron bien"
+							accent="success"
+						/>
+					{:else}
+						<ChipPicker
+							mode="select"
+							showSearch={false}
+							groups={posicionesAgrupadasFiltradas.map((g) => ({
+								key: g.categoria,
+								label: CATEGORIA_LABEL[g.categoria],
+								items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+							}))}
+							value={posicionesFallaron}
+							onChange={handlePosicionesFallaronChange}
+							onCreateNew={() => abrirCrearPosicion('fallo')}
+							emptyText=""
+							filteredEmptyText="No hay posiciones que coincidan."
+							ariaLabel="Posiciones que fallé"
+							accent="warning"
+						/>
+					{/if}
 				</div>
 
 				<div class="space-y-1.5">
@@ -1017,62 +1124,90 @@
 					{/if}
 				</div>
 
-				<!-- T-3.it2.b: técnicas vinculadas (modo editar), separadas
-				     por resultado. El Input legacy de "Posiciones donde tuve
-				     problema" se eliminó — la columna BD se preserva
-				     intacta. -->
-				<div class="space-y-1.5">
-					<Label>Técnicas que fueron bien</Label>
+				<!-- T-3.it2.c: técnicas unificadas (modo editar). Mismo
+				     patrón que el paso 6 del wizard. El Input legacy de
+				     "Posiciones donde tuve problema" se eliminó — la columna
+				     BD se preserva intacta. -->
+				<div class="space-y-4">
+					<h3 class="text-sm font-semibold">Técnicas</h3>
+
+					<Input
+						type="search"
+						bind:value={tecnicaQuery}
+						placeholder="Buscar técnica…"
+						aria-label="Buscar técnica"
+					/>
+
+					<div
+						role="tablist"
+						aria-label="Resultado a editar"
+						class="inline-flex rounded-md border border-border bg-muted p-0.5"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={activeTecnicaTab === 'fue_bien'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activeTecnicaTab ===
+							'fue_bien'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (activeTecnicaTab = 'fue_bien')}
+						>
+							Fue bien ({tecnicasFueBien.length})
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={activeTecnicaTab === 'fallo'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {activeTecnicaTab ===
+							'fallo'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (activeTecnicaTab = 'fallo')}
+						>
+							Fue mal ({tecnicasFallaron.length})
+						</button>
+					</div>
+
 					{#if tecnicasCatalog.length === 0}
 						<p class="text-sm text-muted-foreground italic">
-							Aún no hay técnicas en el catálogo.
+							Aún no hay técnicas en el catálogo. Crea una abajo.
 						</p>
-					{:else}
-						<MultiChips
-							options={tecnicasCatalog
-								.slice()
-								.sort((a, b) => a.nombre.localeCompare(b.nombre))
-								.map((t) => ({
-									value: t.id,
-									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
-								}))}
+					{/if}
+
+					{#if activeTecnicaTab === 'fue_bien'}
+						<ChipPicker
+							mode="select"
+							showSearch={false}
+							items={tecnicasFiltradas.map((t) => ({
+								value: t.id,
+								label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+							}))}
 							value={tecnicasFueBien}
 							onChange={handleTecnicasFueBienChange}
+							onCreateNew={() => abrirCrearTecnica('fue_bien')}
+							emptyText=""
+							filteredEmptyText="No hay técnicas que coincidan."
 							ariaLabel="Técnicas que fueron bien"
+							accent="success"
 						/>
-					{/if}
-					<div>
-						<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fue_bien')}>
-							+ Crear nueva técnica
-						</Button>
-					</div>
-				</div>
-
-				<div class="space-y-1.5">
-					<Label>Técnicas que fallé</Label>
-					{#if tecnicasCatalog.length === 0}
-						<p class="text-sm text-muted-foreground italic">
-							Aún no hay técnicas en el catálogo.
-						</p>
 					{:else}
-						<MultiChips
-							options={tecnicasCatalog
-								.slice()
-								.sort((a, b) => a.nombre.localeCompare(b.nombre))
-								.map((t) => ({
-									value: t.id,
-									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
-								}))}
+						<ChipPicker
+							mode="select"
+							showSearch={false}
+							items={tecnicasFiltradas.map((t) => ({
+								value: t.id,
+								label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+							}))}
 							value={tecnicasFallaron}
 							onChange={handleTecnicasFallaronChange}
+							onCreateNew={() => abrirCrearTecnica('fallo')}
+							emptyText=""
+							filteredEmptyText="No hay técnicas que coincidan."
 							ariaLabel="Técnicas que fallé"
+							accent="warning"
 						/>
 					{/if}
-					<div>
-						<Button variant="outline" size="sm" onclick={() => abrirCrearTecnica('fallo')}>
-							+ Crear nueva técnica
-						</Button>
-					</div>
 				</div>
 
 					{#if errorMsg}

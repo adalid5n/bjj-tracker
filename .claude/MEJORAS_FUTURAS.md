@@ -12,14 +12,11 @@ Cada entrada debería responder:
 
 ## UX
 
-### Reducir read-only de chips en /rolls y /sesion/[id]
+### ~~Reducir read-only de chips en /rolls y /sesion/[id]~~ — HECHO 2026-05-16 (parcial)
 
 - **Origen:** T-3.it2.b, feedback Adalid 2026-05-16
-- **Idea:** las 4 filas read-only ("Posiciones que fueron bien: ...", "Posiciones que fallé: ...", "Técnicas que fueron bien: ...", "Técnicas que fallé: ...") aportan demasiado texto bajo cada roll. Cambiar a una presentación más compacta:
-  - Quitar el label de texto completo (o reducirlo a un icono/abreviatura).
-  - Mostrar los chips en **2 filas máx con scroll horizontal** — mismo patrón que el rediseño del chip-picker pendiente (entrada de abajo).
-- **Por qué:** con catálogos de 9+ entidades por roll, el listado vertical actual ocupa demasiado espacio y diluye la información clave del roll (compañero, resultado).
-- **Cuándo:** junto con el rediseño del chip-picker (T-7 del backlog), para mantener consistencia visual entre la versión editable y la read-only.
+- **Hecho:** rediseño completo del chip-picker (componente nuevo `ChipPicker.svelte`) aplicado tanto a captura como a read-only. Read-only ahora usa `flex flex-wrap` (sin filas-fijas, sin scroll horizontal — decisión post-validación del owner). Estética alineada entre editable y read-only.
+- **Pendiente (si reaparece la fricción):** quitar/abreviar el label de texto completo ("Posiciones que fueron bien:" → icono o más corto). Quedó tal cual; en uso real verá si molesta. Si vuelve, se reabre como tarea propia.
 
 ### Roll editor — sugerir compañero por defecto + selector inteligente
 

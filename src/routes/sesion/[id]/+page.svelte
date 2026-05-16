@@ -7,6 +7,7 @@
 	import RollEditor from '$lib/components/RollEditor.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Fab from '$lib/components/Fab.svelte';
+	import ChipPicker from '$lib/components/ChipPicker.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { Companero, Posicion, Roll, Sesion, Tecnica, TipoSesion } from '$lib/types';
 
@@ -237,6 +238,10 @@
 			{:else}
 				<ul class="space-y-2">
 					{#each rolls as r (r.id)}
+						{@const posBien = posicionesByRoll.get(r.id)?.fueBien ?? []}
+						{@const posFallaron = posicionesByRoll.get(r.id)?.fallaron ?? []}
+						{@const tecBien = tecnicasByRoll.get(r.id)?.fueBien ?? []}
+						{@const tecFallaron = tecnicasByRoll.get(r.id)?.fallaron ?? []}
 						<li>
 							<button
 								type="button"
@@ -264,72 +269,48 @@
 								<!-- T-3.it2.b: hasta 4 filas read-only de chips
 								     (posiciones fueron bien / fallé, técnicas fueron bien /
 								     fallé). Cada fila se oculta si su lista está vacía. -->
-								{#if posicionesByRoll.get(r.id)?.fueBien.length}
-									<div class="mt-2 flex flex-wrap items-center gap-1">
-										<span class="text-xs font-semibold text-muted-foreground">
-											Posiciones que fueron bien:
-										</span>
-										{#each posicionesByRoll.get(r.id)?.fueBien ?? [] as pid (pid)}
-											{@const label = posicionLabel(pid)}
-											{#if label}
-												<span
-													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-												>
-													{label}
-												</span>
-											{/if}
-										{/each}
+								{#if posBien.length}
+									<div class="mt-2">
+										<ChipPicker
+											mode="readonly"
+											label="Posiciones que fueron bien"
+											items={posBien
+												.map((pid) => ({ value: pid, label: posicionLabel(pid) ?? '' }))
+												.filter((o) => o.label)}
+										/>
 									</div>
 								{/if}
-								{#if posicionesByRoll.get(r.id)?.fallaron.length}
-									<div class="mt-1 flex flex-wrap items-center gap-1">
-										<span class="text-xs font-semibold text-muted-foreground">
-											Posiciones que fallé:
-										</span>
-										{#each posicionesByRoll.get(r.id)?.fallaron ?? [] as pid (pid)}
-											{@const label = posicionLabel(pid)}
-											{#if label}
-												<span
-													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-												>
-													{label}
-												</span>
-											{/if}
-										{/each}
+								{#if posFallaron.length}
+									<div class="mt-1">
+										<ChipPicker
+											mode="readonly"
+											label="Posiciones que fallé"
+											items={posFallaron
+												.map((pid) => ({ value: pid, label: posicionLabel(pid) ?? '' }))
+												.filter((o) => o.label)}
+										/>
 									</div>
 								{/if}
-								{#if tecnicasByRoll.get(r.id)?.fueBien.length}
-									<div class="mt-1 flex flex-wrap items-center gap-1">
-										<span class="text-xs font-semibold text-muted-foreground">
-											Técnicas que fueron bien:
-										</span>
-										{#each tecnicasByRoll.get(r.id)?.fueBien ?? [] as tid (tid)}
-											{@const label = tecnicaLabel(tid)}
-											{#if label}
-												<span
-													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-												>
-													{label}
-												</span>
-											{/if}
-										{/each}
+								{#if tecBien.length}
+									<div class="mt-1">
+										<ChipPicker
+											mode="readonly"
+											label="Técnicas que fueron bien"
+											items={tecBien
+												.map((tid) => ({ value: tid, label: tecnicaLabel(tid) ?? '' }))
+												.filter((o) => o.label)}
+										/>
 									</div>
 								{/if}
-								{#if tecnicasByRoll.get(r.id)?.fallaron.length}
-									<div class="mt-1 flex flex-wrap items-center gap-1">
-										<span class="text-xs font-semibold text-muted-foreground">
-											Técnicas que fallé:
-										</span>
-										{#each tecnicasByRoll.get(r.id)?.fallaron ?? [] as tid (tid)}
-											{@const label = tecnicaLabel(tid)}
-											{#if label}
-												<span
-													class="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-												>
-													{label}
-												</span>
-											{/if}
-										{/each}
+								{#if tecFallaron.length}
+									<div class="mt-1">
+										<ChipPicker
+											mode="readonly"
+											label="Técnicas que fallé"
+											items={tecFallaron
+												.map((tid) => ({ value: tid, label: tecnicaLabel(tid) ?? '' }))
+												.filter((o) => o.label)}
+										/>
 									</div>
 								{/if}
 							</button>
