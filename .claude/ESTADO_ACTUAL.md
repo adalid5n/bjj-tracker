@@ -1,8 +1,67 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-16 (cierre sesión 16)
-**Fase activa:** Iteración 2 — chip-picker rediseñado, T-4.it2 siguiente
-**Iteración en curso:** it.2 (3/7 tareas previstas cerradas + chip-picker como tarea independiente)
+**Última actualización:** 2026-05-16 (cierre sesión 17)
+**Fase activa:** Iteración 2 — T-4.it2 cerrada, T-5.it2 siguiente
+**Iteración en curso:** it.2 (4/7 tareas previstas cerradas + chip-picker como tarea independiente)
+
+---
+
+## Última sesión (2026-05-16, sesión 17)
+
+**Hecho — T-4.it2: prefill de contras inline (deuda heredada de T-11
+de it.1, desbloqueada por ADR-002)**
+
+En `TecnicaModalContent.svelte`, al pulsar "+ Crear nueva técnica"
+desde el Combobox de "+ Añadir contra", el push del wizard ahora
+pasa `posicionOrigenId: origen?.posicion_complementaria_id ?? undefined`.
+El wizard de técnica recibe la prop (`posicionOrigenIdProp`,
+`TecnicaWizard:58`) y prefija el paso 3 con la complementaria. El
+usuario puede aceptar o cambiarla en el wizard.
+
+**Comportamiento por caso:**
+- Origen con complementaria asignada → paso 3 prefijado con la
+  complementaria (caso esperado para BJJ canónico: Mount top →
+  contra desde Mount bottom).
+- Origen sin complementaria (transición, par aún no enlazado) →
+  paso 3 vacío, usuario elige a mano. Idéntico al comportamiento
+  pre-T-4.it2.
+
+**Decisiones tomadas durante la sesión:**
+- **Opción A para "sin complementaria"**: no prefill como fallback.
+  Descartadas opción B (adivinar por nombre/tipo: frágil, ADR-002
+  ya lo descartó) y opción C (forzar enlazar antes: demasiado
+  intrusivo).
+- **Sin helper `getComplementaria(id)`**: el subagente Explore lo
+  sugirió, pero al revisar el código vimos que solo había un sitio
+  donde añadir una consulta nueva (`TecnicaModalContent` ya tenía
+  `origen` cargado y solo necesitaba el ID, no la entidad). El otro
+  callsite candidato (`PosicionModalContent`) usa `.find()` sobre
+  un array ya cargado y reemplazarlo añadiría una query a BD.
+  Abstracción prematura → descartada.
+- **Sin tests, sin ADR**. Cambio pequeño (1 prop en el push) sobre
+  cableado ya existente desde T-1.it2. ADR-002 ya documenta el
+  vínculo; T-4.it2 solo aplica ese vínculo a un sitio concreto.
+
+**Comentario de deuda reescrito** (`TecnicaModalContent.svelte:295-310`):
+ya no es deuda, refleja el nuevo comportamiento y la regla de
+fallback.
+
+**Validación**: `pnpm check` limpio (0/0). Validación visual en
+navegador hecha por el owner durante la sesión.
+
+**Iteración 2 — plan vivo:**
+
+- T-1.it2 ✅ (commits `f098a4e`, `4e0b184`).
+- T-2.it2 ✅ refactor plano-edit (commit `aba8300`).
+- T-3.it2 ✅ rolls↔técnicas/posiciones + 4 listas (commit `6d3751b`).
+- **Chip-picker rediseño ✅ (commit `8b03e86`, tarea independiente).**
+- **T-4.it2 ✅ prefill de contras inline (esta sesión).**
+- T-5.it2 (siguiente) — consultas C1/C2 + resumen texto post-sesión.
+- T-6.it2 — pulido UX post uso real.
+- T-7.it2 — cierre + tag `v0.3-it2`.
+
+**Próximo paso concreto:** arrancar T-5.it2 (consultas C1/C2 +
+resumen texto post-sesión).
 
 ---
 

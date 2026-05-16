@@ -301,12 +301,13 @@
 	 * modal — que se vuelve a montar tras el pop — la espere antes de
 	 * leer la lista actualizada.
 	 *
-	 * Sin prefill de `posicionOrigenId`: la contra la ejecuta el oponente,
-	 * por tanto su origen es típicamente la posición complementaria de la
-	 * técnica actual (mount top vs mount bottom, etc.). El schema no tiene
-	 * forma de saber qué posición es la "complementaria" — el usuario lo
-	 * elige consciente en el paso 3 del wizard. (Si en el futuro vinculamos
-	 * top↔bottom, este es el sitio donde re-introducir el prefill correcto.)
+	 * Prefill de `posicionOrigenId` (T-4.it2, desbloqueado por ADR-002):
+	 * la contra la ejecuta el oponente, así que su origen natural es la
+	 * complementaria de la posición desde la que se hace ESTA técnica.
+	 * Si el origen tiene complementaria asignada, prefijamos el paso 3
+	 * del wizard de contra con ella (el usuario sigue pudiendo cambiarla).
+	 * Si no la tiene (transición, par aún no enlazado), no prefijamos —
+	 * el usuario la elige a mano, igual que antes de T-4.it2.
 	 */
 	function handleCreateNuevaTecnica() {
 		mapaModalStack.setReturnHandler(async (newId, kind) => {
@@ -332,7 +333,8 @@
 		mapaModalStack.push({
 			kind: 'wizard-tecnica',
 			modo: 'crear',
-			nombre: 'Nueva técnica (contra)'
+			nombre: 'Nueva técnica (contra)',
+			posicionOrigenId: origen?.posicion_complementaria_id ?? undefined
 		});
 	}
 
