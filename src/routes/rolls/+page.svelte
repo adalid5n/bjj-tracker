@@ -10,6 +10,7 @@
 	import RollEditor from '$lib/components/RollEditor.svelte';
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import ChipPicker from '$lib/components/ChipPicker.svelte';
+	import AnalisisPanel from '$lib/components/AnalisisPanel.svelte';
 	import type {
 		CategoriaPosicion,
 		Companero,
@@ -84,6 +85,11 @@
 	let editorOpen = $state(false);
 	let editingRoll: Roll | undefined = $state(undefined);
 	let editingRollSesionId: string | undefined = $state(undefined);
+
+	// T-5.it2: el panel de análisis se recarga cuando esta key cambia.
+	// Se incrementa tras guardar/borrar un roll desde esta página para
+	// que los conteos de C1/C2 reflejen el cambio sin tener que recargar.
+	let analisisReloadKey = $state(0);
 
 	onMount(async () => {
 		try {
@@ -213,6 +219,7 @@
 		await setPosicionesDelRoll(rollFields.id, posiciones_fue_bien_ids, posiciones_fallaron_ids);
 		await setTecnicasDelRoll(rollFields.id, tecnicas_fue_bien_ids, tecnicas_fallaron_ids);
 		await refresh();
+		analisisReloadKey++;
 	}
 
 	async function handleDeleteRoll() {
@@ -220,6 +227,7 @@
 		const { deleteRoll } = await import('$lib/rolls');
 		await deleteRoll(editingRoll.id);
 		await refresh();
+		analisisReloadKey++;
 	}
 
 	// T-13: helpers para agrupar rolls por día. La fecha viene en
@@ -412,6 +420,8 @@
 		</div>
 	</details>
 	</div>
+
+	<AnalisisPanel reloadKey={analisisReloadKey} />
 
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>

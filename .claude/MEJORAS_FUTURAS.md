@@ -149,6 +149,43 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
   poblado. Si en escaneo rápido cuesta encontrar lo importante,
   retocar.
 
+### C2 — mínimo de rolls configurable para activar bandera
+
+- **Origen:** decisión de producto en sesión 18 (2026-05-16), T-5.it2.
+- **Estado actual:** C2 activa la bandera cualquier compañero con
+  `me_dominaron > 50% del total`, **sin mínimo de rolls**. Esto
+  permite ver banderas pronto pero con riesgo de falso positivo
+  (compañero con 1 roll perdido = 100% loss rate).
+- **Idea:** añadir un selector (3 / 5 / 10 rolls mínimos) en el panel
+  de análisis, equivalente al de C1. Defaultearía a "sin mínimo"
+  para no romper comportamiento, el usuario sube el listón cuando le
+  empiece a molestar el ruido.
+- **Por qué:** decidido aplazar hasta ver, en uso real, si el ruido
+  de "1 roll = bandera" es problema o no. Si el catálogo de
+  compañeros crece y el owner empieza a ver banderas que no le dicen
+  nada, se reabre.
+- **Cuándo:** tras 2-3 semanas de uso real con C2 activo. Sin urgencia.
+
+### Resumen automático post-sesión — aplazado de T-5.it2
+
+- **Origen:** REQUISITOS §3.6 + criterio de éxito it.2. Discutido y
+  aplazado en sesión 18 (2026-05-16) durante el planteamiento de
+  T-5.it2.
+- **Idea:** tras cerrar la captura de una sesión, mostrar
+  automáticamente un bloque de texto resumiendo lo que pasó (rolls,
+  resultados, posiciones-problema repetidas, banderas de C2). Cierra
+  el bucle entre captura y análisis sin tener que ir activamente a
+  /analisis.
+- **Por qué se aplaza:** valor depende de si tras una sesión real el
+  owner NO tiene claro qué pasó. Si suele saberlo de memoria, el
+  resumen sería redundante con los datos crudos. Hay que validar la
+  utilidad de C1/C2 (T-5.it2) en uso real antes de decidir si una
+  vista combinada por sesión aporta sobre lo que ya ofrecen.
+- **Cuándo:** tras 2-3 semanas de uso real de C1/C2. Si echas en
+  falta una conclusión por-sesión que combine ambas, se reabre.
+  Reutilizaría las queries C1/C2 ya construidas, así que la deuda
+  técnica es mínima.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`

@@ -1,8 +1,87 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-16 (cierre sesión 17)
-**Fase activa:** Iteración 2 — T-4.it2 cerrada, T-5.it2 siguiente
-**Iteración en curso:** it.2 (4/7 tareas previstas cerradas + chip-picker como tarea independiente)
+**Última actualización:** 2026-05-16 (cierre sesión 18)
+**Fase activa:** Iteración 2 — T-5.it2 cerrada, T-6.it2 siguiente
+**Iteración en curso:** it.2 (5/7 tareas previstas cerradas + chip-picker como tarea independiente)
+
+---
+
+## Última sesión (2026-05-16, sesión 18)
+
+**Hecho — T-5.it2: panel de análisis C1 + C2 en /rolls**
+
+Tres piezas nuevas, una integración:
+
+- **`src/lib/analisis.ts`** (módulo nuevo): dos funciones de consulta
+  sobre la BD.
+  - `getProblemasRecurrentes(N: 3 | 5 | 10)` → `{ posiciones, tecnicas,
+    sesiones_consideradas }`. Agrega `roll_posicion`/`roll_tecnica`
+    con `resultado='fallo'` filtrando por los rolls de las últimas N
+    sesiones (SELECT con `LIMIT N` ordenado por `sesion.fecha DESC`).
+    GROUP BY entidad, ORDER BY count DESC.
+  - `getCompanerosProblema()` → array de compañeros con
+    `me_dominaron / total_rolls > 0.5`. Para cada uno, sub-query top-3
+    posiciones marcadas como `fallo` en sus rolls perdidos.
+- **`src/lib/components/AnalisisPanel.svelte`** (componente nuevo):
+  panel plegable (`<details>` nativo, expandido por defecto). Header
+  con selector segmented `3 / 5 / 10` (patrón de `/mapa` + RollEditor).
+  Dos secciones: "Problemas recurrentes" (C1, dos sub-listas) y
+  "Compañeros bandera" (C2, cards con borde/bg `warning/5` + `/30`).
+  Items NO clickables (texto informativo). Estado vacío explícito por
+  cada caso (sin sesiones, sin fallos, sin banderas).
+- **`/rolls/+page.svelte`** (integración): `<AnalisisPanel
+  reloadKey={analisisReloadKey} />` entre el bloque sticky de filtros y
+  la lista de rolls. Tras guardar/borrar un roll, `analisisReloadKey++`
+  fuerza recarga via `$effect`.
+
+**Decisiones tomadas durante la sesión:**
+
+- **Resumen automático post-sesión aplazado a MEJORAS_FUTURAS**, no
+  incluido en T-5.it2. El criterio "app sugiere algo accionable" se
+  cubre con C1 + C2. Si tras 2-3 semanas de uso real falta una vista
+  combinada por-sesión, se reabre.
+- **C1 — selector 3 / 5 / 10, sin umbral mínimo de ocurrencias.**
+  Todos los `fallo` cuentan; ordenado por frecuencia DESC. Más simple
+  y más datos para decidir luego si hace falta filtrar.
+- **C2 — sin mínimo de rolls.** Cualquier compañero con
+  `me_dominaron > 50%` activa bandera. Riesgo de falso positivo (1
+  roll perdido = 100% loss rate) aceptado por ahora. Anotado en
+  MEJORAS_FUTURAS para hacerlo configurable cuando el ruido moleste.
+- **C2 — "pierdo" = `me_dominaron` estricto** (no incluir
+  `equilibrado`). Literal de REQUISITOS §3.6.
+- **C1 + C2 combinan ambos ejes del modelo v4**: posiciones-fallé +
+  técnicas-fallé. La distinción ya existe en BD desde T-3.it2.
+- **Vista = panel colapsable en /rolls**, no ruta nueva ni tab en
+  home. Menos navegación, contexto junto a los datos crudos.
+- **Items NO clickables al inicio.** /mapa no soporta deep-link a
+  una entidad concreta; montarlo añade scope. Si tras uso real falta
+  navegación, se añade.
+- **Sin helper `getComplementaria` ni helpers nuevos.** El módulo de
+  análisis no comparte queries con otros módulos; aislado.
+- **Estado del plegable NO persiste entre visitas.** Simple. Si
+  molesta abrir cada vez, se persiste luego.
+
+**MEJORAS_FUTURAS actualizado** con dos entradas nuevas en UX:
+- "Resumen automático post-sesión — aplazado de T-5.it2".
+- "C2 — mínimo de rolls configurable para activar bandera".
+
+**Validación**: `pnpm check` limpio (0/0). Validación visual en
+navegador hecha por el owner durante la sesión.
+
+**Iteración 2 — plan vivo:**
+
+- T-1.it2 ✅ (commits `f098a4e`, `4e0b184`).
+- T-2.it2 ✅ refactor plano-edit (commit `aba8300`).
+- T-3.it2 ✅ rolls↔técnicas/posiciones + 4 listas (commit `6d3751b`).
+- **Chip-picker rediseño ✅ (commit `8b03e86`, tarea independiente).**
+- T-4.it2 ✅ prefill de contras inline (commit `00e0eb6`).
+- **T-5.it2 ✅ panel de análisis C1 + C2 (esta sesión).**
+- T-6.it2 (siguiente) — pulido UX post uso real.
+- T-7.it2 — cierre + tag `v0.3-it2`.
+
+**Próximo paso concreto:** uso real durante unos días para alimentar
+T-6.it2 (pulido post uso real). Sin cambios de código planificados
+hasta tener feedback del owner.
 
 ---
 
