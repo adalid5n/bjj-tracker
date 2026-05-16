@@ -1,8 +1,118 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-16 (cierre sesión 15)
-**Fase activa:** Iteración 2 — T-3.it2 cerrada (con T-3.it2.b), T-4.it2 siguiente
-**Iteración en curso:** it.2 (3/7 tareas previstas cerradas; T-1.it2, T-2.it2, T-3.it2)
+**Última actualización:** 2026-05-16 (cierre sesión 16)
+**Fase activa:** Iteración 2 — chip-picker rediseñado, T-4.it2 siguiente
+**Iteración en curso:** it.2 (3/7 tareas previstas cerradas + chip-picker como tarea independiente)
+
+---
+
+## Última sesión (2026-05-16, sesión 16)
+
+**Hecho — Rediseño chip-picker (tarea independiente, fuera del plan
+T-N de it.2)**
+
+Surgió de `MEJORAS_FUTURAS.md` como pendiente inmediato tras T-3.it2.b.
+Se priorizó antes de T-4.it2 porque las 4 chip-lists de `RollEditor`
+introducidas en T-3.it2.b eran la pantalla que el owner iba a usar
+más en uso real — si la captura era incómoda se rompía el feedback
+loop que alimenta T-4/T-5.
+
+**Componente nuevo `src/lib/components/ChipPicker.svelte`** con dos
+modos:
+
+- **`mode='select'`** (editable): buscador opcional + chips en grid
+  de 2 filas con scroll horizontal (`grid-flow-col auto-cols-max
+  grid-rows-2`). Soporta agrupado por categoría (prop `groups`) o
+  lista plana (`items`). Chip dashed "+ Crear nueva" al final del
+  último grupo si se pasa `onCreateNew`. El buscador interno se
+  puede ocultar con `showSearch={false}` para que el padre controle
+  la query desde fuera (caso tabs en RollEditor).
+- **`mode='readonly'`**: sin buscador, chips como `<span>` no
+  interactivos. Layout `flex flex-wrap` (no grid 2 filas forzadas:
+  si caben en una fila, una; si solo hay 1 chip, no se reserva la
+  segunda fila — decisión post-validación owner).
+- **Prop `accent: 'primary' | 'success' | 'warning'`**: tinta el
+  contenedor con `bg-{accent}/5` y los chips seleccionados con
+  `bg-{accent}` + `text-{accent}-foreground` en lugar del default
+  `primary`. Tokens ya existían en `layout.css`. Solo aplica en
+  `mode='select'`.
+
+**Sustituciones aplicadas:**
+
+- 8 ocurrencias de `MultiChips` en `RollEditor.svelte` (4 wizard,
+  4 form). `MultiChips` se conserva intacto para otros usos
+  estáticos (PESOS, RESULTADOS, etc.).
+- 4 chip-rows read-only en `src/routes/rolls/+page.svelte`.
+- 4 chip-rows read-only en `src/routes/sesion/[id]/+page.svelte`.
+
+**UX adicional en RollEditor (4 bloques: paso 2 wizard, paso 6 wizard,
+form posiciones, form técnicas):**
+
+- **Tabs estilo segmented toggle** (patrón heredado de `/mapa`:
+  wrapper `inline-flex rounded-md border bg-muted p-0.5` con tab
+  activo `bg-background shadow-sm` e inactivo `text-muted-foreground`).
+  Una primera iteración usó el componente `Chips` existente como
+  toggle pero visualmente no se diferenciaba de los chips del
+  ChipPicker debajo — el owner pidió el patrón de /mapa
+  explícitamente para que el cambio de tab se notase.
+- **Buscador único por bloque** (en lugar de uno por set "fue bien
+  / fue mal"). Cambiar de tab conserva la query. Filtrado en vivo
+  case-insensitive contra `label`.
+- **Accent semántico**: tab "Fue bien" → `accent='success'` (tinte
+  verde 5 % + chips seleccionados verdes). Tab "Fue mal" →
+  `accent='warning'` (ámbar). Resuelve la queja "los chips no
+  parecen cambiar al alternar tab" tintando el contexto incluso
+  cuando no hay nada seleccionado.
+- **Contador en cada tab**: `Fue bien (N) / Fue mal (N)`, contando
+  desde el array de selección (no del catálogo filtrado — así "(3)"
+  significa "3 marcadas", independiente del buscador).
+- **Reset al abrir editor**: tab a `'fue_bien'`, query a `''`. En
+  el `$effect` que se ejecuta al abrir el Dialog.
+
+**Decisiones tomadas durante la sesión:**
+
+- **ChipPicker componente nuevo, no extender MultiChips**: las APIs
+  son distintas (groups, search, onCreateNew, accent) y MultiChips
+  se sigue usando para chips estáticos. Mantener ambos limpios.
+- **Read-only flat (`flex flex-wrap`)**, no 2 filas forzadas. Owner
+  validó tras ver la versión inicial con grid 2 filas (que dejaba
+  huecos con 1 solo chip).
+- **Segmented toggle inline (4 copias)** en lugar de extraer un
+  `SegmentedTabs.svelte` — consistente con /mapa y con la regla "no
+  introducir abstracciones que la tarea no exija". Si reaparece en
+  más sitios, se extrae.
+- **Accent solo en modo `select`** (editable). Read-only se queda
+  neutro porque ya hay labels textuales por fila ("Posiciones que
+  fueron bien:") que dan el contexto.
+- **Transición vs diferenciación por color (decisión de UX)**: el
+  owner notó que al cambiar de tab los chips parecían estáticos.
+  Análisis honesto: la transición fade/slide no ayudaría porque los
+  chips son LOS MISMOS (el catálogo no cambia, solo cambia el array
+  de selección). La diferenciación por color sí porque cambia el
+  contexto incluso sin selección. Se eligió la segunda.
+
+**MEJORAS_FUTURAS actualizado**: entrada "Reducir read-only de chips
+en /rolls y /sesion/[id]" marcada como hecha parcial (la presentación
+compacta sí; el "quitar/abreviar el label" queda como pendiente si
+reaparece la fricción en uso real).
+
+**Validación**: `pnpm check` limpio (0 errors / 0 warnings).
+Validación visual en navegador hecha por el owner durante la sesión.
+Commit `8b03e86`, pusheado a `origin/main`.
+
+**Iteración 2 — plan vivo:**
+
+- T-1.it2 ✅ (commits `f098a4e`, `4e0b184`).
+- T-2.it2 ✅ refactor plano-edit (commit `aba8300`).
+- T-3.it2 ✅ rolls↔técnicas/posiciones + 4 listas (commit `6d3751b`).
+- **Chip-picker rediseño ✅ (commit `8b03e86`, tarea independiente).**
+- T-4.it2 (siguiente) — reescritura del prefill de contras inline.
+- T-5.it2 — consultas C1/C2 + resumen texto post-sesión.
+- T-6.it2 — pulido UX post uso real.
+- T-7.it2 — cierre + tag `v0.3-it2`.
+
+**Próximo paso concreto:** arrancar T-4.it2 (reescritura del prefill
+de contras inline, desbloqueado por ADR-002).
 
 ---
 
