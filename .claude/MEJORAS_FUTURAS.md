@@ -251,6 +251,15 @@ Resuelto añadiendo `/// <reference types="vite-plugin-pwa/vanillajs" />` en `sr
 - **Detalle:** las BDs OPFS de instalaciones previas a T-4 todavía tienen la columna `experiencia_anos` (REAL nullable). El código actual no la referencia, no se inserta, no se lee — queda como dead column.
 - **Cuándo:** cuando aparezca el primer schema_v2 (probablemente Iteración 1, al añadir tabla de Posiciones), aprovechar la migración para limpiar también esta columna huérfana.
 
+### Actualizar GitHub Actions del workflow de deploy a versiones con Node 24
+
+- **Origen:** anotación de GitHub Actions en el deploy del cierre de it.2 (run `25967932789`, 2026-05-16).
+- **Detalle:** el workflow `.github/workflows/deploy.yml` usa `actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4` y `pnpm/action-setup@v4`, que internamente corren sobre Node 20. GitHub deprecó Node 20 en runners: desde el **2 de junio de 2026** se fuerza Node 24 por defecto, y el **16 de septiembre de 2026** se retira Node 20 del runner.
+- **Idea:** actualizar cada action a la versión que ya soporta Node 24 nativamente (revisar releases de cada repo). Alternativa puente: añadir `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` como env var del workflow para opt-in antes del cutover.
+- **Por qué:** ahora el deploy funciona pero está en cuenta atrás. Si no se actualiza antes de septiembre, el workflow se rompe y bloquea releases.
+- **Cuándo:** antes del 2 de junio de 2026 idealmente (para validar con margen); como tarde, antes del 16 de septiembre de 2026.
+- **Restricción del proyecto:** `.github/workflows/deploy.yml` está en la lista de ficheros que no se tocan sin pedirlo explícitamente (ver `CONTEXTO_AGENTE.md`). Esta tarea requiere que el owner lo abra.
+
 ---
 
 ## Cómo usar este documento
