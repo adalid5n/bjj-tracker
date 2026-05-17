@@ -124,11 +124,31 @@ T-9.it3 definidas, 7 ejecutadas en esta sesión.
     re-encuadraba el viewport del usuario. Solución: `fit: false`
     por defecto en `runLayoutAndCache`, y `fit: true` solo en el
     primer mount y en el botón Reorganizar.
-  - **Validado por el owner:** añadir una arista entre nodos
-    existentes ya NO mueve el grafo y NO resetea el zoom.
+  - **Validado por el owner antes del último push:** añadir una
+    arista entre nodos existentes NO movía el grafo y NO reseteaba
+    el zoom.
+  - **🔴 REGRESIÓN reportada tras el commit `4d8748a`:** volvió a
+    moverse el grafo Y a resetearse el zoom al añadir o quitar algo,
+    incluso entre nodos existentes. Algo del último ajuste
+    (`fit: false` parametrizado + `fit: true` solo en mount inicial
+    y Reorganizar) ha roto los dos comportamientos que ya funcionaban.
+    Hipótesis a verificar al inicio de la próxima sesión:
+      - El `instance.elements().remove()` + `instance.add(...)` del
+        `$effect` del dataset puede estar reseteando el viewport por
+        sí mismo (antes del layout), ignorando el `fit: false` del
+        preset.
+      - O el `(opts as ...).fit = fit` no se aplica al layout preset
+        (raro, pero hay que confirmar leyendo la doc o haciendo
+        `console.log(opts)` justo antes del `instance.layout(opts).run()`).
+      - O en el caso "arista entre nodos existentes", el dataset
+        cambia de identidad pero el cache se está vaciando por algún
+        motivo y cae a fcose (verificar con log temporal de `cacheSize`
+        antes de quitarlo del todo).
+    Plan: reabrir T-7, añadir logs temporales (`cacheSize`,
+    `isPreset`, `fit`), reproducir, diagnosticar y arreglar.
   - **Pendiente validar:** añadir un nodo nuevo (posición o
     sumisión) debería disparar fcose con toast visible. Validar en
-    próxima sesión.
+    próxima sesión después de arreglar la regresión.
 
 **Cambios de UX importantes registrados en `MEJORAS_FUTURAS.md`:**
 
