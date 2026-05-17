@@ -1,8 +1,69 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-17 (cierre sesión 21)
+**Última actualización:** 2026-05-18 (cierre sesión 22)
 **Fase activa:** Iteración 3 en curso — vista grafo del mapa técnico (Cytoscape + fcose).
-**Iteración en curso:** it.3, T-1 a T-7 cerradas. Plan **replanteado** tras revelación de visión del owner: T-8 a T-11 redefinidas (ver sesión 21).
+**Iteración en curso:** it.3, T-1 a T-8 cerradas. T-9 (persistencia + drag) es la siguiente. T-10 y T-11 quedan pendientes según el plan replanteado (ver sesión 21).
+
+---
+
+## Sesión 22 (2026-05-17 → 2026-05-18)
+
+**Hecho — T-8.it3 completa en 3 commits (T-8.a, T-8.b, T-8.c+d).**
+
+**Decisiones de producto cerradas al inicio de la sesión:**
+- Codificación visual de nodos: color = tipo+rol, tamaño = degree dinámico (inicialmente; mutó a monocromática durante T-8.c+d).
+- Drawer lateral derecho en desktop, drawer inferior `~50dvh` en móvil. Solo en vista Grafo; en vista Lista se mantiene Dialog centrado.
+- Sub-header sticky con dos filas (toggle binario Grafo/Lista + fila contextual con sub-toggle o FilterDropdowns).
+- Default de `/mapa` = vista Grafo (chasis principal, owner asume el coste de cargar el chunk Cytoscape en la primera visita).
+- Tab Sumisiones queda fuera, anotado en `MEJORAS_FUTURAS.md`.
+- Color sumisión inicialmente token nuevo `--sumision` púrpura; eliminado al pivotar a paleta monocromática.
+- Sheet vía `pnpm dlx shadcn-svelte add sheet` (copia componentes al árbol; bumpa `@lucide/svelte` ^1.14→^1.16, sin dep npm nueva).
+- Toggle Grafo/Lista con modal abierto: permitido siempre (drafts de wizard sobreviven al remount).
+
+**T-8.a (commit `2646b22`):** sub-header dos filas + nuevo shape de estado (`vistaActiva` 3-state → `vistaPrincipal` + `subVistaLista`). Solo toca `+page.svelte`.
+
+**T-8.b (commit `5c86862`):** migración Dialog → Sheet/Drawer en `MapaModalHost`:
+- Nuevo hook `useMediaQuery` en `src/lib/hooks/use-media.svelte.ts` (~25 LOC, class field con `matchMedia` listener, guard SSR).
+- `MapaModalHost` acepta prop `presentation: 'dialog' | 'sheet-side' | 'sheet-bottom'`, padre deriva con `$derived` desde `vistaPrincipal` + breakpoint.
+- Snippet `modalContent()` reutilizado entre los tres wrappers; AlertDialog "¿Descartar?" sigue fuera.
+- Comportamiento Sheet (descubierto iterando con el owner):
+  - Overlay con `pointer-events-none!` (Tailwind v4 `!important`) + transparente → grafo queda visible e interactivo detrás.
+  - `preventScroll={false}` → bits-ui no aplica `pointer-events: none` al body (era el bloqueador que impedía clicar grafo/toggle con drawer abierto).
+  - `interactOutsideBehavior="ignore"` → click en el grafo NO cierra el drawer.
+  - `top-14! bottom-14!` (sheet-side) y `bottom-14!` (sheet-bottom) → drawer no tapa `AppHeader` ni `BottomNav`.
+  - X propio dentro del snippet (`showCloseButton={false}` en los wrappers) porque el X nativo de bits-ui cerraba el drawer aunque hubiera dirty.
+- **Dirty guard unificado**: `attemptCloseAll(onClose?)` en el host acepta callback que se invoca solo si el cierre se confirma (inmediato o tras "Descartar" en AlertDialog). Padre lo usa para:
+  - Toggle Grafo/Lista (`requestVistaChange`).
+  - Click en otro nodo del grafo (nueva prop `onAttemptPush` en `GrafoMapa`, padre pasa wrapper que usa `attemptCloseAll`).
+  - `openPosicion`/`openSumision`/`openTecnica`/`openWizardCrear*` (helper `attemptPushModal`).
+- Default `vistaPrincipal` cambió de `'lista'` a `'grafo'` por feedback del owner durante la sesión.
+
+**T-8.c+d (commit `f3f9c72`):** nodos circulares + tamaño por degree + canvas dark.
+- `buildGrafoElements` calcula `degree` (in+out) por nodo y lo guarda en `data.degree`. 5 tests nuevos en `grafo.spec.ts`.
+- `GrafoMapa::buildStylesheet`: reescrito a paleta monocromática sobre canvas oscuro forzado.
+  - Canvas: `class="dark"` en el contenedor + `bg-card` sólido + `rounded-xl` + `border border-border`. Probe de `readTokens` también con `.dark` → tokens resuelven al esquema dark independiente del tema del sistema.
+  - Posición (cualquier rol) → `bg-muted` + borde `muted-foreground`. Diferenciación ofensiva/defensiva/neutral pasa al modal.
+  - Sumisión → `bg-foreground` macizo (único nodo que destaca).
+  - Tamaño: `mapData(degree, 0, 8, 28-64 px)`. Huérfanos al mínimo.
+  - Label fuera del círculo (`text-valign: bottom`) con pill `round-rectangle` en tono `muted` + opacity 1 + padding 3 (oculta las flechas que pasan por debajo sin ser blanco puro).
+  - Flechas todas en `muted-foreground`; `transicion` dashed como único matiz de tipo.
+- `GrafoLeyenda` simplificada a 2 nodos (posición / sumisión) + 2 flechas (acción / transición).
+- Token `--sumision` añadido inicialmente al `layout.css` se retiró al pivotar a monocromática (cleanup en el mismo cambio).
+
+**Iteración de diseño relevante (sesión larga):** la paleta visual del grafo evolucionó del plan inicial (4 colores macizos por tipo+rol) hasta el resultado final (monocromática sobre canvas dark) en 3 iteraciones con feedback del owner. El plan en `.claude/agent-reports/20260517-t8-it3-grafo/plan.md` refleja las decisiones intermedias; el código refleja el resultado final.
+
+**Validación:**
+- `pnpm check` limpio en cada commit (1050 ficheros, 0 errores, 0 warnings).
+- `pnpm test:unit`: 12/12 en `grafo.spec.ts` (el fallo de `Welcome.svelte.spec.ts` es preexistente, Playwright no instalado).
+- `pnpm build` + `pnpm preview` + hard refresh tras cada commit estructural (regla de CONTEXTO_AGENTE para cambios que tocan SW/PWA/modal).
+
+**Próximo paso concreto:**
+- Arrancar **T-9.it3** — persistencia + drag + botón Guardar:
+  - Migración SQLite v4: tabla `grafo_layout (entidad_id, x, y)` (modelo exacto a decidir al arrancar).
+  - Drag nativo (grabify) en posiciones y sumisiones.
+  - Botón "Guardar organización" con dirty state visible.
+  - "Reorganizar" → fcose temporal, no persiste hasta Guardar.
+  - Entra la decisión de si la tabla `grafo_layout` viaja en el export/import JSON (sí por defecto, vía sync.ts).
 
 ---
 
