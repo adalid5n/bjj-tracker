@@ -270,6 +270,21 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
   organización persistente estén en uso real durante un par de
   semanas y se note exactamente qué es lo que molesta.
 
+### Tab Sumisiones en el sub-toggle de Lista del /mapa
+
+- **Origen:** sesión 22 (2026-05-17), decisiones de producto de T-8.it3.
+- **Idea:** añadir un tercer estado al sub-toggle de Lista (`/mapa` →
+  vista Lista) para Sumisiones, junto a Posiciones y Técnicas. Hoy
+  las sumisiones solo se acceden desde el modal de una posición; el
+  owner quería separarlas como tab propio pero priorizó cerrar T-8
+  primero.
+- **Por qué:** acceso directo al catálogo de sumisiones sin pasar por
+  posición. Útil cuando it.3 lleve la vista grafo y el inventario
+  crezca lo suficiente para que la búsqueda dentro de modales sea
+  fricción real.
+- **Cuándo:** post-T-8.it3, valorar en cleanup de it.3 o como tarea
+  propia en it.4 si la fricción es palpable en uso real.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`

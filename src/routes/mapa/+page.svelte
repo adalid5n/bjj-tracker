@@ -106,10 +106,12 @@
 	let errorMessage = $state('');
 	let query = $state('');
 
-	// Toggle entre las tres vistas de /mapa. Default siempre "posiciones"
-	// (lo que existía hasta ahora). No persiste entre navegaciones por
-	// decisión de producto.
-	let vistaActiva = $state<'posiciones' | 'tecnicas' | 'grafo'>('posiciones');
+	// Toggle de dos niveles para /mapa (T-8.it3):
+	//   - vistaPrincipal: chasis principal (Grafo vs Lista).
+	//   - subVistaLista: sub-toggle dentro de Lista (Posiciones vs Técnicas).
+	// No persiste entre navegaciones por decisión de producto.
+	let vistaPrincipal = $state<'grafo' | 'lista'>('grafo');
+	let subVistaLista = $state<'posiciones' | 'tecnicas'>('posiciones');
 	// Filtros del tab "Técnicas". Multi-select: vacío = todos.
 	let tiposSeleccionados = $state<string[]>([]);
 	// Filtros del tab "Grafo" (T-4.it3). Mismo patrón vacío = todos.
@@ -305,103 +307,138 @@
 		</div>
 	{:else}
 		<!--
-		  Sub-header sticky: agrupa toggle de vista, buscador y (solo en tab
-		  Técnicas) el filtro de tipo. Queda pegado justo debajo del
-		  AppHeader (h-14 → top-14). `-mx-4 px-4` para que la línea inferior
-		  llegue de borde a borde. El filtro de tipo entra/sale del sticky
-		  cuando se cambia de tab; ocupa más espacio cuando está visible —
-		  comportamiento aceptado.
+		  Sub-header sticky (T-8.it3): dos filas dentro del mismo contenedor
+		  sticky, sin extraer a componente nuevo (el bloque es corto y solo
+		  esta página lo usa).
+		    - Fila 1 (siempre): toggle binario Grafo / Lista.
+		    - Fila 2 (contextual):
+		        · Lista: sub-toggle Posiciones / Técnicas + buscador
+		          (+ MultiChips de tipo en sub-vista Técnicas).
+		        · Grafo: los 3 FilterDropdown (tipo, estado, categoría).
+		  Queda pegado justo debajo del AppHeader (h-14 → top-14). `-mx-4 px-4`
+		  para que la línea inferior llegue de borde a borde.
 		-->
 		<div
 			class="sticky top-14 z-20 -mx-4 space-y-3 border-b border-border bg-background px-4 pb-2"
 		>
 			<!--
-			  Toggle Posiciones / Técnicas. Dos botones tipo "tab" en lugar del
-			  primitive Tabs de bits-ui — Tabs no está instalado en
-			  `lib/components/ui/` y el contrato (dos vistas exclusivas con
-			  switch visual) se cubre sobradamente con buttons + estilo
-			  condicional usando tokens semánticos. role="tablist" + role="tab"
-			  + aria-selected para que asistivos lo lean como tabs reales.
+			  Fila 1: toggle Grafo / Lista. Mismo patrón visual que el tablist
+			  anterior (buttons + role=tab + aria-selected + estilo condicional
+			  con tokens semánticos). `min-h-9` para que la fila tenga la misma
+			  altura aunque se cambie de vista y se evite micro-CLS.
 			-->
 			<div
 				role="tablist"
 				aria-label="Vista del mapa"
-				class="inline-flex rounded-md border border-border bg-muted p-0.5"
+				class="inline-flex min-h-9 rounded-md border border-border bg-muted p-0.5"
 			>
 				<button
 					type="button"
 					role="tab"
-					aria-selected={vistaActiva === 'posiciones'}
-					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
-					'posiciones'
-						? 'bg-background text-foreground shadow-sm'
-						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => (vistaActiva = 'posiciones')}
-				>
-					Posiciones
-				</button>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={vistaActiva === 'tecnicas'}
-					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
-					'tecnicas'
-						? 'bg-background text-foreground shadow-sm'
-						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => (vistaActiva = 'tecnicas')}
-				>
-					Técnicas
-				</button>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={vistaActiva === 'grafo'}
-					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
+					aria-selected={vistaPrincipal === 'grafo'}
+					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
 					'grafo'
 						? 'bg-background text-foreground shadow-sm'
 						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => (vistaActiva = 'grafo')}
+					onclick={() => (vistaPrincipal = 'grafo')}
 				>
 					Grafo
+				</button>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={vistaPrincipal === 'lista'}
+					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
+					'lista'
+						? 'bg-background text-foreground shadow-sm'
+						: 'text-muted-foreground hover:text-foreground'}"
+					onclick={() => (vistaPrincipal = 'lista')}
+				>
+					Lista
 				</button>
 			</div>
 
 			<!--
-			  El buscador no aplica a la vista grafo (no hay scroll por texto en
-			  un canvas). Filtros del grafo vendrán en T-4.it3.
+			  Fila 2: contenido contextual a la vista principal. `min-h-9` para
+			  alinear visualmente con la fila 1 y evitar saltos micro entre
+			  sub-vistas. El salto grande Lista ↔ Grafo se acepta (cambio de
+			  modo entero, incluido aparición/desaparición del buscador).
 			-->
-			{#if vistaActiva !== 'grafo'}
-				<div class="relative">
-					<SearchIcon
-						class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<Input
-						type="search"
-						placeholder={vistaActiva === 'tecnicas'
-							? 'Buscar por nombre o variante…'
-							: 'Buscar por nombre…'}
-						bind:value={query}
-						aria-label={vistaActiva === 'tecnicas' ? 'Buscar técnicas' : 'Buscar en el mapa'}
-						class="pl-8"
-					/>
-				</div>
-			{/if}
+			{#if vistaPrincipal === 'lista'}
+				<div class="min-h-9 space-y-3">
+					<!--
+					  Sub-toggle Posiciones / Técnicas. Mismo patrón visual que el
+					  toggle principal pero con 2 botones.
+					-->
+					<div
+						role="tablist"
+						aria-label="Sub-vista de lista"
+						class="inline-flex min-h-9 rounded-md border border-border bg-muted p-0.5"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={subVistaLista === 'posiciones'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {subVistaLista ===
+							'posiciones'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (subVistaLista = 'posiciones')}
+						>
+							Posiciones
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={subVistaLista === 'tecnicas'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {subVistaLista ===
+							'tecnicas'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (subVistaLista = 'tecnicas')}
+						>
+							Técnicas
+						</button>
+					</div>
 
-			{#if vistaActiva === 'tecnicas'}
-				<MultiChips
-					options={tipoOptions}
-					value={tiposSeleccionados}
-					onChange={(v) => (tiposSeleccionados = v)}
-					ariaLabel="Filtrar técnicas por tipo"
-				/>
-			{:else if vistaActiva === 'grafo'}
+					<!--
+					  Buscador: presente en Lista (tanto Posiciones como Técnicas).
+					  Oculto en Grafo (no hay scroll por texto en un canvas).
+					-->
+					<div class="relative">
+						<SearchIcon
+							class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+						/>
+						<Input
+							type="search"
+							placeholder={subVistaLista === 'tecnicas'
+								? 'Buscar por nombre o variante…'
+								: 'Buscar por nombre…'}
+							bind:value={query}
+							aria-label={subVistaLista === 'tecnicas'
+								? 'Buscar técnicas'
+								: 'Buscar en el mapa'}
+							class="pl-8"
+						/>
+					</div>
+
+					{#if subVistaLista === 'tecnicas'}
+						<MultiChips
+							options={tipoOptions}
+							value={tiposSeleccionados}
+							onChange={(v) => (tiposSeleccionados = v)}
+							ariaLabel="Filtrar técnicas por tipo"
+						/>
+					{/if}
+				</div>
+			{:else}
 				<!--
 				  Filtros del grafo (T-4.it3) en una sola fila con dropdowns
 				  compactos. Patrón vacío = todos pasan (igual que la vista
 				  Técnicas). El badge del contador aparece solo si hay
 				  selección activa en esa dimensión.
 				-->
-				<div class="flex flex-wrap gap-2">
+				<div class="flex min-h-9 flex-wrap gap-2">
 					<FilterDropdown
 						label="Tipo"
 						options={tipoOptions}
@@ -427,7 +464,7 @@
 			{/if}
 		</div>
 
-		{#if vistaActiva === 'grafo'}
+		{#if vistaPrincipal === 'grafo'}
 			<!--
 			  Vista grafo (T-3.it3). `-mx-4` para sangrar el padding lateral del
 			  main y aprovechar el ancho de viewport. Altura `h-[70vh]`
@@ -444,7 +481,7 @@
 					categorias={categoriasGrafo}
 				/>
 			</div>
-		{:else if vistaActiva === 'posiciones'}
+		{:else if subVistaLista === 'posiciones'}
 			{#if filtroSinResultados}
 				<p
 					class="rounded border border-dashed border-border p-8 text-center text-muted-foreground"
