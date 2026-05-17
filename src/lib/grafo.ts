@@ -15,6 +15,13 @@ export interface GrafoNode {
 		kind: 'posicion' | 'sumision';
 		categoria?: CategoriaPosicion;
 		tipoRol?: TipoRolPosicion;
+		/**
+		 * Grado del nodo (in+out): número de aristas-técnicas que entran o
+		 * salen del nodo. Lo usa Cytoscape vía `mapData(degree, …)` para
+		 * dimensionar el círculo (más técnicas → más grande). Nodos
+		 * huérfanos tienen `degree = 0` y se renderizan al tamaño mínimo.
+		 */
+		degree?: number;
 	};
 }
 
@@ -69,7 +76,8 @@ export function buildGrafoElements(
 					label: p.nombre,
 					kind: 'posicion',
 					categoria: p.categoria,
-					tipoRol: p.tipo
+					tipoRol: p.tipo,
+					degree: 0
 				}
 			})
 		),
@@ -78,7 +86,8 @@ export function buildGrafoElements(
 				data: {
 					id: nodeIdSumision(s.id),
 					label: s.nombre,
-					kind: 'sumision'
+					kind: 'sumision',
+					degree: 0
 				}
 			})
 		)
@@ -110,6 +119,20 @@ export function buildGrafoElements(
 				variante: t.variante
 			}
 		});
+	}
+
+	// Calcular el degree de cada nodo (in+out). Lo hacemos sobre el array
+	// de aristas YA filtrado (técnicas con endpoints válidos) para que el
+	// degree refleje las aristas que realmente se dibujarán en el grafo.
+	// Self-loops (origen === destino) cuentan como 2, igual que el degree
+	// de Cytoscape (in:1, out:1).
+	const nodeById = new Map<string, GrafoNode>();
+	for (const n of nodes) nodeById.set(n.data.id, n);
+	for (const e of edges) {
+		const src = nodeById.get(e.data.source);
+		const tgt = nodeById.get(e.data.target);
+		if (src) src.data.degree = (src.data.degree ?? 0) + 1;
+		if (tgt) tgt.data.degree = (tgt.data.degree ?? 0) + 1;
 	}
 
 	return { nodes, edges };

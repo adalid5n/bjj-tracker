@@ -136,4 +136,57 @@ describe('buildGrafoElements', () => {
 		expect(nodes).toHaveLength(2);
 		expect(edges).toEqual([]);
 	});
+
+	describe('degree (T-8.c)', () => {
+		it('asigna degree = 0 a nodos huérfanos', () => {
+			const { nodes } = buildGrafoElements([pos('p1')], [sum('s1')], []);
+			expect(nodes.find((n) => n.data.id === 'pos:p1')?.data.degree).toBe(0);
+			expect(nodes.find((n) => n.data.id === 'sum:s1')?.data.degree).toBe(0);
+		});
+
+		it('asigna degree = 1 al nodo destino de una sola arista entrante', () => {
+			const { nodes } = buildGrafoElements(
+				[pos('p1'), pos('p2')],
+				[],
+				[tec('t1', { posicion_origen_id: 'p1', posicion_destino_id: 'p2' })]
+			);
+			// p1 tiene 1 saliente, p2 tiene 1 entrante: ambos degree=1.
+			expect(nodes.find((n) => n.data.id === 'pos:p1')?.data.degree).toBe(1);
+			expect(nodes.find((n) => n.data.id === 'pos:p2')?.data.degree).toBe(1);
+		});
+
+		it('cuenta entrantes + salientes para nodos con varias aristas', () => {
+			// p1: 3 salientes (a p2, p3, s1) + 1 entrante (desde p2) = degree 4.
+			// p2: 1 entrante (desde p1) + 1 saliente (a p1) = degree 2.
+			// p3: 1 entrante (desde p1) = degree 1.
+			// s1: 1 entrante (desde p1) = degree 1.
+			const { nodes } = buildGrafoElements(
+				[pos('p1'), pos('p2'), pos('p3')],
+				[sum('s1')],
+				[
+					tec('t1', { posicion_origen_id: 'p1', posicion_destino_id: 'p2' }),
+					tec('t2', { posicion_origen_id: 'p1', posicion_destino_id: 'p3' }),
+					tec('t3', {
+						posicion_origen_id: 'p1',
+						sumision_destino_id: 's1',
+						tipo: 'sumision'
+					}),
+					tec('t4', { posicion_origen_id: 'p2', posicion_destino_id: 'p1' })
+				]
+			);
+			expect(nodes.find((n) => n.data.id === 'pos:p1')?.data.degree).toBe(4);
+			expect(nodes.find((n) => n.data.id === 'pos:p2')?.data.degree).toBe(2);
+			expect(nodes.find((n) => n.data.id === 'pos:p3')?.data.degree).toBe(1);
+			expect(nodes.find((n) => n.data.id === 'sum:s1')?.data.degree).toBe(1);
+		});
+
+		it('no cuenta técnicas descartadas (origen o destino inexistentes) en el degree', () => {
+			const { nodes } = buildGrafoElements(
+				[pos('p1')],
+				[],
+				[tec('t1', { posicion_origen_id: 'p1', posicion_destino_id: 'pX' })]
+			);
+			expect(nodes.find((n) => n.data.id === 'pos:p1')?.data.degree).toBe(0);
+		});
+	});
 });

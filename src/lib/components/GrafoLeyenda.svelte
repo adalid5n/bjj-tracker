@@ -12,14 +12,15 @@
 	import { Popover } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button';
 
-	type ColorRow = { color: string; label: string; tipo: 'solid' | 'dashed' | 'dotted' };
+	type LineRow = { label: string; tipo: 'solid' | 'dashed' };
 
-	const tecnicas: ColorRow[] = [
-		{ color: 'bg-primary', label: 'Ataque', tipo: 'solid' },
-		{ color: 'bg-success', label: 'Sweep', tipo: 'solid' },
-		{ color: 'bg-warning', label: 'Escape', tipo: 'solid' },
-		{ color: 'bg-muted-foreground', label: 'Transición', tipo: 'dashed' },
-		{ color: 'bg-destructive', label: 'Sumisión', tipo: 'solid' }
+	// Paleta monocromática: todas las flechas en muted-foreground. Solo
+	// transicion se distingue (dashed) porque no es un movimiento real
+	// sino un cambio de posición. El tipo concreto (ataque/sweep/
+	// escape/sumision) se ve al clicar la arista y abrir el modal.
+	const tecnicas: LineRow[] = [
+		{ label: 'Acción (ataque, sweep, escape, sumisión)', tipo: 'solid' },
+		{ label: 'Transición', tipo: 'dashed' }
 	];
 </script>
 
@@ -51,13 +52,17 @@
 					<ul class="space-y-1.5">
 						{#each tecnicas as row (row.label)}
 							<li class="flex items-center gap-2">
-								<span
-									class="inline-block h-0.5 w-8 shrink-0 rounded {row.color}"
-									class:border-t-2={row.tipo !== 'solid'}
-									class:border-dashed={row.tipo === 'dashed'}
-									class:border-dotted={row.tipo === 'dotted'}
-									aria-hidden="true"
-								></span>
+								{#if row.tipo === 'solid'}
+									<span
+										class="inline-block h-0.5 w-8 shrink-0 rounded bg-muted-foreground"
+										aria-hidden="true"
+									></span>
+								{:else}
+									<span
+										class="inline-block h-0 w-8 shrink-0 border-t-2 border-dashed border-muted-foreground"
+										aria-hidden="true"
+									></span>
+								{/if}
 								<span>{row.label}</span>
 							</li>
 						{/each}
@@ -91,19 +96,22 @@
 					<ul class="space-y-1.5">
 						<li class="flex items-center gap-2">
 							<span
-								class="inline-block size-4 shrink-0 rounded border border-border bg-muted"
+								class="inline-block size-4 shrink-0 rounded-full border-2 border-muted-foreground bg-muted"
 								aria-hidden="true"
 							></span>
-							<span>Posición (borde: verde = ofensiva, rojo = defensiva)</span>
+							<span>Posición</span>
 						</li>
 						<li class="flex items-center gap-2">
 							<span
-								class="inline-block size-4 shrink-0 rotate-45 rounded-sm border-2 border-destructive bg-muted"
+								class="inline-block size-4 shrink-0 rounded-full border-2 border-foreground bg-foreground"
 								aria-hidden="true"
 							></span>
-							<span>Sumisión (nodo terminal)</span>
+							<span>Sumisión</span>
 						</li>
 					</ul>
+					<p class="mt-2 text-xs text-muted-foreground">
+						Tamaño = nº de técnicas que entran o salen del nodo.
+					</p>
 				</div>
 			</div>
 		</Popover.Content>

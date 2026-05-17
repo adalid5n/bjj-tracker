@@ -75,6 +75,10 @@
 	 */
 	function readTokens() {
 		const probe = document.createElement('div');
+		// Forzar esquema dark independientemente del tema del sistema
+		// — el canvas del grafo está envuelto en `.dark` y los nodos /
+		// flechas / labels se leen mejor sobre fondo oscuro.
+		probe.classList.add('dark');
 		probe.style.position = 'absolute';
 		probe.style.left = '-9999px';
 		probe.style.top = '-9999px';
@@ -119,69 +123,90 @@
 	}
 
 	/**
-	 * Construye el stylesheet de Cytoscape a partir de los tokens. Mapeo:
-	 *  - ataque/sweep/escape/transicion/sumision a los mismos colores que
-	 *    el badge de tipo en la vista Técnicas (primary/success/warning/
-	 *    muted-foreground/destructive), manteniendo el lenguaje visual.
-	 *  - Transición = línea punteada (única distinción por estilo de línea).
-	 *  - Estado funciona = línea más gruesa y opaca; probando = grosor
-	 *    medio y opacidad media; descartada = fina y apenas visible.
-	 *  - Sumisión = nodo en forma de diamante con fondo --destructive.
-	 *  - Posición ofensiva/defensiva/neutral = mismo fondo --muted con
-	 *    borde de color (success/destructive/border) — diferenciación
-	 *    legible sin saturar.
+	 * Construye el stylesheet de Cytoscape a partir de los tokens.
+	 * Paleta monocromática (decisión sobria): todas las posiciones se
+	 * ven igual y la sumisión es el único nodo que se distingue por
+	 * color. La diferenciación de rol (ofensiva/defensiva/neutral) se
+	 * ve solo al clicar el nodo y abrir el modal.
+	 *
+	 *   - posición (cualquier rol) → fondo muted + borde muted-fg
+	 *   - sumisión                → fondo foreground (oscuro) macizo
+	 *
+	 * Label fuera del círculo (`text-valign: bottom`) para que círculos
+	 * pequeños no sufran texto desbordado.
+	 *
+	 * Tamaño dinámico vía `mapData(degree, 0, 8, 28, 64)`: huérfanos al
+	 * mínimo (28 px) y nodos muy conectados hasta 64 px. `mapData`
+	 * clampa fuera de rango por defecto. K = 8 elegido por catálogo
+	 * BJJ típico.
+	 *
+	 * Aristas mantienen el mapeo previo (ataque/sweep/escape/transición/
+	 * sumision a primary/success/warning/muted-foreground/destructive).
 	 */
 	function buildStylesheet(t: ReturnType<typeof readTokens>): StylesheetJson {
 		return [
-			// Posición base
+			// Base común para todos los nodos: forma, tamaño, label, borde
+			// con grosor visible. El color de fondo y borde lo fijan los
+			// selectores específicos de abajo.
+			{
+				selector: 'node',
+				style: {
+					shape: 'ellipse',
+					label: 'data(label)',
+					'border-width': 2,
+					// Label fuera del círculo (debajo). Permite círculos
+					// pequeños sin que el texto sobresalga del relleno.
+					'text-valign': 'bottom',
+					'text-halign': 'center',
+					'text-margin-y': 4,
+					'text-wrap': 'wrap',
+					'text-max-width': '80px',
+					color: t.foreground,
+					'font-size': 10,
+					'font-weight': 600,
+					// Fondo del label tipo "pill": tono `--muted` (gris
+					// ligeramente más claro que el canvas en el esquema
+					// dark forzado), esquinas redondeadas, padding
+					// generoso para que respire. Oculta cualquier arista
+					// que pase justo por debajo sin chocar con la paleta.
+					'text-background-color': t.muted,
+					'text-background-opacity': 1,
+					'text-background-padding': 3,
+					'text-background-shape': 'round-rectangle',
+					width: 'mapData(degree, 0, 8, 28, 64)',
+					height: 'mapData(degree, 0, 8, 28, 64)'
+				}
+			},
+			// Todas las posiciones (ofensiva/defensiva/neutral) comparten
+			// el mismo aspecto: gris claro con borde sutil. La diferencia
+			// entre roles ya no se ve en el grafo — se ve al clicar el
+			// nodo y abrir el modal (chips TIPO_ROL_BADGE). Decisión
+			// sobria: menos colores, jerarquía solo por tamaño/conexión.
 			{
 				selector: 'node[kind = "posicion"]',
 				style: {
-					shape: 'round-rectangle',
-					label: 'data(label)',
 					'background-color': t.muted,
-					'border-color': t.border,
-					'border-width': 1,
-					'text-valign': 'center',
-					'text-halign': 'center',
-					'text-wrap': 'wrap',
-					'text-max-width': '76px',
-					color: t.foreground,
-					'font-size': 11,
-					width: 90,
-					height: 64
+					'background-opacity': 1,
+					'border-color': t.mutedForeground
 				}
 			},
-			{
-				selector: 'node[kind = "posicion"][tipoRol = "ofensiva"]',
-				style: { 'border-color': t.success, 'border-width': 3 }
-			},
-			{
-				selector: 'node[kind = "posicion"][tipoRol = "defensiva"]',
-				style: { 'border-color': t.destructive, 'border-width': 3 }
-			},
-			// Sumisión: diamante (nodo terminal). Mismo patrón visual
-			// que posición defensiva (relleno gris + borde rojo grueso),
-			// solo cambia la forma — para no saturar con un rojo macizo.
+			// Sumisión → relleno oscuro (foreground) macizo. Único nodo
+			// que se distingue por color, marca de "terminal".
 			{
 				selector: 'node[kind = "sumision"]',
 				style: {
-					shape: 'diamond',
-					label: 'data(label)',
-					'background-color': t.muted,
-					'border-color': t.destructive,
-					'border-width': 3,
-					'text-valign': 'center',
-					'text-halign': 'center',
-					'text-wrap': 'wrap',
-					'text-max-width': '60px',
-					color: t.foreground,
-					'font-size': 11,
-					width: 96,
-					height: 96
+					'background-color': t.foreground,
+					'background-opacity': 1,
+					'border-color': t.foreground
 				}
 			},
-			// Aristas: defaults
+			// Aristas: todas en muted-foreground (mismo gris que el borde
+			// de las posiciones — entona con la paleta monocromática). La
+			// diferenciación por tipo (ataque/sweep/escape/sumision) ya no
+			// se ve en el grafo; queda solo en el modal de la técnica al
+			// hacer click sobre la arista. Único matiz de tipo aquí:
+			// `transicion` va dashed (no es un movimiento "real", solo
+			// cambio de posición — dashed comunica eso sin color extra).
 			{
 				selector: 'edge',
 				style: {
@@ -193,32 +218,11 @@
 					'arrow-scale': 1.1
 				}
 			},
-			// Color por tipo
-			{
-				selector: 'edge[tipo = "ataque"]',
-				style: { 'line-color': t.primary, 'target-arrow-color': t.primary }
-			},
-			{
-				selector: 'edge[tipo = "sweep"]',
-				style: { 'line-color': t.success, 'target-arrow-color': t.success }
-			},
-			{
-				selector: 'edge[tipo = "escape"]',
-				style: { 'line-color': t.warning, 'target-arrow-color': t.warning }
-			},
 			{
 				selector: 'edge[tipo = "transicion"]',
-				style: {
-					'line-color': t.mutedForeground,
-					'target-arrow-color': t.mutedForeground,
-					'line-style': 'dashed'
-				}
+				style: { 'line-style': 'dashed' }
 			},
-			{
-				selector: 'edge[tipo = "sumision"]',
-				style: { 'line-color': t.destructive, 'target-arrow-color': t.destructive }
-			},
-			// Estado: funciona y probando se ven igual (sólida color tipo).
+			// Estado: funciona y probando se ven igual (sólida estándar).
 			// Solo descartada se distingue (línea punteada y desvanecida).
 			// La distinción fina probando vs funciona vive en el modal.
 			{ selector: 'edge[estado = "funciona"]', style: { width: 2.5, opacity: 1 } },
@@ -502,7 +506,14 @@
 	});
 </script>
 
-<div class="relative h-full w-full">
+<!--
+  `dark` fuerza que el canvas del grafo use el esquema oscuro
+  independientemente del tema del sistema (decisión: el grafo se ve
+  mejor sobre fondo oscuro, los nodos y flechas se leen con más
+  presencia). Tokens leídos en `readTokens` también resuelven a los
+  valores de `.dark` porque el probe se inserta con esa misma clase.
+-->
+<div class="dark relative h-full w-full overflow-hidden rounded-xl border border-border bg-card">
 	{#if loading}
 		<div class="absolute inset-0 flex items-center justify-center text-muted-foreground">
 			Cargando grafo…
