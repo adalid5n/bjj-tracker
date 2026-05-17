@@ -22,7 +22,7 @@
 	import type { GrafoEdge, GrafoNode } from '$lib/grafo';
 	import { theme } from '$lib/theme.svelte';
 	import GrafoLeyenda from '$lib/components/GrafoLeyenda.svelte';
-	import { mapaModalStack } from '$lib/components/mapa-modal-stack.svelte';
+	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
 	import { Button } from '$lib/components/ui/button';
 
 	type Props = {
@@ -33,6 +33,12 @@
 		tipos?: string[];
 		estados?: string[];
 		categorias?: string[];
+		// Callback opcional para abrir el modal de un nodo/arista al hacer
+		// tap. Cuando el padre lo proporciona, el grafo delega en él en
+		// lugar de tocar `mapaModalStack` directamente; así el padre puede
+		// interceptar para preguntar "¿Descartar?" si el wizard actual está
+		// dirty antes de cambiar de entidad.
+		onAttemptPush?: (entry: MapaModalEntry) => void;
 	};
 
 	let {
@@ -40,7 +46,8 @@
 		edges = [],
 		tipos = [],
 		estados = [],
-		categorias = []
+		categorias = [],
+		onAttemptPush
 	}: Props = $props();
 
 	let container: HTMLDivElement;
@@ -445,8 +452,13 @@
 					const kind = node.data('kind') as 'posicion' | 'sumision';
 					const realId = (node.id() as string).slice(4);
 					const nombre = node.data('label') as string;
-					mapaModalStack.closeAll();
-					mapaModalStack.push({ kind, id: realId, nombre });
+					const entry: MapaModalEntry = { kind, id: realId, nombre };
+					if (onAttemptPush) {
+						onAttemptPush(entry);
+					} else {
+						mapaModalStack.closeAll();
+						mapaModalStack.push(entry);
+					}
 				});
 
 				// Click en arista: pushea la técnica. El id de la arista
@@ -455,8 +467,13 @@
 					const edge = event.target;
 					const id = edge.id() as string;
 					const nombre = edge.data('nombre') as string;
-					mapaModalStack.closeAll();
-					mapaModalStack.push({ kind: 'tecnica', id, nombre });
+					const entry: MapaModalEntry = { kind: 'tecnica', id, nombre };
+					if (onAttemptPush) {
+						onAttemptPush(entry);
+					} else {
+						mapaModalStack.closeAll();
+						mapaModalStack.push(entry);
+					}
 				});
 				cy = instance;
 				// Disparar el layout real ahora que el handler de

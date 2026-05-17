@@ -27,10 +27,12 @@
 	 * El wizard registra/desregistra el dirty handler en `mapaModalStack`.
 	 */
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Sheet from '$lib/components/ui/sheet';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import XIcon from '@lucide/svelte/icons/x';
 	import type { Posicion, SumisionTerminal, Tecnica } from '$lib/types';
 	import { mapaModalStack, tecnicaWizardDraft, posicionWizardDraft } from './mapa-modal-stack.svelte';
 	import PosicionModalContent from './PosicionModalContent.svelte';
@@ -40,10 +42,22 @@
 	import SumisionWizard from './SumisionWizard.svelte';
 	import TecnicaWizard from './TecnicaWizard.svelte';
 
-	// Opcional: callback que el host (página) puede pasar para refrescar
-	// listas tras un cambio en el catálogo (crear/editar/borrar posición).
-	// Hoy lo usa `/mapa` para recargar la lista de posiciones.
-	let { onCatalogChanged }: { onCatalogChanged?: () => void } = $props();
+	// T-8.b: el host es agnóstico del contenedor visual; el padre decide
+	// cómo presentar el modal en función del contexto:
+	//   - 'dialog'       → Dialog centrado tradicional (default, vista Lista).
+	//   - 'sheet-side'   → Sheet/drawer lateral derecho (vista Grafo desktop).
+	//   - 'sheet-bottom' → Sheet/drawer inferior ~50vh (vista Grafo móvil).
+	// El contenido interior (header sticky, breadcrumb, body, dirty handler)
+	// es idéntico en los tres casos: se renderiza vía el snippet
+	// `modalContent` con un wrapper distinto. La lógica de stack, dirty
+	// handler y AlertDialog se mantiene intacta — es ortogonal al contenedor.
+	let {
+		onCatalogChanged,
+		presentation = 'dialog'
+	}: {
+		onCatalogChanged?: () => void;
+		presentation?: 'dialog' | 'sheet-side' | 'sheet-bottom';
+	} = $props();
 
 	// Cache de detalles cargados bajo demanda (id → entidad).
 	// Una entrada por kind, los tres se rellenan a medida que se navega.
@@ -58,6 +72,11 @@
 	// dispara: cerrar todo (closeAll) o pop una entrada.
 	let mostrarConfirmDescartar = $state(false);
 	let accionPendiente = $state<'closeAll' | 'pop' | null>(null);
+	// Callback opcional asociado a una pendiente de tipo 'closeAll'. Se
+	// invoca cuando el cierre ocurre de verdad — inmediato si no había
+	// dirty, o después de "Descartar" si lo había. Si el usuario cancela
+	// el AlertDialog, el callback se descarta sin ejecutar.
+	let pendingCloseAllCallback: (() => void) | null = null;
 
 	const stack = $derived(mapaModalStack.stack);
 	const top = $derived(mapaModalStack.top);
@@ -188,6 +207,7 @@
 		// dispara quien corresponda (handleAttemptClose / handleBack / etc.).
 		if (!value) {
 			accionPendiente = null;
+			pendingCloseAllCallback = null;
 			mostrarConfirmDescartar = false;
 		}
 	}
@@ -214,6 +234,27 @@
 		mapaModalStack.pop();
 	}
 
+	// Llamable desde el padre (vía `bind:this`) cuando algo externo al
+	// host quiere cerrar todo el stack — p. ej. cambiar de vista, clicar
+	// otro nodo del grafo, botón X propio.
+	// `onClose` se invoca solo si el cierre ocurre de verdad: inmediato
+	// si no había dirty, o tras "Descartar" en el AlertDialog si lo había.
+	// Si el usuario cancela el AlertDialog, `onClose` se descarta.
+	export function attemptCloseAll(onClose?: () => void) {
+		if (!mapaModalStack.isOpen) {
+			onClose?.();
+			return;
+		}
+		if (mapaModalStack.isDirty()) {
+			pendingCloseAllCallback = onClose ?? null;
+			accionPendiente = 'closeAll';
+			mostrarConfirmDescartar = true;
+		} else {
+			mapaModalStack.closeAll();
+			onClose?.();
+		}
+	}
+
 	function handleConfirmDescartar() {
 		// El usuario confirma descartar: cerramos el AlertDialog explícitamente
 		// antes de tocar el stack. Si dejamos que bits-ui lo cierre vía el
@@ -221,11 +262,14 @@
 		// el Dialog principal se desmonta a la par y el AlertDialog se queda
 		// colgado sin propagar su `onOpenChange(false)`.
 		const accion = accionPendiente;
+		const cb = pendingCloseAllCallback;
 		accionPendiente = null;
+		pendingCloseAllCallback = null;
 		mostrarConfirmDescartar = false;
 		mapaModalStack.setDirtyHandler(null);
 		if (accion === 'closeAll') {
 			mapaModalStack.closeAll();
+			cb?.();
 		} else if (accion === 'pop') {
 			mapaModalStack.pop();
 		}
@@ -300,15 +344,16 @@
 	);
 </script>
 
-<Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
-	<Dialog.Content
-		class="flex max-h-[90vh] flex-col sm:max-w-md"
-		onOpenAutoFocus={(e) => e.preventDefault()}
-		onEscapeKeydown={handleAttemptClose}
-		onInteractOutside={handleAttemptClose}
-	>
-		{#if top}
-			<Dialog.Header>
+<!--
+  Snippet con el contenido interior común a los tres wrappers (Dialog,
+  Sheet-side, Sheet-bottom). Se renderiza una sola vez aquí y se invoca
+  desde cada rama de `{#if presentation === ...}` para evitar duplicar el
+  árbol. El header, breadcrumb, body scrollable y los handlers del wizard
+  son agnósticos del wrapper exterior.
+-->
+{#snippet modalContent()}
+	{#if top}
+		<Dialog.Header>
 				<!--
 				  Breadcrumb (T-1.it2 fix): solo muestra nodos de lectura
 				  (posicion/tecnica/sumision), los wizards de creación/edición
@@ -340,18 +385,35 @@
 					</nav>
 				{/if}
 
-				<div class="flex items-center gap-2">
-					{#if stack.length > 1}
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							onclick={handleBack}
-							aria-label="Volver al modal anterior"
-						>
-							<ArrowLeftIcon />
-						</Button>
-					{/if}
-					<Dialog.Title>{topTitle}</Dialog.Title>
+				<div class="flex items-center justify-between gap-2">
+					<div class="flex items-center gap-2">
+						{#if stack.length > 1}
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								onclick={handleBack}
+								aria-label="Volver al modal anterior"
+							>
+								<ArrowLeftIcon />
+							</Button>
+						{/if}
+						<Dialog.Title>{topTitle}</Dialog.Title>
+					</div>
+					<!--
+					  X propio (en lugar del que trae shadcn por defecto via
+					  `showCloseButton`). Pasa por `attemptCloseAll`, que
+					  respeta el dirty handler — sin esto, el botón nativo
+					  de bits-ui dispara el cierre antes de que podamos
+					  interceptarlo con AlertDialog.
+					-->
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						onclick={() => attemptCloseAll()}
+						aria-label="Cerrar"
+					>
+						<XIcon />
+					</Button>
 				</div>
 			</Dialog.Header>
 
@@ -460,8 +522,68 @@
 				</div>
 			{/if}
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+{/snippet}
+
+<!--
+  Wrapper externo elegido por el padre vía `presentation`. Las tres ramas
+  comparten:
+    - mismo `open` y `onOpenChange` (gobiernan el stack).
+    - mismos handlers `onEscapeKeydown` y `onInteractOutside` que
+      interceptan el cierre si hay dirty (handleAttemptClose).
+    - `onOpenAutoFocus={(e) => e.preventDefault()}` para no robar foco al
+      abrir.
+  Tanto Dialog como Sheet (shadcn-svelte) son wrappers de bits-ui Dialog
+  por dentro, así que los tres aceptan la misma API de eventos.
+
+  Tamaños:
+    - dialog       → centrado, `sm:max-w-md`, alto `max-h-[90vh]` (como hoy).
+    - sheet-side   → drawer lateral derecho, ancho `w-full sm:max-w-md`.
+      El sheet-content base limita a `data-[side=right]:sm:max-w-sm`, lo
+      sobreescribimos a `sm:max-w-md` para igualar al Dialog y dar más
+      espacio a los wizards.
+    - sheet-bottom → drawer inferior `h-[50vh]` (decisión de producto).
+-->
+{#if presentation === 'dialog'}
+	<Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
+		<Dialog.Content
+			class="flex max-h-[90vh] flex-col sm:max-w-md"
+			showCloseButton={false}
+			onOpenAutoFocus={(e) => e.preventDefault()}
+			onEscapeKeydown={handleAttemptClose}
+			onInteractOutside={handleAttemptClose}
+		>
+			{@render modalContent()}
+		</Dialog.Content>
+	</Dialog.Root>
+{:else if presentation === 'sheet-side'}
+	<Sheet.Root open={isOpen} onOpenChange={handleOpenChange}>
+		<Sheet.Content
+			side="right"
+			class="top-14! bottom-14! h-auto! flex w-full flex-col p-4 sm:max-w-md"
+			showCloseButton={false}
+			interactOutsideBehavior="ignore"
+			preventScroll={false}
+			onOpenAutoFocus={(e) => e.preventDefault()}
+			onEscapeKeydown={handleAttemptClose}
+		>
+			{@render modalContent()}
+		</Sheet.Content>
+	</Sheet.Root>
+{:else}
+	<Sheet.Root open={isOpen} onOpenChange={handleOpenChange}>
+		<Sheet.Content
+			side="bottom"
+			class="bottom-14! h-[50dvh]! flex flex-col p-4"
+			showCloseButton={false}
+			interactOutsideBehavior="ignore"
+			preventScroll={false}
+			onOpenAutoFocus={(e) => e.preventDefault()}
+			onEscapeKeydown={handleAttemptClose}
+		>
+			{@render modalContent()}
+		</Sheet.Content>
+	</Sheet.Root>
+{/if}
 
 <!--
   Confirm de descartar cambios (cambio E). El AlertDialog vive a nivel del

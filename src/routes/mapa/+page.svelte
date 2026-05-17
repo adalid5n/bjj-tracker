@@ -7,8 +7,9 @@
 	import GrafoMapa from '$lib/components/GrafoMapa.svelte';
 	import MapaModalHost from '$lib/components/MapaModalHost.svelte';
 	import MultiChips from '$lib/components/MultiChips.svelte';
-	import { mapaModalStack } from '$lib/components/mapa-modal-stack.svelte';
+	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
 	import { buildGrafoElements } from '$lib/grafo';
+	import { useMediaQuery } from '$lib/hooks/use-media.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
@@ -118,6 +119,36 @@
 	let tiposGrafo = $state<string[]>([]);
 	let estadosGrafo = $state<string[]>([]);
 	let categoriasGrafo = $state<string[]>([]);
+
+	// T-8.b: detección reactiva de breakpoint para decidir cómo presentar
+	// el modal del mapa. `md` es 768px en Tailwind, mismo valor que usa el
+	// resto de utilities responsive del proyecto. La instancia se crea una
+	// vez por mount de la página; se registra un listener `matchMedia` que
+	// dispara reactivamente cuando el usuario redimensiona la ventana o
+	// rota el dispositivo.
+	const desktopQuery = useMediaQuery('(min-width: 768px)');
+
+	// Mapeo a la prop `presentation` del host:
+	//   - Vista Lista → Dialog centrado (el grafo no está visible, no hay
+	//     nada que dejar a la vista detrás del modal).
+	//   - Vista Grafo desktop → drawer lateral derecho (el grafo permanece
+	//     visible a la izquierda).
+	//   - Vista Grafo móvil → drawer inferior ~50vh (el grafo permanece
+	//     visible arriba).
+	let presentation = $derived<'dialog' | 'sheet-side' | 'sheet-bottom'>(
+		vistaPrincipal === 'lista'
+			? 'dialog'
+			: desktopQuery.matches
+				? 'sheet-side'
+				: 'sheet-bottom'
+	);
+
+	// Bind al host del modal para poder pedirle un cierre que respete el
+	// dirty handler (si hay wizard sucio, abre AlertDialog en vez de
+	// descartar a saco).
+	let modalHost = $state<
+		{ attemptCloseAll: (onClose?: () => void) => void } | undefined
+	>(undefined);
 
 	onMount(() => {
 		void refresh();
@@ -254,35 +285,53 @@
 	// recalculan solo cuando cambia el catálogo, no en cada render.
 	const grafoElements = $derived(buildGrafoElements(posiciones, sumisiones, tecnicas));
 
-	// Push de nodo al stack de modales. Cierra automáticamente cualquier
-	// stack residual de una navegación anterior antes de empezar uno nuevo.
+	// Helper: cierra el modal actual respetando el dirty handler, y solo
+	// cuando el cierre se confirma (inmediato si limpio, tras "Descartar"
+	// si dirty), pushea la nueva entrada. Reemplaza el viejo patrón
+	// `mapaModalStack.closeAll(); mapaModalStack.push(...)` para que no
+	// se pierdan cambios accidentalmente al saltar entre entidades.
+	function attemptPushModal(entry: MapaModalEntry) {
+		if (modalHost) {
+			modalHost.attemptCloseAll(() => mapaModalStack.push(entry));
+		} else {
+			// Fallback defensivo: si el host aún no está bind'd, hacemos
+			// el viejo flujo. No debería pasar en uso normal.
+			mapaModalStack.closeAll();
+			mapaModalStack.push(entry);
+		}
+	}
+
 	function openPosicion(p: Posicion) {
-		mapaModalStack.closeAll();
-		mapaModalStack.push({ kind: 'posicion', id: p.id, nombre: p.nombre });
+		attemptPushModal({ kind: 'posicion', id: p.id, nombre: p.nombre });
 	}
 
 	function openSumision(s: SumisionTerminal) {
-		mapaModalStack.closeAll();
-		mapaModalStack.push({ kind: 'sumision', id: s.id, nombre: s.nombre });
+		attemptPushModal({ kind: 'sumision', id: s.id, nombre: s.nombre });
 	}
 
 	function openTecnica(t: Tecnica) {
-		mapaModalStack.closeAll();
-		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+		attemptPushModal({ kind: 'tecnica', id: t.id, nombre: t.nombre });
 	}
 
-	// Abre el wizard de creación de posición. El host renderiza el wizard
-	// como contenido del Dialog cuando el top del stack es `wizard-posicion`.
 	function openWizardCrearPosicion() {
-		mapaModalStack.closeAll();
-		mapaModalStack.push({ kind: 'wizard-posicion', modo: 'crear', nombre: 'Nueva posición' });
+		attemptPushModal({ kind: 'wizard-posicion', modo: 'crear', nombre: 'Nueva posición' });
 	}
 
-	// Análogo para sumisión terminal (T-9). El host renderiza el
-	// SumisionWizard cuando el top del stack es `wizard-sumision`.
 	function openWizardCrearSumision() {
-		mapaModalStack.closeAll();
-		mapaModalStack.push({ kind: 'wizard-sumision', modo: 'crear', nombre: 'Nueva sumisión' });
+		attemptPushModal({ kind: 'wizard-sumision', modo: 'crear', nombre: 'Nueva sumisión' });
+	}
+
+	// Cambio de vista (Grafo / Lista) desde el toggle del sub-header.
+	// Si hay modal abierto con cambios sin guardar, el AlertDialog
+	// "¿Descartar?" del host se interpone; el cambio de vista solo
+	// ocurre tras confirmar el descarte.
+	function requestVistaChange(target: 'grafo' | 'lista') {
+		if (target === vistaPrincipal) return;
+		if (modalHost) {
+			modalHost.attemptCloseAll(() => (vistaPrincipal = target));
+		} else {
+			vistaPrincipal = target;
+		}
 	}
 </script>
 
@@ -340,7 +389,7 @@
 					'grafo'
 						? 'bg-background text-foreground shadow-sm'
 						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => (vistaPrincipal = 'grafo')}
+					onclick={() => requestVistaChange('grafo')}
 				>
 					Grafo
 				</button>
@@ -352,7 +401,7 @@
 					'lista'
 						? 'bg-background text-foreground shadow-sm'
 						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => (vistaPrincipal = 'lista')}
+					onclick={() => requestVistaChange('lista')}
 				>
 					Lista
 				</button>
@@ -479,6 +528,7 @@
 					tipos={tiposGrafo}
 					estados={estadosGrafo}
 					categorias={categoriasGrafo}
+					onAttemptPush={attemptPushModal}
 				/>
 			</div>
 		{:else if subVistaLista === 'posiciones'}
@@ -634,4 +684,4 @@
 	</DropdownMenu.Root>
 {/if}
 
-<MapaModalHost onCatalogChanged={refresh} />
+<MapaModalHost bind:this={modalHost} onCatalogChanged={refresh} {presentation} />

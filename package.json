@@ -22,7 +22,7 @@
 		"@eslint/js": "latest",
 		"@fontsource-variable/inter": "^5.2.8",
 		"@internationalized/date": "^3.12.1",
-		"@lucide/svelte": "^1.14.0",
+		"@lucide/svelte": "^1.16.0",
 		"@playwright/test": "latest",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.59.1",
