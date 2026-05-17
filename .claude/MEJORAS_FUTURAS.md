@@ -166,6 +166,69 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
   nada, se reabre.
 - **Cuándo:** tras 2-3 semanas de uso real con C2 activo. Sin urgencia.
 
+### Reducir fricción al crear técnica tipo sumisión (nombre redundante)
+
+- **Origen:** sesión T-6.it3 (2026-05-17), feedback del owner tras
+  crear "Kimura desde guardia cerrada" como técnica vinculada al
+  nodo terminal sumisión "Kimura".
+- **Síntoma:** flujo redundante visualmente — el usuario crea la
+  sumisión "Kimura" como nodo terminal y luego una técnica también
+  llamada "Kimura" para vincular origen→sumisión. El nombre se
+  duplica en cabecera de modal de técnica + breadcrumb +
+  notificaciones.
+- **Por qué pasa:** el modelo separa "concepto sumisión" (nodo
+  terminal, reusable desde múltiples orígenes) de "ejecución desde
+  un origen concreto" (arista). Es coherente con REQUISITOS §3.5
+  pero al usuario le parece duplicación cuando el origen es UNO.
+- **Opciones a evaluar:**
+  - **A) Auto-rellenar nombre + variante al crear técnica tipo sumisión.**
+    En el wizard de técnica, paso "tipo = sumisión + destino =
+    Kimura", el campo nombre se auto-fillea con "Kimura" y `variante`
+    sugiere "desde {origen}". El usuario solo lo edita si quiere
+    matizar. Coste mínimo, cero cambio de modelo.
+  - **B) Atajo "+ Añadir sumisión desde aquí" en el modal de posición.**
+    En lugar de "Nueva técnica" + elegir tipo sumisión + elegir
+    destino, un botón directo que abre un mini-wizard de 1 paso:
+    "¿qué sumisión?" y crea la técnica con nombre=sumisión y
+    variante=null. Menos clicks. Schema intacto.
+  - **C) Eliminar el nombre de la técnica tipo sumisión.** En vez de
+    "Kimura (Kimura)" el modal mostraría solo "Kimura desde guardia
+    cerrada". Requiere cambiar TecnicaModalContent + lista en
+    /mapa/Técnicas. Schema intacto.
+  - **D) Refactor del modelo: sumisión = sumatorio de aristas
+    tipo `sumision`.** Eliminar nodo terminal sumisión, las técnicas
+    tipo sumisión apuntan a "nada" (sin destino) y el grafo agrupa
+    visualmente las que comparten nombre. Cambio grande, rompe
+    REQUISITOS §3.5.
+- **Recomendación inicial:** A + B son baratas y complementarias.
+  Hacer A primero (gana 80 % de la fricción), B después si sigue
+  molestando.
+- **Cuándo:** post-it.3 si tras 1-2 semanas de uso real sigue
+  molestando. No bloquea cierre de it.3.
+
+### Simplificar enum de TipoTecnica si el uso real solo usa transición
+
+- **Origen:** sesión T-5.it3 (2026-05-17), conversación sobre leyenda del grafo.
+- **Observación del owner:** "creo que solo se usará transición, que
+  implicará pasar de posición A a posición B, sea avanzar o no en la
+  lucha de posiciones". La distinción semántica entre `ataque` y
+  `transicion` (también potencialmente `sweep`/`escape`) es difusa y
+  puede que en la práctica solo se acabe usando `transicion` para
+  cualquier paso A→B y `sumision` para los remates.
+- **Idea:** tras 2-3 semanas de uso real con catálogo poblado, mirar
+  qué distribución de `tipo` hay en `tecnicas`. Si >80 % son
+  `transicion`+`sumision`, plantear:
+  - **A) Migración a 2 tipos**: `transicion` y `sumision`. Schema
+    nuevo, migración que mapea los demás → `transicion`. Limpio pero
+    pierdes la diferenciación visual del grafo por tipo.
+  - **B) Mantener enum pero ocultar tipos no usados de la UI**: el
+    wizard de técnica solo ofrece los tipos con uso real. Schema
+    intacto.
+- **Por qué se aplaza:** decisión depende de datos de uso. Hoy
+  mantenemos las 5 etiquetas porque el modelo ya estaba decidido en
+  it.1 y T-5.it3 ya está cerrada.
+- **Cuándo:** tras 2-3 semanas con catálogo realista poblado.
+
 ### Resumen automático post-sesión — aplazado de T-5.it2
 
 - **Origen:** REQUISITOS §3.6 + criterio de éxito it.2. Discutido y

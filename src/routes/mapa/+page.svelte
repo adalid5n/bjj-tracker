@@ -3,9 +3,12 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
+	import GrafoMapa from '$lib/components/GrafoMapa.svelte';
 	import MapaModalHost from '$lib/components/MapaModalHost.svelte';
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import { mapaModalStack } from '$lib/components/mapa-modal-stack.svelte';
+	import { buildGrafoElements } from '$lib/grafo';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
@@ -103,12 +106,16 @@
 	let errorMessage = $state('');
 	let query = $state('');
 
-	// Toggle entre las dos vistas de /mapa. Default siempre "posiciones"
+	// Toggle entre las tres vistas de /mapa. Default siempre "posiciones"
 	// (lo que existía hasta ahora). No persiste entre navegaciones por
 	// decisión de producto.
-	let vistaActiva = $state<'posiciones' | 'tecnicas'>('posiciones');
+	let vistaActiva = $state<'posiciones' | 'tecnicas' | 'grafo'>('posiciones');
 	// Filtros del tab "Técnicas". Multi-select: vacío = todos.
 	let tiposSeleccionados = $state<string[]>([]);
+	// Filtros del tab "Grafo" (T-4.it3). Mismo patrón vacío = todos.
+	let tiposGrafo = $state<string[]>([]);
+	let estadosGrafo = $state<string[]>([]);
+	let categoriasGrafo = $state<string[]>([]);
 
 	onMount(() => {
 		void refresh();
@@ -229,6 +236,22 @@
 		label: TIPO_TECNICA_LABEL[tipo]
 	}));
 
+	// Options de estado y categoría para los filtros del grafo (T-4.it3).
+	// Orden conceptual de estado: probando → funciona → descartada.
+	const estadoOptions: { value: EstadoTecnica; label: string }[] = [
+		{ value: 'probando', label: ESTADO_LABEL.probando },
+		{ value: 'funciona', label: ESTADO_LABEL.funciona },
+		{ value: 'descartada', label: ESTADO_LABEL.descartada }
+	];
+	const categoriaOptions = CATEGORIAS_ORDEN.map((cat) => ({
+		value: cat,
+		label: CATEGORIA_LABEL[cat]
+	}));
+
+	// Elementos del grafo (nodos + aristas) derivados del catálogo. Se
+	// recalculan solo cuando cambia el catálogo, no en cada render.
+	const grafoElements = $derived(buildGrafoElements(posiciones, sumisiones, tecnicas));
+
 	// Push de nodo al stack de modales. Cierra automáticamente cualquier
 	// stack residual de una navegación anterior antes de empezar uno nuevo.
 	function openPosicion(p: Posicion) {
@@ -329,22 +352,40 @@
 				>
 					Técnicas
 				</button>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={vistaActiva === 'grafo'}
+					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaActiva ===
+					'grafo'
+						? 'bg-background text-foreground shadow-sm'
+						: 'text-muted-foreground hover:text-foreground'}"
+					onclick={() => (vistaActiva = 'grafo')}
+				>
+					Grafo
+				</button>
 			</div>
 
-			<div class="relative">
-				<SearchIcon
-					class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-				/>
-				<Input
-					type="search"
-					placeholder={vistaActiva === 'tecnicas'
-						? 'Buscar por nombre o variante…'
-						: 'Buscar por nombre…'}
-					bind:value={query}
-					aria-label={vistaActiva === 'tecnicas' ? 'Buscar técnicas' : 'Buscar en el mapa'}
-					class="pl-8"
-				/>
-			</div>
+			<!--
+			  El buscador no aplica a la vista grafo (no hay scroll por texto en
+			  un canvas). Filtros del grafo vendrán en T-4.it3.
+			-->
+			{#if vistaActiva !== 'grafo'}
+				<div class="relative">
+					<SearchIcon
+						class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+					/>
+					<Input
+						type="search"
+						placeholder={vistaActiva === 'tecnicas'
+							? 'Buscar por nombre o variante…'
+							: 'Buscar por nombre…'}
+						bind:value={query}
+						aria-label={vistaActiva === 'tecnicas' ? 'Buscar técnicas' : 'Buscar en el mapa'}
+						class="pl-8"
+					/>
+				</div>
+			{/if}
 
 			{#if vistaActiva === 'tecnicas'}
 				<MultiChips
@@ -353,10 +394,57 @@
 					onChange={(v) => (tiposSeleccionados = v)}
 					ariaLabel="Filtrar técnicas por tipo"
 				/>
+			{:else if vistaActiva === 'grafo'}
+				<!--
+				  Filtros del grafo (T-4.it3) en una sola fila con dropdowns
+				  compactos. Patrón vacío = todos pasan (igual que la vista
+				  Técnicas). El badge del contador aparece solo si hay
+				  selección activa en esa dimensión.
+				-->
+				<div class="flex flex-wrap gap-2">
+					<FilterDropdown
+						label="Tipo"
+						options={tipoOptions}
+						value={tiposGrafo}
+						onChange={(v) => (tiposGrafo = v)}
+						ariaLabel="Filtrar grafo por tipo de técnica"
+					/>
+					<FilterDropdown
+						label="Estado"
+						options={estadoOptions}
+						value={estadosGrafo}
+						onChange={(v) => (estadosGrafo = v)}
+						ariaLabel="Filtrar grafo por estado de técnica"
+					/>
+					<FilterDropdown
+						label="Categoría"
+						options={categoriaOptions}
+						value={categoriasGrafo}
+						onChange={(v) => (categoriasGrafo = v)}
+						ariaLabel="Filtrar grafo por categoría de posición"
+					/>
+				</div>
 			{/if}
 		</div>
 
-		{#if vistaActiva === 'posiciones'}
+		{#if vistaActiva === 'grafo'}
+			<!--
+			  Vista grafo (T-3.it3). `-mx-4` para sangrar el padding lateral del
+			  main y aprovechar el ancho de viewport. Altura `h-[70vh]`
+			  provisional — T-8.it3 hará el ajuste responsive fino. Cytoscape se
+			  importa dinámicamente dentro de GrafoMapa.svelte, no entra en el
+			  bundle inicial.
+			-->
+			<div class="-mx-4 h-[70vh] bg-muted/20">
+				<GrafoMapa
+					nodes={grafoElements.nodes}
+					edges={grafoElements.edges}
+					tipos={tiposGrafo}
+					estados={estadosGrafo}
+					categorias={categoriasGrafo}
+				/>
+			</div>
+		{:else if vistaActiva === 'posiciones'}
 			{#if filtroSinResultados}
 				<p
 					class="rounded border border-dashed border-border p-8 text-center text-muted-foreground"

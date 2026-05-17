@@ -1,12 +1,166 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-16 (cierre sesión 19)
-**Fase activa:** Iteración 2 ✅ cerrada (tag `v0.3-it2`). Sin iteración activa.
-**Iteración en curso:** ninguna — pendiente arrancar planificación de it.3.
+**Última actualización:** 2026-05-17 (cierre sesión 20)
+**Fase activa:** Iteración 3 en curso — vista grafo del mapa técnico (Cytoscape + fcose).
+**Iteración en curso:** it.3, T-1 a T-7 hechas (T-7 con fix pendiente de validar en próxima sesión); T-8 y T-9 pendientes.
 
 ---
 
-## Última sesión (2026-05-16, sesión 19)
+## Última sesión (2026-05-17, sesión 20)
+
+**Hecho — Arranque y desarrollo de iteración 3 (T-1.it3 a T-7.it3)**
+
+Planificación delegada a agente Plan al inicio (informe completo en
+`.claude/agent-reports/20260516-it3-plan/plan.md`). 9 tareas T-1.it3 a
+T-9.it3 definidas, 7 ejecutadas en esta sesión.
+
+**Decisiones de producto cerradas al inicio:**
+- Toggle Lista | Grafo en `/mapa` (tercer estado del toggle existente
+  "Posiciones / Técnicas").
+- Misma capacidad en móvil y desktop (sin diferencias).
+- Alcance mínimo: grafo + filtros + modales existentes. Sin export a
+  imagen, sin posiciones manuales guardadas en BD.
+- Auto-layout (Cytoscape calcula), no coordenadas en schema.
+- Sumisión = un único nodo terminal (REQUISITOS §3.5).
+- Algoritmo: fcose (force-directed con clustering).
+
+**Tareas completadas:**
+
+- **T-1.it3 ✅ Spike Cytoscape + fcose**
+  - `pnpm add cytoscape@3.33.3 cytoscape-fcose@2.2.0`.
+  - Tipo declaration `src/lib/types/cytoscape-fcose.d.ts`.
+  - Componente mínimo `GrafoMapa.svelte` con dataset hardcoded.
+  - Validado bundle: chunks separados (~434 KB cytoscape + ~122 KB
+    fcose). NO entra en bundle inicial — lazy-loaded vía
+    `await import(...)` dentro de `onMount`.
+  - Ruta dev temporal `/dev/grafo-spike` (eliminada en T-3).
+
+- **T-2.it3 ✅ Función pura `buildGrafoElements`**
+  - `src/lib/grafo.ts` mapea `(posiciones, sumisiones, técnicas)` →
+    `{nodes, edges}` formato Cytoscape.
+  - IDs de nodos prefijados `pos:<id>` / `sum:<id>` para evitar
+    colisiones.
+  - 8 tests unitarios en `grafo.spec.ts` (vacío, mapeo, aristas
+    paralelas, descarte de huérfanas, nodos aislados).
+
+- **T-3.it3 ✅ Toggle Lista / Grafo en /mapa**
+  - Tercer estado `'grafo'` en `vistaActiva` con tercer botón en el
+    sub-header sticky existente.
+  - Buscador del header se oculta en vista grafo (decisión asumida).
+  - Eliminada la ruta `/dev/grafo-spike` ahora que el grafo está
+    integrado.
+
+- **T-4.it3 ✅ Filtros tipo / estado / categoría**
+  - **Cambio de UI tras feedback del owner:** los 3 filtros pasan
+    de `MultiChips` (3 filas) a 3 dropdowns compactos
+    `FilterDropdown.svelte` con badge contador. Una sola línea en el
+    sub-header. Usa wrapper local de `DropdownMenu` con `CheckboxItem`.
+  - Filtros aplican via `applyFilters(cy)` en `$effect` sin
+    reconstruir el grafo (toggle `display: none/element`). Nodos
+    huérfanos tras filtrar también se ocultan si hay filtro activo.
+  - Patrón vacío = todos pasan (consistente con vista Técnicas).
+  - **Fix en CheckboxItem:** `closeOnSelect={false}` en lugar de
+    `onSelect={preventDefault}` (esta bloqueaba también el
+    `onCheckedChange` en bits-ui v2).
+
+- **T-5.it3 ✅ Estilos visuales finales**
+  - Mapeo de colores por tipo via CSS vars del proyecto:
+    `ataque=--primary`, `sweep=--success`, `escape=--warning`,
+    `transicion=--muted-foreground` (dashed), `sumision=--destructive`.
+  - Estado: funciona y probando se ven igual (sólida color tipo).
+    Solo descartada se distingue (línea dotted, opacidad 0.4).
+  - Nodos posición: rectángulo redondeado, borde según rol
+    (verde ofensiva, rojo defensiva, neutral fino).
+  - Nodos sumisión: forma diamante con borde rojo y relleno gris
+    (tras feedback del owner — el diamante rojo macizo desentonaba).
+  - Reactividad al tema claro/oscuro: `$effect` sobre `theme.isDark`
+    reaplica stylesheet vía `requestAnimationFrame`.
+  - **Bug crítico resuelto:** Cytoscape no entiende `oklch()` ni
+    `var(--…)` — la lectura inicial vía `getComputedStyle().getPropertyValue('--token')`
+    devolvía oklch literal y el parser de color de Cytoscape lo
+    descartaba (colores se quedaban en azul default `:selected`).
+    Solución: probe DOM resuelve `var(--token)` aplicada a `color`, y
+    canvas trampolín convierte el resultado a `rgb()` sRGB
+    garantizado.
+  - **Otro bug resuelto:** import de `cytoscape-fcose` necesita
+    fallback `(fcoseMod.default ?? fcoseMod)` para cubrir ambos
+    shapes ESM/CJS. Sin esto fcose no se registraba y los nodos
+    salían en diagonal.
+  - Leyenda nueva: `GrafoLeyenda.svelte` — botón "?" arriba a la
+    derecha del canvas, abre Popover (bits-ui directo) con las
+    convenciones de color/forma. Usa tokens semánticos así que la
+    leyenda y el grafo se sincronizan ante cambios de tema.
+
+- **T-6.it3 ✅ Click handlers → mapaModalStack**
+  - `cy.on('tap', 'node', ...)` y `'edge'` pushean al stack de
+    modales existente. IDs de nodo llevan prefijo, se strippea.
+  - `$effect` reactivo sobre `nodes`/`edges` reemplaza elementos en
+    sitio cuando el padre llama `refresh()` (tras editar/crear desde
+    modal abierto desde el grafo).
+
+- **T-7.it3 🟡 (parcialmente validado) — Estabilidad de layout**
+  - Cache de posiciones a nivel de módulo (`<script module>`):
+    `positionsCache: Map<string, {x,y}>`. Mantiene el determinismo
+    entre cambios de tab.
+  - `pickLayoutOptions(nodes, forceFcose)` decide layout:
+    - Todos cacheados → `preset` (estable, idéntico).
+    - Algún nodo nuevo → `fcose` completo (recoloca todo).
+    - **Descartada** la variante intermedia con `fixedNodeConstraint`
+      tras feedback del owner: mantener viejos inmóviles + nuevo en
+      mal sitio sumaba un click manual de Reorganizar; mejor
+      auto-relayout completo cuando aparece nodo nuevo.
+  - Botón "Reorganizar" (icono refresh, esquina superior izquierda
+    del canvas) limpia el cache y fuerza fcose completo manual.
+  - Toast inferior "Reorganizando grafo…" durante 600ms cuando se
+    dispara fcose completo (no aparece en el caso preset).
+  - **Bug del cache vacío resuelto:** `instance.one('layoutstop')`
+    se registraba DESPUÉS de que el constructor de Cytoscape
+    ejecutase el layout inicial; el evento se perdía y el cache
+    nunca se rellenaba. Solución: instanciar con `layout: 'null'`,
+    registrar `instance.on('layoutstop')` como handler persistente, y
+    disparar el layout real con `runLayoutAndCache(instance, false, true)`.
+  - **Bug del reset de zoom resuelto:** Cytoscape aplica `fit: true`
+    por defecto a los layouts → cada actualización del catálogo
+    re-encuadraba el viewport del usuario. Solución: `fit: false`
+    por defecto en `runLayoutAndCache`, y `fit: true` solo en el
+    primer mount y en el botón Reorganizar.
+  - **Validado por el owner:** añadir una arista entre nodos
+    existentes ya NO mueve el grafo y NO resetea el zoom.
+  - **Pendiente validar:** añadir un nodo nuevo (posición o
+    sumisión) debería disparar fcose con toast visible. Validar en
+    próxima sesión.
+
+**Cambios de UX importantes registrados en `MEJORAS_FUTURAS.md`:**
+
+- **Simplificar enum TipoTecnica** si el uso real solo usa
+  `transicion` y `sumision` (owner sospecha que el resto no las
+  usará). Decisión tras 2-3 semanas de uso real.
+- **Reducir fricción al crear técnica tipo sumisión** — el nombre se
+  duplica con el nodo terminal sumisión. Cuatro opciones a evaluar
+  (auto-fill nombre / atajo "+ Añadir sumisión desde aquí" /
+  esconder nombre redundante / refactor del modelo).
+
+**ADRs propuestos pero no escritos (pendientes):**
+- ADR-004: elección de layout fcose (con comparativa).
+- ADR-005: lazy-loading de Cytoscape y umbral de bundle.
+
+**Validación de la sesión:**
+- `pnpm check` limpio (0 errors / 0 warnings).
+- `pnpm build` limpio (chunks separados confirmados).
+- 8/8 tests unitarios de `grafo.spec.ts` pasan.
+
+**Próximo paso concreto:**
+1. Validar en navegador (Adalid) el fix del cache en T-7: tras
+   refrescar, cambiar entre tabs y añadir una arista entre nodos
+   existentes **NO** debe mover el grafo. Si funciona, cerrar T-7.
+2. **T-8.it3** — pulido móvil + a11y mínima.
+3. **T-9.it3** — cierre formal: bump versión `0.4.0`, tag `v0.4-it3`,
+   escritura de ADRs 004 y 005, actualización de ESTADO_ACTUAL al
+   cierre.
+
+---
+
+## Sesión 19 (2026-05-16)
 
 **Hecho — T-7.it2: cierre de iteración 2**
 
