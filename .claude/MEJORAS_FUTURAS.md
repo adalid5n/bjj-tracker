@@ -249,6 +249,27 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
   Reutilizaría las queries C1/C2 ya construidas, así que la deuda
   técnica es mínima.
 
+### Sumisiones vs técnicas — redundancia del modelo
+
+- **Origen:** Adalid, 2026-05-17 (sesión 21), durante el replanteo de
+  it.3.
+- **Detalle:** una "técnica de sumisión" hoy se modela como una técnica
+  con `tipo='sumision'` apuntando a un nodo sumisión terminal. Al
+  capturar, el usuario rellena dos veces información que se solapa
+  (nombre de la técnica + nombre del nodo sumisión destino) y el grafo
+  representa la sumisión dos veces (la arista y el nodo terminal).
+- **Idea:** revisar si una sumisión debería ser un único concepto —
+  posibles caminos: (a) sumisión = nodo terminal sin arista
+  redundante, la técnica se infiere; (b) sumisión = arista directa
+  entre dos posiciones sin nodo terminal; (c) refactor del modelo
+  para fusionar tipos. Decisión post-uso real.
+- **Por qué:** al rediseñar el grafo (T-8.it3) y meter persistencia
+  (T-9.it3), la redundancia se va a notar más. Pero un refactor del
+  modelo es alcance grande, mejor hacerlo aparte cuando it.3 cierre.
+- **Cuándo:** post-it.3, cuando el grafo siempre-visible y la
+  organización persistente estén en uso real durante un par de
+  semanas y se note exactamente qué es lo que molesta.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`

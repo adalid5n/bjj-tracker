@@ -1,12 +1,118 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-17 (cierre sesión 20)
+**Última actualización:** 2026-05-17 (cierre sesión 21)
 **Fase activa:** Iteración 3 en curso — vista grafo del mapa técnico (Cytoscape + fcose).
-**Iteración en curso:** it.3, T-1 a T-7 hechas (T-7 con fix pendiente de validar en próxima sesión); T-8 y T-9 pendientes.
+**Iteración en curso:** it.3, T-1 a T-7 cerradas. Plan **replanteado** tras revelación de visión del owner: T-8 a T-11 redefinidas (ver sesión 21).
 
 ---
 
-## Última sesión (2026-05-17, sesión 20)
+## Sesión 21 (2026-05-17, tarde)
+
+**Hecho — diagnóstico y cierre de T-7.it3 + replanteo del resto de it.3**
+
+**Diagnóstico de la regresión reportada en sesión 20 (el grafo se movía
+y el zoom se reseteaba tras `4d8748a`):**
+
+- No era un bug del código. Logs temporales `[T-7]` en
+  `pickLayoutOptions`, `runLayoutAndCache` y el `$effect` reactivo del
+  dataset confirmaron: en el caso "arista entre nodos existentes",
+  `pickLayout → preset`, `optsFit=false`, `zoomChanged=false`,
+  `panChanged=false`, `totalPanDelta={0,0}`. El grafo NO se mueve.
+- La regresión era el **Service Worker sirviendo un bundle viejo**
+  (anterior al fix de T-7). El owner estaba probando contra GH Pages
+  con la PWA cacheada agresivamente. Bundle nombrado como
+  `5.BjKgAW_x.js` con un log `[GrafoMapa] layout` que no existe en el
+  código actual — era el bundle previo cacheado por el SW.
+- Validado caso "nodo nuevo" también: el owner añadió un nodo y
+  reportó "nada se mueve, todo OK". No se exploró por qué el caso
+  "nodo nuevo" no dispara fcose como dice el código teórico — irrelevante
+  porque ese flujo se va a redefinir en T-8/T-9.
+- El commit `1a2af1b` que anotaba la regresión fue un falso positivo
+  por cache de SW. Anotado aquí para referencia futura.
+
+**Logs temporales limpiados** del fichero antes de cerrar T-7.
+
+**Revelación de visión del owner mid-sesión** (mientras hablábamos de
+qué hacer con T-8/T-9): el grafo que quiere construir es bastante más
+ambicioso que lo desplegado en T-1..T-7:
+
+- **Nodos circulares uniformes** (no rectángulos ni diamantes); el
+  tamaño/color codifica la categoría.
+- **Grafo siempre visible**, no como una de tres tabs (Lista /
+  Posiciones / Técnicas / Grafo) sino como chasis principal de la
+  vista. Toggle binario **Grafo / Lista**, con Lista conteniendo el
+  sub-toggle Posiciones/Técnicas/Sumisiones actual.
+- **Modal/wizard como drawer inferior** en móvil (~50% alto) para no
+  tapar el grafo. Desktop pendiente de decidir (drawer lateral o
+  mantener centrado).
+- **Sincronización modal↔grafo:** al abrir un modal de una entidad
+  (posición/sumisión/técnica), el grafo hace **pan/zoom animado al
+  nodo focal**. Al saltar a otra entidad desde dentro del modal, el
+  grafo transiciona al nuevo nodo. El grafo "cuenta la historia" que
+  estás leyendo.
+- **Organización del usuario prevalece y se persiste:**
+  - Al añadir nodos, los existentes NO se mueven (fcose con
+    `fixedNodeConstraint`; solo el nuevo se acomoda).
+  - **Drag nativo (grabify)** en posiciones y sumisiones — sin modo
+    edición separado.
+  - **Botón "Guardar organización"** que persiste las posiciones en
+    SQLite (no localStorage — así entra en export/import JSON).
+  - Botón **"Reorganizar"** (el que ya existe) → fcose temporal,
+    sobrescribe lo de pantalla pero NO toca lo persistido hasta
+    Guardar. Cambios pendientes marcados visualmente (dirty state).
+  - Refresh (F5) → carga lo último guardado de SQLite, si existe.
+
+**Matiz aceptado por el owner**: no hay sync automático entre desktop
+y móvil (no hay backend). El export/import JSON es el puente. Si la
+tabla `grafo_layout` entra en el export, el layout viaja al importar.
+
+**Plan it.3 actualizado (reemplaza al de sesión 20):**
+
+- **T-7.it3 ✅** — cerrada hoy. El caso "nodo nuevo" no se valida en
+  el modelo actual porque desaparece en T-8/T-9.
+- **T-8.it3** — composición + estética nuevas:
+  - Toggle binario Grafo / Lista (colapsar Posiciones/Técnicas/Grafo →
+    Lista con sub-toggle interno).
+  - Nodos circulares uniformes; tamaño/color codifican categoría
+    (decisiones concretas al arrancar).
+  - Grafo siempre visible en vista Grafo. Modal → drawer inferior
+    en móvil; decisión desktop pendiente.
+- **T-9.it3** — organización persistente:
+  - Migración SQLite v4: tabla `grafo_layout (entidad_id, x, y)` o
+    similar (modelo exacto a decidir al arrancar).
+  - Drag nativo (grabify) en posiciones y sumisiones.
+  - Botón "Guardar organización" con estado dirty visible.
+  - Reorganizar → fcose temporal, no persiste hasta Guardar.
+- **T-10.it3** — sincronización modal↔grafo: pan/zoom animado al
+  nodo focal cuando se abre/cambia el modal. Decisiones pendientes:
+  qué hacer si el nodo está filtrado, qué pasa al cerrar el modal,
+  qué tipo de animación.
+- **T-11.it3** — cierre formal: bump 0.4.0, tag `v0.4-it3`, ADRs
+  004 (fcose), 005 (lazy-load Cytoscape), 006 (nueva — layout grafo
+  siempre-visible + drawer), 007 (nueva — sincronización modal↔grafo),
+  008 (nueva — persistencia de layout en SQLite + dirty state).
+
+**MEJORAS_FUTURAS.md actualizado** con entrada "Sumisiones vs técnicas
+— redundancia del modelo" para revisar post-it.3.
+
+**Validación de la sesión:**
+- `git diff src/lib/components/GrafoMapa.svelte` vuelve vacío tras
+  limpiar los logs (idéntico al HEAD).
+
+**Próximo paso concreto:**
+1. Commit con la limpieza de logs (no toca código real) +
+   actualización de ESTADO_ACTUAL.md y MEJORAS_FUTURAS.md.
+2. Arrancar T-8.it3 — empezar por decisiones de producto al inicio:
+   - Codificación visual de nodos (tamaño/color por qué categoría).
+   - Layout desktop (drawer lateral, mantener modal central, o
+     drawer inferior universal).
+   - Cómo se materializa el toggle binario y dónde vive el
+     sub-toggle de Lista (en el sub-header existente o en un panel
+     propio).
+
+---
+
+## Sesión 20 (2026-05-17, mañana)
 
 **Hecho — Arranque y desarrollo de iteración 3 (T-1.it3 a T-7.it3)**
 
