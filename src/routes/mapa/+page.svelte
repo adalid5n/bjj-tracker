@@ -159,7 +159,14 @@
 	// llega bindable: el grafo la sube cuando el usuario arrastra o
 	// pulsa Reorganizar, y la baja cuando guarda con éxito.
 	let grafoComponent = $state<
-		{ saveLayout: () => Promise<void>; reorganize: () => void } | undefined
+		{
+			saveLayout: () => Promise<void>;
+			reorganize: () => void;
+			panToEntity: (
+				target: { kind: 'posicion' | 'sumision' | 'tecnica'; id: string },
+				presentation: 'dialog' | 'sheet-side' | 'sheet-bottom'
+			) => void;
+		} | undefined
 	>(undefined);
 	let grafoDirty = $state(false);
 	let savingLayout = $state(false);
@@ -179,6 +186,30 @@
 
 	onMount(() => {
 		void refresh();
+	});
+
+	// T-10.it3: sincronización modal↔grafo. Cada vez que cambia el top
+	// del stack de modales, el grafo hace pan animado al nodo/arista
+	// focal para que el usuario "siga la historia" visualmente.
+	//
+	// Reglas:
+	//  - Solo entradas de entidad (posicion/sumision/tecnica) disparan
+	//    pan. Wizards (crear/editar) NO — crear/editar no es navegación.
+	//  - Al cerrar el modal entero (top undefined) NO se hace nada — el
+	//    grafo se queda donde estaba (decisión de producto).
+	//  - El zoom no se toca; solo el pan.
+	//  - El componente del grafo se encarga del early return si aún no
+	//    tiene `cy` o si el id no existe; aquí solo filtramos por kind.
+	$effect(() => {
+		const top = mapaModalStack.top;
+		if (!top || !grafoComponent) return;
+		if (
+			top.kind !== 'posicion' &&
+			top.kind !== 'sumision' &&
+			top.kind !== 'tecnica'
+		)
+			return;
+		grafoComponent.panToEntity({ kind: top.kind, id: top.id }, presentation);
 	});
 
 	// T-9.b.it3: si el usuario intenta navegar a otra ruta (BottomNav,

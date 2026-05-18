@@ -445,6 +445,89 @@
 		dirty = false;
 	}
 
+	/**
+	 * Pan animado para centrar una entidad (posición / sumisión / técnica)
+	 * en la zona útil del canvas, dejando libre la parte tapada por el
+	 * drawer/sheet del modal. NO toca el zoom — solo el pan. T-10.it3.
+	 *
+	 * El padre llama a este método cada vez que cambia el top del stack
+	 * de modales. El `presentation` actual decide los insets:
+	 *  - 'dialog'       → sin insets (vista Lista, no aplica).
+	 *  - 'sheet-side'   → drawer derecho ocupa ~50% del ancho.
+	 *  - 'sheet-bottom' → drawer inferior ocupa ~50% del alto.
+	 *
+	 * Para técnicas (arista), el "punto focal" es el midpoint entre los
+	 * nodos source y target de la arista, no un nodo concreto. Coherente
+	 * con la decisión de producto: una técnica no es un nodo, es la
+	 * transición entre dos.
+	 *
+	 * Early returns silenciosos cuando:
+	 *  - cy no inicializado todavía (race con mount).
+	 *  - el nodo/arista no existe en el grafo (entidad recién borrada
+	 *    pero modal aún abierto, o catálogo aún cargando).
+	 */
+	export function panToEntity(
+		target: { kind: 'posicion' | 'sumision' | 'tecnica'; id: string },
+		presentation: 'dialog' | 'sheet-side' | 'sheet-bottom'
+	): void {
+		if (!cy) return;
+		const instance = cy;
+
+		// Resolver coordenadas modelo del punto focal.
+		let modelX: number;
+		let modelY: number;
+		if (target.kind === 'tecnica') {
+			// Arista: el id Cytoscape es el id de la técnica tal cual
+			// (sin prefijo) — ver `buildGrafoElements` en `$lib/grafo.ts`.
+			const edge = instance.getElementById(target.id);
+			if (edge.empty() || !edge.isEdge()) return;
+			const src = edge.source();
+			const tgt = edge.target();
+			if (src.empty() || tgt.empty()) return;
+			const ps = src.position();
+			const pt = tgt.position();
+			modelX = (ps.x + pt.x) / 2;
+			modelY = (ps.y + pt.y) / 2;
+		} else {
+			const prefix = target.kind === 'posicion' ? 'pos:' : 'sum:';
+			const node = instance.getElementById(prefix + target.id);
+			if (node.empty()) return;
+			const p = node.position();
+			modelX = p.x;
+			modelY = p.y;
+		}
+
+		// Centro pixel deseado dentro del contenedor, descontando insets.
+		// `cy.width()` / `cy.height()` devuelven el tamaño del contenedor
+		// del grafo (no del viewport modelo), en CSS pixels.
+		const W = instance.width();
+		const H = instance.height();
+		let insetRight = 0;
+		let insetBottom = 0;
+		if (presentation === 'sheet-side') insetRight = W * 0.5;
+		else if (presentation === 'sheet-bottom') insetBottom = H * 0.5;
+		const targetPxX = (W - insetRight) / 2;
+		const targetPxY = (H - insetBottom) / 2;
+
+		// Pan target en Cytoscape: para que el punto modelo `m` aparezca
+		// en el pixel `p`, pan = p - m * zoom (transformación afín
+		// estándar: pixel = m * zoom + pan).
+		const zoom = instance.zoom();
+		const panX = targetPxX - modelX * zoom;
+		const panY = targetPxY - modelY * zoom;
+
+		// `stop()` cancela cualquier animación previa (incluido el settle
+		// inicial de fcose si llega justo después del mount). El drag
+		// activo del usuario NO es animación — es input directo y no se
+		// ve afectado por `stop()`.
+		instance.stop();
+		instance.animate({
+			pan: { x: panX, y: panY },
+			duration: 300,
+			easing: 'ease-in-out'
+		} as Parameters<typeof instance.animate>[0]);
+	}
+
 	// Reaccionar a cambios del dataset (cuando el padre llama refresh()
 	// tras editar/crear desde un modal abierto vía click en el grafo).
 	// Reemplaza los elements de Cytoscape en sitio sin recrear la
