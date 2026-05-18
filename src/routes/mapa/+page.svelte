@@ -5,6 +5,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import SaveIcon from '@lucide/svelte/icons/save';
+	import MoveIcon from '@lucide/svelte/icons/move';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
 	import GrafoMapa from '$lib/components/GrafoMapa.svelte';
@@ -170,6 +171,11 @@
 	>(undefined);
 	let grafoDirty = $state(false);
 	let savingLayout = $state(false);
+	// Modo edición de layout. En `true` los nodos pasan a `grabify` y
+	// los tap quedan silenciados (no abren modal) para no chocar con
+	// el flujo de arrastre. El usuario debe salir del modo para volver
+	// a navegar.
+	let grafoEditing = $state(false);
 	// AlertDialog "¿Descartar cambios del grafo?" usado cuando el
 	// usuario intenta cambiar a vista Lista con `grafoDirty=true`.
 	// Patrón controlado (open + onOpenChange, NO bind:open) idéntico al
@@ -650,6 +656,17 @@
 					/>
 					<div class="ml-auto flex flex-wrap items-center gap-2">
 						<Button
+							variant={grafoEditing ? 'default' : 'outline'}
+							size="sm"
+							onclick={() => (grafoEditing = !grafoEditing)}
+							aria-pressed={grafoEditing}
+							aria-label={grafoEditing ? 'Salir del modo mover nodos' : 'Activar modo mover nodos'}
+							title={grafoEditing ? 'Salir del modo mover nodos' : 'Mover nodos'}
+						>
+							<MoveIcon class="size-4" />
+							<span class="hidden sm:inline">{grafoEditing ? 'Salir' : 'Mover nodos'}</span>
+						</Button>
+						<Button
 							variant="outline"
 							size="sm"
 							onclick={handleReorganizar}
@@ -681,16 +698,20 @@
 
 		{#if vistaPrincipal === 'grafo'}
 			<!--
-			  Vista grafo (T-3.it3). `-mx-4` para sangrar el padding lateral del
-			  main y aprovechar el ancho de viewport. Altura `h-[70vh]`
-			  provisional — T-8.it3 hará el ajuste responsive fino. Cytoscape se
-			  importa dinámicamente dentro de GrafoMapa.svelte, no entra en el
-			  bundle inicial.
+			  Vista grafo. En móvil el contenedor sangra el padding lateral
+			  del main (`-mx-4`) y anula el `pb-28` (`-mb-28`) para llegar a
+			  ras del bottom nav (`bottom-14` = 56px). Altura calculada con
+			  `dvh` para que aguante la barra dinámica del navegador móvil:
+			  100dvh − 13rem (header 14 + sub-header ~6 + nav 14 + padding).
+			  En desktop volvemos al wrapper acotado con altura `70vh`.
 			-->
-			<div class="-mx-4 h-[70vh] bg-muted/20">
+			<div
+				class="-mx-4 -mb-28 h-[calc(100dvh-13rem)] bg-muted/20 sm:mx-0 sm:mb-0 sm:h-[70vh]"
+			>
 				<GrafoMapa
 					bind:this={grafoComponent}
 					bind:dirty={grafoDirty}
+					bind:editing={grafoEditing}
 					nodes={grafoElements.nodes}
 					edges={grafoElements.edges}
 					tipos={tiposGrafo}

@@ -39,7 +39,7 @@
 </script>
 
 <nav
-	class="fixed right-0 bottom-0 left-0 z-20 border-t border-border bg-background shadow-[0_-2px_4px_rgba(0,0,0,0.04)]"
+	class="fixed right-0 bottom-0 left-0 z-20 border-t border-border bg-background shadow-[0_-2px_8px_rgba(0,0,0,0.18)]"
 >
 	<ul class="mx-auto flex max-w-md justify-around">
 		{#each items as item (item.href)}

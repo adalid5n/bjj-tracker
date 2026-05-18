@@ -50,6 +50,13 @@
 		//   - el usuario pulsa Reorganizar.
 		// Vuelve a `false` solo cuando `saveLayout()` termina con éxito.
 		dirty?: boolean;
+		// T-1.it4 (rework): modo edición de layout. El padre lo bindea
+		// a un botón "Mover nodos" del sub-header. En `false` (default)
+		// los nodos son `ungrabify` + `pannable`: tap abre modal, drag
+		// pannea el canvas. En `true` los nodos son `grabify`: drag
+		// mueve el nodo, tap se ignora (sin modal) para no chocar con
+		// el flujo de movimiento.
+		editing?: boolean;
 	};
 
 	let {
@@ -59,7 +66,8 @@
 		estados = [],
 		categorias = [],
 		onAttemptPush,
-		dirty = $bindable(false)
+		dirty = $bindable(false),
+		editing = $bindable(false)
 	}: Props = $props();
 
 	let container: HTMLDivElement;
@@ -76,31 +84,13 @@
 	// auto. Lo activamos al final de `onMount` para que el cierre
 	// natural del layout no se interprete como "el usuario movió algo".
 	let initialLoadComplete = false;
-	// T-1.it4: long-press para activar el drag de un nodo. Los nodos
-	// están en estado `ungrabify` por defecto; tras `tapstart` mantenido
-	// `ARM_DURATION_MS` ms sin movimiento, el nodo bajo el dedo pasa a
-	// `grabbify` + recibe la clase `drag-armed` (feedback visual). Se
-	// desarma al soltar (`tapend`) o tras drag (`dragfree`). El
-	// movimiento antes del umbral (`tapdrag`) cancela el armado para
-	// permitir pan/scroll iniciado sobre un nodo.
-	const ARM_DURATION_MS = 350;
-	let armTimer: ReturnType<typeof setTimeout> | null = null;
-	let armedNode: import('cytoscape').NodeSingular | null = null;
-
-	function cancelArmTimer() {
-		if (armTimer !== null) {
-			clearTimeout(armTimer);
-			armTimer = null;
-		}
-	}
-
-	function disarmCurrentNode() {
-		if (armedNode) {
-			armedNode.ungrabify();
-			armedNode.removeClass('drag-armed');
-			armedNode = null;
-		}
-	}
+	// T-1.it4 (rework): el long-press no es viable con Cytoscape —
+	// cambiar `grabify` durante un touch en curso rompe la maquinaria
+	// interna (`r.dragData.touchDragEles` se inicializa solo en
+	// `touchstart`, no se reevalúa después → undefined → TypeError).
+	// Sustituido por un modo edición explícito: la prop `editing`
+	// controla si los nodos son arrastrables o solo navegables. El
+	// $effect de abajo sincroniza el estado de Cytoscape con la prop.
 
 	/**
 	 * Lee tokens semánticos desde las CSS vars del documento como strings
@@ -242,19 +232,6 @@
 					'border-color': t.foreground
 				}
 			},
-			// T-1.it4: feedback visual del long-press. El nodo "armado"
-			// (tras taphold ≥350 ms) crece un 10 % y refuerza el borde para
-			// que el usuario vea claro que puede arrastrarlo. Mismo rango
-			// que el base (28-64) pero ×1.1 → 30.8-70.4. Hardcoded porque
-			// Cytoscape no soporta multiplicar mapData inline.
-			{
-				selector: 'node.drag-armed',
-				style: {
-					'border-width': 4,
-					width: 'mapData(degree, 0, 8, 30.8, 70.4)',
-					height: 'mapData(degree, 0, 8, 30.8, 70.4)'
-				}
-			},
 			// Aristas: todas en muted-foreground (mismo gris que el borde
 			// de las posiciones — entona con la paleta monocromática). La
 			// diferenciación por tipo (ataque/sweep/escape/sumision) ya no
@@ -351,6 +328,27 @@
 		estados;
 		categorias;
 		if (cy) applyFilters(cy);
+	});
+
+	// Sincroniza la prop `editing` con el estado de los nodos.
+	// IMPORTANTE: pannable y grabbable son MUTUAMENTE EXCLUSIVOS en
+	// Cytoscape — un nodo pannable se overridea a !grabbable
+	// (cytoscape.esm.mjs:13757). Por eso hacemos toggle de ambos:
+	//   - Modo navegación: panify + ungrabify (drag = pan canvas).
+	//   - Modo edición:    unpanify + grabify (drag = mueve nodo).
+	// Leemos `editing` ANTES del early return para que Svelte 5
+	// registre la dependency en la primera evaluación (cuando aún
+	// no hay `cy` y haríamos early return sin tracking).
+	$effect(() => {
+		const isEditing = editing;
+		if (!cy) return;
+		if (isEditing) {
+			cy.nodes().unpanify();
+			cy.nodes().grabify();
+		} else {
+			cy.nodes().ungrabify();
+			cy.nodes().panify();
+		}
 	});
 
 	// Reaccionar al cambio de tema (claro/oscuro). El theme manager aplica
@@ -542,8 +540,31 @@
 		const H = instance.height();
 		let insetRight = 0;
 		let insetBottom = 0;
-		if (presentation === 'sheet-side') insetRight = W * 0.5;
-		else if (presentation === 'sheet-bottom') insetBottom = H * 0.5;
+		// Medimos el drawer real del DOM en vez de asumir un % fijo del
+		// contenedor: el drawer se dimensiona contra el viewport
+		// (`50dvh`, `sm:max-w-md`), no contra el grafo, así que sus
+		// proporciones no coinciden con `H`/`W`. Calculamos el overlap real
+		// entre el rect del drawer y el rect del contenedor del grafo.
+		if (presentation === 'sheet-bottom' || presentation === 'sheet-side') {
+			const side = presentation === 'sheet-bottom' ? 'bottom' : 'right';
+			const drawerEl = document.querySelector<HTMLElement>(
+				`[data-slot="sheet-content"][data-side="${side}"]`
+			);
+			if (drawerEl) {
+				const drawerRect = drawerEl.getBoundingClientRect();
+				const grafoRect = container.getBoundingClientRect();
+				if (presentation === 'sheet-bottom') {
+					insetBottom = Math.max(0, grafoRect.bottom - drawerRect.top);
+				} else {
+					insetRight = Math.max(0, grafoRect.right - drawerRect.left);
+				}
+			} else {
+				// Fallback: primer render, drawer aún no en DOM. Aproximamos
+				// con el ratio de diseño (drawer ≈ 50% del eje correspondiente).
+				if (presentation === 'sheet-side') insetRight = W * 0.5;
+				else insetBottom = H * 0.5;
+			}
+		}
 		const targetPxX = (W - insetRight) / 2;
 		const targetPxY = (H - insetBottom) / 2;
 
@@ -661,63 +682,30 @@
 					const p = node.position();
 					positionsCache.set(node.id(), { x: p.x, y: p.y });
 					dirty = true;
-					disarmCurrentNode();
 				});
 
-				// T-1.it4: long-press para activar el drag.
-				//
-				// Por defecto los nodos son no-arrastrables (`ungrabify`):
-				// cualquier touch/click+drag sobre un nodo se delega al
-				// pan del canvas (igual que si tocaras el fondo). Solo
-				// tras un `tapstart` mantenido `ARM_DURATION_MS` ms sin
-				// movimiento promovemos ese nodo a arrastrable. Eso
-				// elimina el drag accidental al hacer pan táctil iniciado
-				// sobre un nodo, y diferencia claramente "tap para abrir
-				// modal" de "long-press + arrastrar para mover".
-				//
-				// No usamos el evento nativo `taphold` de Cytoscape porque
-				// su duración (`r.tapholdDuration`) está hardcoded a 500
-				// ms en el renderer y no se expone como opción pública.
-				// Replicar el patrón con `tapstart` + `tapdrag` (cancela)
-				// + `tapend` (cleanup) nos da control sobre el umbral sin
-				// tocar internals.
-				instance.nodes().ungrabify();
+				// Modo navegación (default): nodos `panify` + `ungrabify` →
+				// drag desde nodo pannea el canvas. Modo edición:
+				// `unpanify` + `grabify` → drag mueve el nodo. Los dos
+				// flags son mutuamente excluyentes (pannable overridea
+				// grabbable a false en Cytoscape), por eso van en pareja.
+				if (editing) {
+					instance.nodes().unpanify();
+					instance.nodes().grabify();
+				} else {
+					instance.nodes().ungrabify();
+					instance.nodes().panify();
+				}
 				// Nodos añadidos posteriormente (cambio de catálogo, vía
-				// el $effect que reemplaza elements) heredan el estado
-				// "no-arrastrable" automáticamente.
+				// el $effect que reemplaza elements) heredan el modo actual.
 				instance.on('add', 'node', (event) => {
-					event.target.ungrabify();
-				});
-
-				instance.on('tapstart', 'node', (event) => {
-					const node = event.target;
-					cancelArmTimer();
-					armTimer = setTimeout(() => {
-						armTimer = null;
-						disarmCurrentNode();
-						armedNode = node;
-						node.grabbify();
-						node.addClass('drag-armed');
-						// Feedback háptico (no-op silencioso donde no esté
-						// soportado o no haya permiso — iOS Safari, desktop).
-						if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-							navigator.vibrate(20);
-						}
-					}, ARM_DURATION_MS);
-				});
-
-				// Cualquier movimiento antes de cumplirse el umbral cancela
-				// el armado → el touch acaba siendo pan del canvas, no drag.
-				instance.on('tapdrag', () => {
-					cancelArmTimer();
-				});
-
-				// Cualquier release (sin drag, post-drag, en otro nodo, en el
-				// background) limpia el estado. Idempotente con el
-				// `disarmCurrentNode` de `dragfree`.
-				instance.on('tapend', () => {
-					cancelArmTimer();
-					disarmCurrentNode();
+					if (editing) {
+						event.target.unpanify();
+						event.target.grabify();
+					} else {
+						event.target.ungrabify();
+						event.target.panify();
+					}
 				});
 
 				// Click en nodo: pushea posición o sumisión al stack de
@@ -725,6 +713,10 @@
 				// del nodo lleva prefijo 'pos:' o 'sum:' (4 chars) para
 				// evitar colisiones en el grafo — se strippea aquí.
 				instance.on('tap', 'node', (event) => {
+					// En modo edición ignoramos el tap: el usuario está
+					// moviendo nodos, no navegando. Para abrir modal hay
+					// que salir del modo edición primero.
+					if (editing) return;
 					const node = event.target;
 					const kind = node.data('kind') as 'posicion' | 'sumision';
 					const realId = (node.id() as string).slice(4);
@@ -741,6 +733,9 @@
 				// Click en arista: pushea la técnica. El id de la arista
 				// es el id de la técnica tal cual (sin prefijo).
 				instance.on('tap', 'edge', (event) => {
+					// Mismo criterio que en nodos: en modo edición no
+					// abrimos modales.
+					if (editing) return;
 					const edge = event.target;
 					const id = edge.id() as string;
 					const nombre = edge.data('nombre') as string;
@@ -785,8 +780,6 @@
 	});
 
 	onDestroy(() => {
-		cancelArmTimer();
-		armedNode = null;
 		cy?.destroy();
 		cy = null;
 	});
@@ -799,7 +792,7 @@
   presencia). Tokens leídos en `readTokens` también resuelven a los
   valores de `.dark` porque el probe se inserta con esa misma clase.
 -->
-<div class="dark relative h-full w-full overflow-hidden rounded-xl border border-border bg-card">
+<div class="dark relative h-full w-full overflow-hidden bg-card sm:rounded-xl sm:border sm:border-border">
 	{#if loading}
 		<div class="absolute inset-0 flex items-center justify-center text-muted-foreground">
 			Cargando grafo…
