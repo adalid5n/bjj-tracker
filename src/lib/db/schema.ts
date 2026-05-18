@@ -269,13 +269,50 @@ function migrate3To4(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v5:
- *   { from: 4, to: 5, run: (db) => { ... } }
+ * DDL incremental para subir de schema v4 a v5 (T-9.it3).
+ *
+ * Añade `grafo_layout`: persistencia de la posición (x, y) de cada nodo del
+ * grafo del mapa técnico. Una sola tabla cubre tanto posiciones como
+ * sumisiones para evitar duplicar lógica de capa de datos.
+ *
+ * Decisiones de modelado:
+ * - Clave compuesta `(entidad_id, kind)`. No hay FK porque `entidad_id`
+ *   apunta a dos tablas distintas (`posiciones` o `sumisiones_terminales`)
+ *   según `kind`. La integridad referencial se mantiene desde TS: las
+ *   funciones `deletePosicion()` / `deleteSumision()` limpian su fila de
+ *   `grafo_layout` explícitamente. Trade-off: ganamos tabla única y código
+ *   simple; el coste es que un bug en TS podría dejar huérfanos (auditable
+ *   con un LEFT JOIN puntual si hace falta).
+ * - `CHECK (kind IN ('posicion', 'sumision'))` garantiza el dominio sin
+ *   ENUM (SQLite no los tiene).
+ * - `x`/`y` como REAL: fcose y Cytoscape trabajan en coordenadas continuas;
+ *   no hay grid implícito.
+ */
+export const SCHEMA_V5_MIGRATION = `
+CREATE TABLE grafo_layout (
+  entidad_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('posicion', 'sumision')),
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  PRIMARY KEY (entidad_id, kind)
+);
+
+UPDATE schema_meta SET value = '5' WHERE key = 'version';
+`;
+
+function migrate4To5(db: MigrationDb): void {
+	db.exec(SCHEMA_V5_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v6:
+ *   { from: 5, to: 6, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
 	{ from: 2, to: 3, run: migrate2To3 },
-	{ from: 3, to: 4, run: migrate3To4 }
+	{ from: 3, to: 4, run: migrate3To4 },
+	{ from: 4, to: 5, run: migrate4To5 }
 ];
 
 /**

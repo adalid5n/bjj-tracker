@@ -8,6 +8,7 @@
  */
 
 import { init, query, run } from '$lib/db';
+import { deleteLayout } from '$lib/grafo-layout';
 import type { SumisionTerminal } from '$lib/types';
 
 export type NewSumisionTerminal = Omit<SumisionTerminal, 'id' | 'created_at' | 'updated_at'>;
@@ -58,4 +59,7 @@ export async function updateSumision(data: SumisionTerminalUpdate): Promise<void
 export async function deleteSumision(id: string): Promise<void> {
 	await init();
 	await run('DELETE FROM sumisiones_terminales WHERE id = ?', [id]);
+	// Limpieza del layout del grafo (T-9.it3). `grafo_layout` no tiene FK
+	// porque apunta a dos tablas; el huérfano se elimina aquí en TS.
+	await deleteLayout(id, 'sumision');
 }

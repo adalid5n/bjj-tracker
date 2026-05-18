@@ -4,6 +4,7 @@
  */
 
 import { init, query, run } from '$lib/db';
+import { deleteLayout } from '$lib/grafo-layout';
 import type { Posicion } from '$lib/types';
 
 export type NewPosicion = Omit<Posicion, 'id' | 'created_at' | 'updated_at'>;
@@ -75,6 +76,9 @@ export async function deletePosicion(id: string): Promise<void> {
 	await syncComplementaria(id, null);
 	await run('UPDATE posiciones SET updated_at = ? WHERE id = ?', [now, id]);
 	await run('DELETE FROM posiciones WHERE id = ?', [id]);
+	// Limpieza del layout del grafo (T-9.it3). `grafo_layout` no tiene FK
+	// porque apunta a dos tablas; el huérfano se elimina aquí en TS.
+	await deleteLayout(id, 'posicion');
 }
 
 /**

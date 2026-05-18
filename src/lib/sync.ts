@@ -19,7 +19,7 @@ import type {
 	TecnicaContra
 } from '$lib/types';
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 // T-3.it2: filas de las tablas pivot `roll_tecnica` y `roll_posicion`.
 // `resultado` es 'fue_bien' | 'fallo' (CHECK en SQL). La PK compuesta
@@ -37,6 +37,16 @@ export type RollPosicionRow = {
 	resultado: 'fue_bien' | 'fallo';
 };
 
+// T-9.it3: layout persistido del grafo del mapa técnico. `kind` distingue
+// si `entidad_id` apunta a `posiciones` o a `sumisiones_terminales`
+// (CHECK en SQL). Ver migración v5 en `db/schema.ts`.
+export type GrafoLayoutDbRow = {
+	entidad_id: string;
+	kind: 'posicion' | 'sumision';
+	x: number;
+	y: number;
+};
+
 export type ExportPayload = {
 	schema_version: number;
 	exported_at: string;
@@ -49,6 +59,7 @@ export type ExportPayload = {
 	tecnica_contras: TecnicaContra[];
 	roll_posicion: RollPosicionRow[];
 	roll_tecnica: RollTecnicaRow[];
+	grafo_layout: GrafoLayoutDbRow[];
 };
 
 export async function exportAll(): Promise<ExportPayload> {
@@ -62,7 +73,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		tecnicas,
 		tecnicaContras,
 		rollPosicion,
-		rollTecnica
+		rollTecnica,
+		grafoLayout
 	] = await Promise.all([
 		query<Companero>('SELECT * FROM companeros ORDER BY created_at'),
 		query<Sesion>('SELECT * FROM sesiones ORDER BY created_at'),
@@ -76,6 +88,9 @@ export async function exportAll(): Promise<ExportPayload> {
 		),
 		query<RollTecnicaRow>(
 			'SELECT roll_id, tecnica_id, resultado FROM roll_tecnica ORDER BY roll_id, tecnica_id, resultado'
+		),
+		query<GrafoLayoutDbRow>(
+			'SELECT entidad_id, kind, x, y FROM grafo_layout ORDER BY entidad_id, kind'
 		)
 	]);
 	return {
@@ -89,7 +104,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		tecnicas,
 		tecnica_contras: tecnicaContras,
 		roll_posicion: rollPosicion,
-		roll_tecnica: rollTecnica
+		roll_tecnica: rollTecnica,
+		grafo_layout: grafoLayout
 	};
 }
 
@@ -118,7 +134,8 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 		'tecnicas',
 		'tecnica_contras',
 		'roll_posicion',
-		'roll_tecnica'
+		'roll_tecnica',
+		'grafo_layout'
 	];
 	for (const key of requiredArrays) {
 		if (!Array.isArray(p[key])) {
@@ -142,6 +159,7 @@ export async function importAll(payload: unknown): Promise<{
 	tecnica_contras: number;
 	roll_posicion: number;
 	roll_tecnica: number;
+	grafo_layout: number;
 }> {
 	assertExportShape(payload);
 
@@ -165,6 +183,9 @@ export async function importAll(payload: unknown): Promise<{
 		try {
 			// Wipe en orden FK (hijos antes que padres) — no estrictamente
 			// necesario con FK OFF, pero mantenemos el orden por claridad.
+			// `grafo_layout` no tiene FK; orden indiferente, lo borramos
+			// con los demás "hijos" del catálogo.
+			await run('DELETE FROM grafo_layout');
 			await run('DELETE FROM roll_tecnica');
 			await run('DELETE FROM roll_posicion');
 			await run('DELETE FROM tecnica_contras');
@@ -207,7 +228,8 @@ export async function importAll(payload: unknown): Promise<{
 		tecnicas: payload.tecnicas.length,
 		tecnica_contras: payload.tecnica_contras.length,
 		roll_posicion: payload.roll_posicion.length,
-		roll_tecnica: payload.roll_tecnica.length
+		roll_tecnica: payload.roll_tecnica.length,
+		grafo_layout: payload.grafo_layout.length
 	};
 }
 
@@ -342,6 +364,14 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 			`INSERT INTO roll_tecnica (roll_id, tecnica_id, resultado)
 			 VALUES (?, ?, ?)`,
 			[rt.roll_id, rt.tecnica_id, rt.resultado]
+		);
+	}
+
+	for (const gl of payload.grafo_layout) {
+		await run(
+			`INSERT INTO grafo_layout (entidad_id, kind, x, y)
+			 VALUES (?, ?, ?, ?)`,
+			[gl.entidad_id, gl.kind, gl.x, gl.y]
 		);
 	}
 }
