@@ -156,9 +156,16 @@ cualquier máquina) las herede.
 ## Continuidad entre sesiones
 
 - Existe `ESTADO_ACTUAL.md` con el estado vivo del proyecto.
-- Al cierre de cada sesión de trabajo, actualizar ese fichero con:
-  qué se completó, qué decisiones se tomaron, en qué punto exacto
-  quedamos, cuál es el siguiente paso concreto.
+- **Actualizar `ESTADO_ACTUAL.md` SIEMPRE que se haga `git push`.** No
+  es opcional ni "al cierre de sesión": va con el push, sea el primero
+  o el quinto de la sesión. El update se acompaña en el mismo commit
+  del cambio o en un commit `docs(...)` inmediatamente posterior, antes
+  del push. Una rama que push deja el doc desactualizado es una rama
+  que miente al siguiente agente o sesión que la lea.
+- El update mínimo incluye: qué se completó, qué decisiones se tomaron,
+  en qué punto exacto quedamos, cuál es el siguiente paso concreto. Si
+  un push corrige/reescribe trabajo de un subagente o sesión anterior,
+  corregir también la sección histórica que ya no aplica.
 - Las decisiones técnicas con peso van a `.claude/decisiones/NNN-tema.md`
   (ADR cortos), para referencia futura.
 - Las reglas permanentes del proyecto se reflejan aquí, en este fichero.

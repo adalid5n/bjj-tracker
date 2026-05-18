@@ -1,14 +1,55 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-18 (sesión 24, T-1.it4 implementada — pendiente validación visual del owner)
-**Fase activa:** Iteración 4 abierta — primera tarea (T-1.it4, long-press en grafo) implementada técnicamente.
+**Última actualización:** 2026-05-19 (sesión 25, T-1.it4 cerrada — rework a modo edición + UX grafo móvil, push en `4cbacae`)
+**Fase activa:** Iteración 4 abierta. T-1.it4 cerrada y validada en local.
 **Iteración en curso:** it.4. Sin plan formal (no se ha escrito `ITERACION_4.md`); scope decidido tarea-a-tarea desde el backlog de `MEJORAS_FUTURAS.md`.
 
 ---
 
-## Sesión 24 (2026-05-18, noche)
+## Sesión 25 (2026-05-19)
 
-**Hecho — T-1.it4 implementada en 1 commit (`93baea6`); pendiente validación visual del owner en local antes de cerrar.**
+**Hecho — T-1.it4 cerrada con rework completo del approach (commit `4cbacae`) + 3 mejoras UX del grafo en móvil. Push a `origin/main` aprobado tras validación visual del owner.**
+
+**Contexto:** sesión arrancada con la rama `claude/continue-work-rVl5W` que llevaba la T-1.it4 del subagente (sesión 24, commits `93baea6` + `e135cab`). Fast-forward a `main` "a ciegas" por decisión del owner; validación visual posterior detectó dos bugs distintos que llevaron a reescribir el approach.
+
+**Decisiones técnicas tomadas (con evidencia del bundle de Cytoscape):**
+
+1. **El long-press a base de toggling `grabify` durante un touch NO es viable con Cytoscape.** `r.dragData.touchDragEles` se inicializa SOLO en `touchstart` (si el nodo era grabbable en ese momento) y no se reevalúa después. Si nosotros cambiamos `grabify` a mitad del touch (vía taphold o setTimeout), Cytoscape sí ve el nodo como draggable en `touchmove` pero `touchDragEles` sigue `undefined` → `addNodesToDrag(undefined, …)` → `TypeError: Cannot read properties of undefined (reading 'cy')` (`cytoscape.esm.mjs:25723` llamada desde `:27057`).
+
+2. **`pannable` y `grabbable` son mutuamente excluyentes en Cytoscape**: el override `grabbable` fuerza `false` cuando `pannable` está activo (`cytoscape.esm.mjs:13757`: `return ele.cy().autoungrabify() || ele.pannable() ? false : undefined;`). Por eso `grabify()` no surte efecto sobre un nodo `panify`. El toggle debe ir en pareja.
+
+3. **`tapholdDuration` de Cytoscape está hardcoded a 500 ms** (`cytoscape.esm.mjs:28095`). No se expone al constructor.
+
+4. **`pannable` NO es propiedad de stylesheet**, es un flag del elemento expuesto via API `panify()` / `unpanify()` (una sola `n`).
+
+5. **`$effect` de Svelte 5 con early return**: si la primera ejecución hace `if (!cy) return;` antes de leer una prop reactiva, Svelte solo registra `cy` (que no es `$state`) como dep → el effect nunca se re-evalúa cuando la prop cambia. Fix: leer la prop al principio (`const isEditing = editing;`) antes del early return.
+
+**Solución (commit `4cbacae`) — T-1.it4 reescrita como modo edición:**
+- Prop bindable `editing` en `GrafoMapa.svelte` + botón "Mover nodos" en el sub-header de `/mapa` (variant `outline` ↔ `default` según estado).
+- Modo navegación (default): nodos `panify + ungrabify` → tap abre modal, drag desde nodo pannea canvas.
+- Modo edición: nodos `unpanify + grabify` → tap silenciado (no abre modal para no chocar con drag), drag mueve el nodo y marca `dirty` (botón "Guardar organización" aparece, igual flujo que pre-it.4).
+- Eliminado todo el código del taphold: `armedNode`, `armTimer`, `cancelArmTimer`, `disarmCurrentNode`, `suppressNextTap`, los listeners globales `tapdrag`/`tapend`, el selector de stylesheet `node.drag-armed`. La feature "feedback visual al armar" desaparece — ya no aplica con el patrón nuevo.
+
+**UX del grafo en móvil (mismo commit):**
+- Grafo llega al bottom nav: en `/mapa/+page.svelte:690`, wrapper a `-mx-4 -mb-28 h-[calc(100dvh-13rem)] sm:mx-0 sm:mb-0 sm:h-[70vh]`. `-mb-28` cancela el `pb-28` del `<main>`. Border y rounded solo en `sm:` y arriba (en móvil de borde a borde).
+- `panToEntity` (`GrafoMapa.svelte:538-`) mide el drawer real del DOM (`document.querySelector('[data-slot="sheet-content"][data-side="..."]').getBoundingClientRect()`) en lugar de asumir 50% del contenedor. Auto-calibrado si se cambia el tamaño del drawer.
+- `BottomNav.svelte:42`: sombra `0_-2px_4px_rgba(0,0,0,0.04)` → `0_-2px_8px_rgba(0,0,0,0.18)`. Aplica a todas las pantallas; el motivo de tocarla es que sobre fondos oscuros (el grafo dark) un alpha de 4% se perdía por completo. Mejora general de definición.
+
+**Reglas de proceso clarificadas (memoria + `CONTEXTO_AGENTE.md`):**
+- Actualizar `ESTADO_ACTUAL.md` es parte del flujo de push, no algo separado. Cada push deja el doc al día.
+
+**Validación técnica:**
+- `pnpm check` → 1053 ficheros, 0/0 errores/warnings.
+- Validación visual: owner confirmó modo navegación + modo edición + pan desde nodo OK.
+
+**Próximo paso concreto:**
+- Decidir siguiente tarea de it.4 desde el backlog (`MEJORAS_FUTURAS.md`). Candidatos discutidos en s24: combobox compañero en RollEditor, tab Sumisiones en `/mapa`, orden `/rolls` por `created_at DESC`, tokens semánticos en componentes propios, botón "Forzar actualización" en `/ajustes`, Node 24 en workflow (requiere abrir fichero prohibido).
+
+---
+
+## Sesión 24 (2026-05-18, noche) — implementación inicial T-1.it4, reescrita en s25
+
+**Hecho — T-1.it4 implementada en 1 commit (`93baea6`) por subagente en cloud; pendiente validación visual del owner en local antes de cerrar. APPROACH DESCARTADO: la sesión 25 confirmó que no es viable con Cytoscape (ver decisiones técnicas s25, puntos 1-2). Lo que sigue queda como histórico de qué se intentó y por qué.**
 
 **Contexto:** sesión arrancada justo tras cerrar it.3 (tag `v0.4-it3`). No se redactó plan formal de it.4: se decidió tarea-a-tarea desde el backlog. El owner eligió empezar por la entrada anotada en s23 — "Long-press para activar el drag de nodos en el grafo" (`MEJORAS_FUTURAS.md` §UX).
 
