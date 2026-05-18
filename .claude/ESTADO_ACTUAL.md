@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
 **Última actualización:** 2026-05-18 (cierre sesión 23)
-**Fase activa:** Iteración 3 en curso — vista grafo del mapa técnico (Cytoscape + fcose).
-**Iteración en curso:** it.3, T-1 a T-10 cerradas (incluido fix de breadcrumb T-10.it3.a). T-11 (cierre formal: bump 0.4.0, tag `v0.4-it3`, ADRs) es la siguiente.
+**Fase activa:** Iteración 3 ✅ cerrada (tag `v0.4-it3`, 2026-05-18).
+**Iteración en curso:** ninguna. La siguiente iteración (it.4) está por planificar.
 
 ---
 
@@ -64,18 +64,23 @@
   - Regla nueva en `CONTEXTO_AGENTE.md` (ver arriba).
   - El script se movió a `tests/e2e/grafo-layout.e2e.mjs` con paths parametrizados (`BJJ_E2E_URL`, `BJJ_E2E_OUT`), README de uso y `.gitignore` para `output/`.
 
+**T-11.it3 (commit `4eeeaa7`, tag `v0.4-it3`):** cierre formal de it.3.
+- Bump `package.json` 0.3.0 → 0.4.0.
+- 5 ADRs nuevos en `.claude/decisiones/` (004-008). ADR-009 (breadcrumb dedup) NO se redactó: regla bien capturada en el comentario de `pushOrPopTo` y en sesión 23 de este fichero; si reaparece en otros contextos, se promociona.
+  - 004 — fcose (algoritmo de layout, sesión 20).
+  - 005 — lazy-load Cytoscape vía `await import(...)` (sesión 20).
+  - 006 — layout grafo siempre-visible + Sheet/Drawer (sesión 22).
+  - 007 — sincronización modal↔grafo / pan animado (sesión 23, T-10).
+  - 008 — persistencia layout SQLite + dirty + auto-dirty (sesión 23, T-9).
+- Tag anotado `v0.4-it3` empujado a origin con `--follow-tags`.
+
+**Iteración 3 cerrada.** Total: 11 tareas, 8 sesiones (s16 a s23), ~26 commits. Funcionalidad principal: vista grafo del mapa técnico con persistencia de layout, sincronización modal↔grafo y UI Sheet/Drawer.
+
 **Próximo paso concreto:**
-- Arrancar **T-11.it3** — cierre formal de it.3:
-  - Bump de versión a 0.4.0 (`package.json`).
-  - Tag `v0.4-it3`.
-  - ADRs nuevos:
-    - 004 — fcose (decisión del algoritmo de layout, sesión 20).
-    - 005 — lazy-load de Cytoscape vía `await import(...)` (sesión 20).
-    - 006 — layout grafo siempre-visible + drawer (sesión 22).
-    - 007 — sincronización modal↔grafo (sesión 23, T-10).
-    - 008 — persistencia de layout en SQLite + dirty state + auto-dirty (sesión 23, T-9).
-    - 009 — breadcrumb deduplicado (sesión 23, T-10.it3.a, opcional según peso).
-  - Decidir si MEJORAS_FUTURAS necesita pase de revisión antes de cerrar la iteración.
+- Planificar iteración 4. Posibles candidatos en backlog (`MEJORAS_FUTURAS.md`):
+  - Long-press para drag en grafo (anotado en s23).
+  - Refinamientos de UX heredados de iteraciones previas.
+  - Funcionalidad nueva del PoC (consultar REQUISITOS.md y discutir scope con el owner antes de elegir).
 
 ---
 
