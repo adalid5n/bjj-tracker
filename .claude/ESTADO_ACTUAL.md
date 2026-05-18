@@ -1,8 +1,81 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-18 (cierre sesión 22)
+**Última actualización:** 2026-05-18 (cierre sesión 23)
 **Fase activa:** Iteración 3 en curso — vista grafo del mapa técnico (Cytoscape + fcose).
-**Iteración en curso:** it.3, T-1 a T-8 cerradas. T-9 (persistencia + drag) es la siguiente. T-10 y T-11 quedan pendientes según el plan replanteado (ver sesión 21).
+**Iteración en curso:** it.3, T-1 a T-10 cerradas (incluido fix de breadcrumb T-10.it3.a). T-11 (cierre formal: bump 0.4.0, tag `v0.4-it3`, ADRs) es la siguiente.
+
+---
+
+## Sesión 23 (2026-05-18, tarde)
+
+**Hecho — T-9.it3 (a+b), T-10.it3 y T-10.it3.a cerradas en 4 commits.**
+
+**Decisiones de producto cerradas al inicio de la sesión (T-9):**
+- Modelo de tabla: `grafo_layout(entidad_id TEXT, kind TEXT CHECK in ('posicion','sumision'), x REAL, y REAL, PRIMARY KEY (entidad_id, kind))`. Tabla única sin FK (apunta a dos tablas distintas según `kind`).
+- Limpieza de huérfanos: manual en TS dentro de `deletePosicion()` / `deleteSumision()` (no triggers, no cascade).
+- Layout sí viaja en export/import JSON (`sync.ts` bumpa schema version 4→5).
+- "Reorganizar" corre fcose completo sobre todos los nodos (ignora layout guardado); vista previa temporal hasta Guardar.
+- Drag con dirty explícito + botón "Guardar organización" visible solo si dirty; nada persiste sin pulsar Guardar.
+- Auto-dirty al cargar si hay nodos sin layout en BD (típico: posición creada en otra máquina + importada).
+- F5 con dirty pendiente NO se intercepta (coherente con wizards del proyecto).
+
+**Decisiones de producto cerradas para T-10:**
+- Pan animado al cambiar el top del modal stack: solo pan, zoom intacto.
+- Re-pan en cada cambio del top (push, pop, salto entre entidades).
+- Técnica = arista → pan al midpoint entre source y target.
+- Cerrar el modal entero (stack vacío) → no hacer nada (el grafo se queda donde estaba).
+- Wizards (`wizard-*`) NO disparan pan (no son navegación entre entidades).
+
+**T-9.a.it3 (commit `c674569`):** DB layer del layout del grafo.
+- `SCHEMA_V5_MIGRATION` en `db/schema.ts` con la tabla `grafo_layout`. Migraciones v1-v4 intactas.
+- `src/lib/grafo-layout.ts` (nuevo): `getAllLayouts`, `upsertLayouts` (batch BEGIN/COMMIT/ROLLBACK), `deleteLayout`. Tipo público `GrafoLayoutRow` en snake_case por consistencia con el resto del lib (revertí un primer intento del subagente que iba camelCase).
+- `deletePosicion` y `deleteSumision` ahora llaman a `deleteLayout` al final.
+- `sync.ts`: `CURRENT_SCHEMA_VERSION` 4→5, payload + export + import + validador strict incluyen `grafo_layout`. Layout NO entra en el `countsLine` del toast (plumbing visual, no entidad de negocio — como `roll_posicion`/`roll_tecnica`).
+
+**T-9.b.it3 (commit `c15da2b`):** UI del layout.
+- `GrafoMapa.svelte`: prop bindable `dirty`, métodos exportados `saveLayout()` / `reorganize()`, hidratación desde BD en `onMount` (siembra el `positionsCache` antes de instanciar Cytoscape), `dragfree` handler marca dirty + cachea pero NO persiste, fcose con `fixedNodeConstraint` para acomodar nodos nuevos respetando los fijados. Auto-dirty cuando hay nodos sin layout en BD tras hidratar. Flag `initialLoadComplete` silencia `dragfree` durante el settle inicial.
+- `/mapa/+page.svelte`: botones "Reorganizar" (siempre en vista grafo) y "Guardar organización" (solo si `grafoDirty`) en la fila 2 del sub-header. AlertDialog "¿Descartar cambios del grafo?" SEPARADO del modal host (decisión defendida en `agent-reports/20260518-t9-it3-layout/ui-layer.md`: 2 diálogos secuenciales por scope vs cambiar la API del host).
+- `beforeNavigate` de SvelteKit intercepta navegación BottomNav / back/forward con `grafoDirty=true` → mismo AlertDialog → tras "Descartar" hace `goto(targetUrl)`. `willUnload=true` (F5) NO se intercepta.
+- Botón Reorganizar in-canvas (sobreimpuesto al grafo) eliminado; ahora vive en el sub-header.
+- `tests/e2e/grafo-layout.e2e.mjs` (script Playwright manual, 10 casos) + `tests/e2e/README.md` + `.gitignore`. Extensión `.e2e.mjs` queda fuera del `testMatch` de `playwright.config.ts` → no entra en CI. `playwright.config.ts` ya existía (vino con el scaffolding, nunca había habido tests).
+- `CONTEXTO_AGENTE.md`: regla nueva — "no crear ni ejecutar tests automatizados sin consentimiento explícito" (subagentes y orquestador). Provino de un incidente en esta sesión: un subagente ejecutó un script Playwright propio para validar T-9.b sin pedírmelo a mí ni al owner; los binarios ya estaban en el proyecto, pero el consentimiento no.
+- `MEJORAS_FUTURAS.md`: entrada nueva — "Long-press para activar drag de nodos en el grafo" (Adalid 2026-05-18). Drag instantáneo de Cytoscape funciona; revisar tras uso real en móvil.
+
+**T-10.it3 (commit `18e295b`):** sincronización modal↔grafo.
+- `GrafoMapa.svelte`: método imperativo `panToEntity(target, presentation)`. Resuelve coordenadas (nodo `pos:`/`sum:` por id; midpoint de la arista para `kind: 'tecnica'`), calcula pan target descontando insets del drawer (50% del ancho en `sheet-side`, 50% del alto en `sheet-bottom`), anima 300ms ease-in-out vía `cy.animate({ pan })`. Zoom intacto. `cy.stop()` antes de animar.
+- `/mapa/+page.svelte`: `$effect` que observa `mapaModalStack.top` y la `presentation` derivada; cuando el top cambia (push, pop, salto) llama `panToEntity(...)`. Filtra wizards y `top === undefined`. Bonus: si el dispositivo rota cruzando 768px con un modal abierto, `presentation` cambia y el `$effect` re-corre → re-pan adaptándose al nuevo drawer.
+- Firma elegida: `(target, presentation: 'dialog'|'sheet-side'|'sheet-bottom')` en lugar de pasar insets en pixels, porque el contenedor vive dentro del componente (acceso directo a `cy.width()`/`cy.height()`).
+
+**T-10.it3.a (commit `f28313c`):** fix del breadcrumb.
+- Bug reportado por Adalid mientras testaba T-10: estando en modal de Posición A, abrir Técnica T (origen A) crea breadcrumb `[A, T]`; click en "Origen A" hacía `push` y dejaba `[A, T, A]` en vez de retroceder a `[A]`.
+- Fix unificado: nuevo método `pushOrPopTo(entry)` en `mapa-modal-stack.svelte.ts` — si la entidad destino (mismo `kind`+`id`) ya está en el stack, hace `popTo` en lugar de `push`. Single source of truth para "no duplicar entidades en el breadcrumb; volver a una visitada es retroceder".
+- Reemplazos: 5 sitios — `pushPosicion`/`pushSumision`/`pushTecnica` en `TecnicaModalContent.svelte`, `pushTecnica` en `PosicionModalContent.svelte` y `SumisionModalContent.svelte`. **NO se tocan** los `closeAll + push` (`attemptPushModal` de `+page.svelte`, taps del grafo en `GrafoMapa.svelte`) — son salto lateral, no navegación interna; semántica distinta. **NO se tocan** los push de wizards.
+
+**Validación:**
+- Cada commit con `pnpm check` 0/0 y 13/13 tests reales.
+- T-9.b: validación manual del owner en `pnpm dev` (sub-header, AlertDialog, BottomNav con beforeNavigate).
+- T-10: validación manual del owner en `pnpm dev` (pan funciona; el bug del breadcrumb se descubrió aquí y se arregló en T-10.it3.a).
+- T-10.it3.a: `pnpm check` 0/0; sin validación visual adicional al cierre por scope contenido del fix.
+- 4 commits empujados a origin en 2 lotes (T-9.a + T-9.b + T-10.it3 tras OK del owner; T-10.it3.a aparte).
+
+**Notas de proceso (incidente del subagente Playwright):**
+- Un subagente ejecutó un script Playwright propio para validar T-9.b sin pedírmelo a mí ni al owner. Los binarios ya estaban instalados (vienen como dev deps), no añadió nada al `package.json` ni al lockfile, y los artefactos quedaban en `/tmp`.
+- Decisiones que se tomaron en consecuencia:
+  - Regla nueva en `CONTEXTO_AGENTE.md` (ver arriba).
+  - El script se movió a `tests/e2e/grafo-layout.e2e.mjs` con paths parametrizados (`BJJ_E2E_URL`, `BJJ_E2E_OUT`), README de uso y `.gitignore` para `output/`.
+
+**Próximo paso concreto:**
+- Arrancar **T-11.it3** — cierre formal de it.3:
+  - Bump de versión a 0.4.0 (`package.json`).
+  - Tag `v0.4-it3`.
+  - ADRs nuevos:
+    - 004 — fcose (decisión del algoritmo de layout, sesión 20).
+    - 005 — lazy-load de Cytoscape vía `await import(...)` (sesión 20).
+    - 006 — layout grafo siempre-visible + drawer (sesión 22).
+    - 007 — sincronización modal↔grafo (sesión 23, T-10).
+    - 008 — persistencia de layout en SQLite + dirty state + auto-dirty (sesión 23, T-9).
+    - 009 — breadcrumb deduplicado (sesión 23, T-10.it3.a, opcional según peso).
+  - Decidir si MEJORAS_FUTURAS necesita pase de revisión antes de cerrar la iteración.
 
 ---
 
