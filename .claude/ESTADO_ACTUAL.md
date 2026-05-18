@@ -1,8 +1,55 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-18 (cierre sesión 23)
-**Fase activa:** Iteración 3 ✅ cerrada (tag `v0.4-it3`, 2026-05-18).
-**Iteración en curso:** ninguna. La siguiente iteración (it.4) está por planificar.
+**Última actualización:** 2026-05-18 (sesión 24, T-1.it4 implementada — pendiente validación visual del owner)
+**Fase activa:** Iteración 4 abierta — primera tarea (T-1.it4, long-press en grafo) implementada técnicamente.
+**Iteración en curso:** it.4. Sin plan formal (no se ha escrito `ITERACION_4.md`); scope decidido tarea-a-tarea desde el backlog de `MEJORAS_FUTURAS.md`.
+
+---
+
+## Sesión 24 (2026-05-18, noche)
+
+**Hecho — T-1.it4 implementada en 1 commit (`93baea6`); pendiente validación visual del owner en local antes de cerrar.**
+
+**Contexto:** sesión arrancada justo tras cerrar it.3 (tag `v0.4-it3`). No se redactó plan formal de it.4: se decidió tarea-a-tarea desde el backlog. El owner eligió empezar por la entrada anotada en s23 — "Long-press para activar el drag de nodos en el grafo" (`MEJORAS_FUTURAS.md` §UX).
+
+**Decisiones de producto cerradas al inicio (T-1.it4):**
+- Umbral del long-press: **350 ms** (punto medio entre la estimación inicial de 250 ms y el default de Cytoscape de 500 ms). Sensación de "press deliberado" sin frustrar.
+- Feedback visual al armar: **borde 4 px + escala +10 %** del nodo. Anuncia "ya puedes arrastrar" sin animación de pulso.
+- Feedback háptico: **`navigator.vibrate(20)`** al armar (no-op silencioso en desktop / iOS sin permiso).
+- Aplicabilidad: **mismo umbral en desktop y táctil**. Consistencia + simplifica el código frente a bifurcar por `pointerType`.
+
+**T-1.it4 (commit `93baea6`):** long-press para drag de nodos en grafo.
+- `GrafoMapa.svelte`: nodos en `ungrabify` por defecto al mount; listener `'add', 'node'` mantiene el estado para nodos añadidos posteriormente (tras refresh del catálogo vía el `$effect` que reemplaza elements).
+- Estado local: `armTimer`, `armedNode`, `ARM_DURATION_MS = 350`. Helpers `cancelArmTimer()` / `disarmCurrentNode()`.
+- Handlers nuevos:
+  - `tapstart 'node'`: arranca timer 350 ms; al disparar arma el nodo (`grabbify()` + clase `drag-armed` + `navigator.vibrate(20)`).
+  - `tapdrag` global: cancela el timer si el usuario se mueve antes del umbral → el touch acaba siendo pan del canvas (resuelve el drag accidental al hacer scroll iniciado sobre un nodo).
+  - `tapend` global: cancela timer + desarma (idempotente con `dragfree`).
+- `dragfree 'node'` (existente): se añade `disarmCurrentNode()` al final, tras volcar al cache y marcar dirty.
+- Stylesheet: selector `node.drag-armed` con `border-width: 4` + `width/height: mapData(degree, 0, 8, 30.8, 70.4)` (los mismos rangos base 28-64 ×1.1, hardcoded porque Cytoscape no permite multiplicar `mapData` inline).
+- `onDestroy`: cancela timer + nulea `armedNode` antes de destruir Cytoscape.
+
+**No se usa el evento nativo `taphold` de Cytoscape** porque `r.tapholdDuration` está hardcoded a 500 ms en el renderer (`node_modules/cytoscape/src/extensions/renderer/base/index.mjs:103`) y no se expone como opción pública del constructor. Replicar el patrón con `tapstart` + `tapdrag` + `tapend` da control sobre el umbral sin tocar internals.
+
+**Comportamiento resultante** (a validar en local):
+- Tap rápido en nodo → abre modal (igual que antes).
+- Press <350 ms y soltar sin moverse → abre modal.
+- Press <350 ms + mover → pan del canvas. **Antes:** arrastraba el nodo accidentalmente. **Ahora:** pan limpio.
+- Press ≥350 ms quieto → vibración + nodo crece +10 % con borde reforzado → al mover arrastra; al soltar marca dirty (igual flujo que pre-it.4 para Guardar/Reorganizar).
+- Press ≥350 ms y soltar sin mover → cleanup silencioso. No abre modal, no marca dirty.
+
+**Validación técnica:**
+- `pnpm check` → 1052 ficheros, 0/0 errores/warnings.
+- `pnpm test:unit` → 13/13 tests reales pasando (`grafo.spec.ts` 12/12 intactos; el fallo de `Welcome.svelte.spec.ts` por Playwright browser sin instalar es preexistente y se ignora, igual que en sesiones previas).
+- `pnpm build` → 8.81 s, sin warnings nuevos.
+- **Validación visual: pendiente.** La sesión se desarrolló en el contenedor cloud (Claude Code on the web) sin acceso a navegador del owner. Regla del proyecto (`CONTEXTO_AGENTE.md`): no testar automatizado sin consentimiento explícito.
+
+**Próximo paso concreto (al continuar en local):**
+1. `git pull origin claude/continue-work-rVl5W` + `pnpm install` por si cambió algo.
+2. `pnpm dev`, abrir `/mapa` en vista Grafo (default), validar los 5 comportamientos listados arriba en táctil (móvil real o devtools touch emulator) y en desktop.
+3. Si sensación OK → commit `docs(it-4): cerrar sesión 24 — T-1.it4 validada` actualizando este fichero con resultado de la validación.
+4. Si hay que ajustar (umbral, intensidad visual, vibración) → commit nuevo con el ajuste antes del `docs(...)`.
+5. Decidir siguiente tarea de it.4 desde el backlog. Candidatos discutidos al inicio de la sesión: combobox compañero en RollEditor, tab Sumisiones en `/mapa`, orden `/rolls` por `created_at DESC`, tokens semánticos en componentes propios, botón "Forzar actualización" en `/ajustes`, Node 24 en workflow (requiere abrir fichero prohibido).
 
 ---
 
