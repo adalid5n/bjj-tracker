@@ -76,6 +76,31 @@
 	// auto. Lo activamos al final de `onMount` para que el cierre
 	// natural del layout no se interprete como "el usuario movió algo".
 	let initialLoadComplete = false;
+	// T-1.it4: long-press para activar el drag de un nodo. Los nodos
+	// están en estado `ungrabify` por defecto; tras `tapstart` mantenido
+	// `ARM_DURATION_MS` ms sin movimiento, el nodo bajo el dedo pasa a
+	// `grabbify` + recibe la clase `drag-armed` (feedback visual). Se
+	// desarma al soltar (`tapend`) o tras drag (`dragfree`). El
+	// movimiento antes del umbral (`tapdrag`) cancela el armado para
+	// permitir pan/scroll iniciado sobre un nodo.
+	const ARM_DURATION_MS = 350;
+	let armTimer: ReturnType<typeof setTimeout> | null = null;
+	let armedNode: import('cytoscape').NodeSingular | null = null;
+
+	function cancelArmTimer() {
+		if (armTimer !== null) {
+			clearTimeout(armTimer);
+			armTimer = null;
+		}
+	}
+
+	function disarmCurrentNode() {
+		if (armedNode) {
+			armedNode.ungrabify();
+			armedNode.removeClass('drag-armed');
+			armedNode = null;
+		}
+	}
 
 	/**
 	 * Lee tokens semánticos desde las CSS vars del documento como strings
@@ -215,6 +240,19 @@
 					'background-color': t.foreground,
 					'background-opacity': 1,
 					'border-color': t.foreground
+				}
+			},
+			// T-1.it4: feedback visual del long-press. El nodo "armado"
+			// (tras taphold ≥350 ms) crece un 10 % y refuerza el borde para
+			// que el usuario vea claro que puede arrastrarlo. Mismo rango
+			// que el base (28-64) pero ×1.1 → 30.8-70.4. Hardcoded porque
+			// Cytoscape no soporta multiplicar mapData inline.
+			{
+				selector: 'node.drag-armed',
+				style: {
+					'border-width': 4,
+					width: 'mapData(degree, 0, 8, 30.8, 70.4)',
+					height: 'mapData(degree, 0, 8, 30.8, 70.4)'
 				}
 			},
 			// Aristas: todas en muted-foreground (mismo gris que el borde
@@ -623,6 +661,63 @@
 					const p = node.position();
 					positionsCache.set(node.id(), { x: p.x, y: p.y });
 					dirty = true;
+					disarmCurrentNode();
+				});
+
+				// T-1.it4: long-press para activar el drag.
+				//
+				// Por defecto los nodos son no-arrastrables (`ungrabify`):
+				// cualquier touch/click+drag sobre un nodo se delega al
+				// pan del canvas (igual que si tocaras el fondo). Solo
+				// tras un `tapstart` mantenido `ARM_DURATION_MS` ms sin
+				// movimiento promovemos ese nodo a arrastrable. Eso
+				// elimina el drag accidental al hacer pan táctil iniciado
+				// sobre un nodo, y diferencia claramente "tap para abrir
+				// modal" de "long-press + arrastrar para mover".
+				//
+				// No usamos el evento nativo `taphold` de Cytoscape porque
+				// su duración (`r.tapholdDuration`) está hardcoded a 500
+				// ms en el renderer y no se expone como opción pública.
+				// Replicar el patrón con `tapstart` + `tapdrag` (cancela)
+				// + `tapend` (cleanup) nos da control sobre el umbral sin
+				// tocar internals.
+				instance.nodes().ungrabify();
+				// Nodos añadidos posteriormente (cambio de catálogo, vía
+				// el $effect que reemplaza elements) heredan el estado
+				// "no-arrastrable" automáticamente.
+				instance.on('add', 'node', (event) => {
+					event.target.ungrabify();
+				});
+
+				instance.on('tapstart', 'node', (event) => {
+					const node = event.target;
+					cancelArmTimer();
+					armTimer = setTimeout(() => {
+						armTimer = null;
+						disarmCurrentNode();
+						armedNode = node;
+						node.grabbify();
+						node.addClass('drag-armed');
+						// Feedback háptico (no-op silencioso donde no esté
+						// soportado o no haya permiso — iOS Safari, desktop).
+						if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+							navigator.vibrate(20);
+						}
+					}, ARM_DURATION_MS);
+				});
+
+				// Cualquier movimiento antes de cumplirse el umbral cancela
+				// el armado → el touch acaba siendo pan del canvas, no drag.
+				instance.on('tapdrag', () => {
+					cancelArmTimer();
+				});
+
+				// Cualquier release (sin drag, post-drag, en otro nodo, en el
+				// background) limpia el estado. Idempotente con el
+				// `disarmCurrentNode` de `dragfree`.
+				instance.on('tapend', () => {
+					cancelArmTimer();
+					disarmCurrentNode();
 				});
 
 				// Click en nodo: pushea posición o sumisión al stack de
@@ -690,6 +785,8 @@
 	});
 
 	onDestroy(() => {
+		cancelArmTimer();
+		armedNode = null;
 		cy?.destroy();
 		cy = null;
 	});
