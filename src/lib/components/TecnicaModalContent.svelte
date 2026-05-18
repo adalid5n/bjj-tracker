@@ -187,15 +187,15 @@
 	});
 
 	function pushPosicion(p: Posicion) {
-		mapaModalStack.push({ kind: 'posicion', id: p.id, nombre: p.nombre });
+		mapaModalStack.pushOrPopTo({ kind: 'posicion', id: p.id, nombre: p.nombre });
 	}
 
 	function pushSumision(s: SumisionTerminal) {
-		mapaModalStack.push({ kind: 'sumision', id: s.id, nombre: s.nombre });
+		mapaModalStack.pushOrPopTo({ kind: 'sumision', id: s.id, nombre: s.nombre });
 	}
 
 	function pushTecnica(t: Tecnica) {
-		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+		mapaModalStack.pushOrPopTo({ kind: 'tecnica', id: t.id, nombre: t.nombre });
 	}
 
 	const motivoBloqueoBorrado = $derived(

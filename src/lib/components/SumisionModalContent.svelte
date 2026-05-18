@@ -91,7 +91,7 @@
 	});
 
 	function pushTecnica(t: Tecnica) {
-		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+		mapaModalStack.pushOrPopTo({ kind: 'tecnica', id: t.id, nombre: t.nombre });
 	}
 
 	const motivoBloqueoBorrado = $derived(

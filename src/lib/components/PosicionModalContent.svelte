@@ -206,7 +206,7 @@
 	}
 
 	function pushTecnica(t: Tecnica) {
-		mapaModalStack.push({ kind: 'tecnica', id: t.id, nombre: t.nombre });
+		mapaModalStack.pushOrPopTo({ kind: 'tecnica', id: t.id, nombre: t.nombre });
 	}
 
 	// Total de referencias que bloquean el borrado. Si > 0 → botón deshabilitado.

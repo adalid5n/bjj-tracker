@@ -125,6 +125,33 @@ class MapaModalStack {
 		this.#stack = [...this.#stack, entry];
 	}
 
+	/**
+	 * Navegación entre entidades del mapa (T-10.it3.a). Si la entidad
+	 * destino (mismo `kind` + `id`) ya está en el stack, hacer `popTo`
+	 * para volver a ella en lugar de duplicarla en el breadcrumb.
+	 * Si no, `push` normal.
+	 *
+	 * Regla: el breadcrumb representa el camino de navegación; volver
+	 * a una entidad ya visitada es retroceder, no avanzar. Ejemplo:
+	 * estás en Posición A, abres Técnica T (origen A) → stack=[A, T].
+	 * Click en "Origen A" debe volver a A, no crear [A, T, A].
+	 *
+	 * Solo aplica a navegación entre entidades (`posicion`/`sumision`/
+	 * `tecnica`). Los wizards usan `push` directo: crear/editar no es
+	 * navegación y nunca debería deduplicarse.
+	 */
+	pushOrPopTo(entry: MapaModalEntry): void {
+		if (!('id' in entry)) {
+			this.push(entry);
+			return;
+		}
+		const idx = this.#stack.findIndex(
+			(e) => 'id' in e && e.kind === entry.kind && e.id === entry.id
+		);
+		if (idx >= 0) this.popTo(idx);
+		else this.push(entry);
+	}
+
 	pop(): void {
 		if (this.#stack.length === 0) return;
 		this.#stack = this.#stack.slice(0, -1);
