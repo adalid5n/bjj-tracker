@@ -1,16 +1,19 @@
 <script lang="ts" module>
 	/**
-	 * Cache de posiciones de nodos a nivel de módulo (vive mientras la
-	 * pestaña esté abierta). Lo usamos para que al cambiar de tab y
-	 * volver a "Grafo" la disposición sea idéntica — fcose por diseño
-	 * es no determinista (cada cálculo da un layout distinto).
+	 * Cache de posiciones de nodos a nivel de módulo. Sirve como capa
+	 * intermedia entre la BD (`grafo_layout`) y Cytoscape:
+	 *  - En cada mount sembramos el cache desde `getAllLayouts()`. La
+	 *    BD es la fuente de verdad persistente; el cache evita re-leerla
+	 *    en cada $effect de cambio de catálogo.
+	 *  - Cada drag actualiza el cache + marca dirty (sin persistir).
+	 *  - "Guardar organización" vuelca el cache a BD vía `upsertLayouts`
+	 *    y baja el flag dirty.
+	 *  - "Reorganizar" limpia el cache, corre fcose plano y, en
+	 *    `layoutstop`, re-puebla el cache con las nuevas coords; queda
+	 *    dirty hasta que el usuario guarde.
 	 *
-	 * Convenio: si para los nodos actuales tenemos TODAS sus posiciones
-	 * cacheadas, usamos layout `preset` con esas coords. En cuanto
-	 * aparece un nodo nuevo (catálogo creció), volvemos a fcose y
-	 * sobrescribimos el cache. La regla "$state solo en class fields"
-	 * no aplica aquí porque esto NO es state reactivo — es solo memo
-	 * mutable.
+	 * La regla "$state solo en class fields" no aplica aquí porque esto
+	 * NO es state reactivo — es solo memo mutable.
 	 */
 	const positionsCache = new Map<string, { x: number; y: number }>();
 </script>
@@ -18,12 +21,11 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import type { Core, LayoutOptions, StylesheetJson } from 'cytoscape';
-	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import type { GrafoEdge, GrafoNode } from '$lib/grafo';
 	import { theme } from '$lib/theme.svelte';
 	import GrafoLeyenda from '$lib/components/GrafoLeyenda.svelte';
 	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { getAllLayouts, upsertLayouts, type GrafoLayoutKind } from '$lib/grafo-layout';
 
 	type Props = {
 		nodes?: GrafoNode[];
@@ -39,6 +41,15 @@
 		// interceptar para preguntar "¿Descartar?" si el wizard actual está
 		// dirty antes de cambiar de entidad.
 		onAttemptPush?: (entry: MapaModalEntry) => void;
+		// T-9.b.it3: bindable. El padre observa este flag para mostrar
+		// el botón "Guardar organización" y para interceptar navegación
+		// con AlertDialog "¿Descartar?".
+		// Sube a `true` cuando:
+		//   - tras hidratar desde BD quedan nodos sin layout persistido,
+		//   - el usuario arrastra un nodo,
+		//   - el usuario pulsa Reorganizar.
+		// Vuelve a `false` solo cuando `saveLayout()` termina con éxito.
+		dirty?: boolean;
 	};
 
 	let {
@@ -47,7 +58,8 @@
 		tipos = [],
 		estados = [],
 		categorias = [],
-		onAttemptPush
+		onAttemptPush,
+		dirty = $bindable(false)
 	}: Props = $props();
 
 	let container: HTMLDivElement;
@@ -59,6 +71,11 @@
 	// medio segundo después de `layoutstop`.
 	let reordering = $state(false);
 	let reorderingHideTimer: ReturnType<typeof setTimeout> | null = null;
+	// T-9.b.it3: durante la hidratación inicial (cargar layouts desde
+	// BD + primer layout) silenciamos el handler `dragfree` y el dirty
+	// auto. Lo activamos al final de `onMount` para que el cierre
+	// natural del layout no se interprete como "el usuario movió algo".
+	let initialLoadComplete = false;
 
 	/**
 	 * Lee tokens semánticos desde las CSS vars del documento como strings
@@ -317,12 +334,12 @@
 	 *  - **Todos cacheados** → `preset` con coords del cache. Estable
 	 *    e idéntico a la última vez (caso típico: añadir una arista
 	 *    entre nodos existentes, o solo cambiar entre tabs).
-	 *  - **Cualquier nodo nuevo** → `fcose` completo. Más limpio y
-	 *    predecible que intentar inserción incremental que termina
-	 *    colocando el nuevo nodo en mal sitio (descartado tras
-	 *    feedback del owner — el coste de mantener los viejos
-	 *    inmóviles no se justifica si el resultado igual obliga a
-	 *    reorganizar manualmente).
+	 *  - **Algunos cacheados** → `fcose` con `fixedNodeConstraint` para
+	 *    los que sí están; los nuevos se acomodan respetando los
+	 *    fijados. Caso típico tras T-9.b.it3: layout persistido en BD
+	 *    + nodo nuevo creado en otra sesión.
+	 *  - **Ninguno cacheado** → `fcose` plano. Catálogo vacío de
+	 *    layouts persistidos o tras "Reorganizar".
 	 *
 	 * `forceFcose: true` ignora el cache entero — para el botón
 	 * "Reorganizar" que el usuario pulsa cuando quiere reset.
@@ -347,8 +364,22 @@
 				isPreset: true
 			};
 		}
+		// Algunos nodos cacheados, otros no: fcose con `fixedNodeConstraint`
+		// para fijar los conocidos. fcose acepta un array
+		// `{ nodeId, position: {x,y} }` que mantiene esos nodos inmóviles
+		// durante el cómputo y acomoda solo los nuevos a su alrededor.
+		const fixedNodeConstraint = currentNodes
+			.map((n) => {
+				const cached = positionsCache.get(n.data.id);
+				return cached ? { nodeId: n.data.id, position: cached } : null;
+			})
+			.filter((x): x is { nodeId: string; position: { x: number; y: number } } => x !== null);
 		return {
-			opts: { name: 'fcose', animate: false } as unknown as LayoutOptions,
+			opts: {
+				name: 'fcose',
+				animate: false,
+				fixedNodeConstraint
+			} as unknown as LayoutOptions,
 			isPreset: false
 		};
 	}
@@ -371,15 +402,47 @@
 	}
 
 	/**
-	 * Handler del botón "Reorganizar". Limpia el cache de posiciones y
-	 * corre fcose desde cero. El usuario lo usa cuando el grafo se ha
-	 * vuelto desordenado tras varios cambios incrementales y quiere
-	 * reset visual.
+	 * Limpia el cache de posiciones y corre fcose desde cero. Llamado
+	 * desde el botón "Reorganizar" del padre vía `bind:this`. Marca
+	 * el grafo como dirty: el usuario debe pulsar "Guardar organización"
+	 * para persistir la nueva disposición (o descartar volviendo a
+	 * cargar la página / cambiar de vista). T-9.b.it3.
 	 */
-	function reorganizar() {
+	export function reorganize() {
 		if (!cy) return;
 		positionsCache.clear();
 		runLayoutAndCache(cy, true, true);
+		dirty = true;
+	}
+
+	/**
+	 * Vuelca a BD las posiciones actuales de todos los nodos
+	 * posición/sumisión del grafo. Llamado desde el botón
+	 * "Guardar organización" del padre vía `bind:this`. T-9.b.it3.
+	 *
+	 * El id real (sin prefijo `pos:`/`sum:`) se obtiene strippeando
+	 * los 4 primeros chars del id del nodo Cytoscape, mismo convenio
+	 * que el handler `tap` del nodo.
+	 *
+	 * Reset `dirty=false` solo si el upsert termina sin error; si
+	 * falla, el flag se mantiene para que el usuario pueda reintentar.
+	 */
+	export async function saveLayout(): Promise<void> {
+		if (!cy) return;
+		const rows: { entidad_id: string; kind: GrafoLayoutKind; x: number; y: number }[] = [];
+		cy.nodes().forEach((n) => {
+			const kind = n.data('kind') as GrafoLayoutKind | undefined;
+			if (kind !== 'posicion' && kind !== 'sumision') return;
+			const pos = n.position();
+			rows.push({
+				entidad_id: (n.id() as string).slice(4),
+				kind,
+				x: pos.x,
+				y: pos.y
+			});
+		});
+		await upsertLayouts(rows);
+		dirty = false;
 	}
 
 	// Reaccionar a cambios del dataset (cuando el padre llama refresh()
@@ -404,11 +467,30 @@
 
 		(async () => {
 			try {
-				const [cytoscapeMod, fcoseMod] = await Promise.all([
+				// Cargamos en paralelo: chunk Cytoscape, chunk fcose y la
+				// tabla `grafo_layout` (T-9.b.it3). El SELECT es barato y
+				// el await aquí evita un flicker en el que fcose
+				// computaría posiciones que luego sobreescribiríamos.
+				const [cytoscapeMod, fcoseMod, dbLayouts] = await Promise.all([
 					import('cytoscape'),
-					import('cytoscape-fcose')
+					import('cytoscape-fcose'),
+					getAllLayouts().catch((err) => {
+						// Si la BD falla (improbable: solo lectura), seguimos
+						// con cache vacío. Mejor degradar a fcose plano que
+						// petar la vista entera.
+						console.error('[GrafoMapa] getAllLayouts failed:', err);
+						return [];
+					})
 				]);
 				if (cancelled) return;
+
+				// Siembra el cache desde BD: la clave es el id Cytoscape
+				// (con prefijo `pos:`/`sum:`), el row guarda el id desnudo.
+				positionsCache.clear();
+				for (const row of dbLayouts) {
+					const prefix = row.kind === 'posicion' ? 'pos:' : 'sum:';
+					positionsCache.set(prefix + row.entidad_id, { x: row.x, y: row.y });
+				}
 
 				const cytoscape = cytoscapeMod.default;
 				// cytoscape-fcose es CJS empaquetado; según el bundler `default`
@@ -447,6 +529,19 @@
 					}, 600);
 				});
 
+				// T-9.b.it3: drag persistente. Cada vez que el usuario
+				// suelta un nodo, actualizamos cache + marcamos dirty.
+				// NO escribimos a BD aquí; eso lo hace `saveLayout()`.
+				// Silenciamos durante la carga inicial para no contar el
+				// settle del primer fcose como "el usuario movió algo".
+				instance.on('dragfree', 'node', (event) => {
+					if (!initialLoadComplete) return;
+					const node = event.target;
+					const p = node.position();
+					positionsCache.set(node.id(), { x: p.x, y: p.y });
+					dirty = true;
+				});
+
 				// Click en nodo: pushea posición o sumisión al stack de
 				// modales del mapa (reusa el host existente). El id real
 				// del nodo lleva prefijo 'pos:' o 'sum:' (4 chars) para
@@ -480,6 +575,13 @@
 					}
 				});
 				cy = instance;
+				// T-9.b.it3: si hay nodos sin layout persistido en BD,
+				// fcose con `fixedNodeConstraint` los acomodará alrededor
+				// de los fijados. Auto-dirty para alertar al usuario de
+				// que hay disposiciones nuevas no guardadas.
+				const nodesWithoutDbLayout = nodes.filter((n) => !positionsCache.has(n.data.id));
+				const autoDirty = nodes.length > 0 && nodesWithoutDbLayout.length > 0;
+
 				// Disparar el layout real ahora que el handler de
 				// `layoutstop` ya está registrado y va a poblar el cache.
 				// `fit: true` solo en el primer mount para encuadrar el
@@ -489,6 +591,10 @@
 				// antes del mount (el $effect podría haber corrido con cy null).
 				applyFilters(instance);
 				loading = false;
+				if (autoDirty) dirty = true;
+				// Activar el dragfree handler. A partir de aquí, cualquier
+				// movimiento del usuario sube el flag dirty.
+				initialLoadComplete = true;
 			} catch (e) {
 				error = e instanceof Error ? e.message : String(e);
 				loading = false;
@@ -526,16 +632,11 @@
 	{/if}
 	<div bind:this={container} class="h-full w-full"></div>
 	{#if !loading && !error}
-		<Button
-			variant="outline"
-			size="icon"
-			class="absolute top-3 left-3 z-10 size-9 rounded-full shadow-sm"
-			aria-label="Reorganizar grafo"
-			title="Reorganizar grafo"
-			onclick={reorganizar}
-		>
-			<RefreshCwIcon class="size-4" />
-		</Button>
+		<!--
+		  T-9.b.it3: el botón "Reorganizar" se ha movido al sub-header
+		  de `/mapa` (junto a "Guardar organización"). El padre llama
+		  al método imperativo `reorganize()` vía `bind:this`.
+		-->
 		<GrafoLeyenda />
 		{#if reordering}
 			<div

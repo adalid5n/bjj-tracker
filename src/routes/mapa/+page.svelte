@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import SaveIcon from '@lucide/svelte/icons/save';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
 	import GrafoMapa from '$lib/components/GrafoMapa.svelte';
@@ -10,7 +13,8 @@
 	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
 	import { buildGrafoElements } from '$lib/grafo';
 	import { useMediaQuery } from '$lib/hooks/use-media.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import type {
@@ -150,8 +154,51 @@
 		{ attemptCloseAll: (onClose?: () => void) => void } | undefined
 	>(undefined);
 
+	// T-9.b.it3: ref al componente del grafo para invocar `saveLayout()`
+	// y `reorganize()` desde los botones del sub-header. La prop `dirty`
+	// llega bindable: el grafo la sube cuando el usuario arrastra o
+	// pulsa Reorganizar, y la baja cuando guarda con éxito.
+	let grafoComponent = $state<
+		{ saveLayout: () => Promise<void>; reorganize: () => void } | undefined
+	>(undefined);
+	let grafoDirty = $state(false);
+	let savingLayout = $state(false);
+	// AlertDialog "¿Descartar cambios del grafo?" usado cuando el
+	// usuario intenta cambiar a vista Lista con `grafoDirty=true`.
+	// Patrón controlado (open + onOpenChange, NO bind:open) idéntico al
+	// del MapaModalHost. Decidí mantenerlo SEPARADO del AlertDialog del
+	// host de modales (en lugar de fusionar ambos) porque:
+	//   1. El host no expone `isDirty()` al padre; fusionar requeriría
+	//      cambiar su API.
+	//   2. Los dos diálogos NO suelen coincidir en el flujo real (los
+	//      cambios del grafo no se hacen con un wizard abierto) y, si
+	//      coinciden, dos diálogos secuenciales (uno por scope) dicen
+	//      con más claridad QUÉ se está descartando.
+	let mostrarConfirmDescartarGrafo = $state(false);
+	let accionPostDescarteGrafo: (() => void) | null = null;
+
 	onMount(() => {
 		void refresh();
+	});
+
+	// T-9.b.it3: si el usuario intenta navegar a otra ruta (BottomNav,
+	// link interno, back/forward del navegador) con cambios sin guardar
+	// en el grafo, cancelamos la navegación y reusamos el mismo
+	// AlertDialog que el toggle Grafo/Lista. Tras "Descartar" se ejecuta
+	// `goto(nav.to.url)` para completar la navegación que el usuario
+	// pidió originalmente.
+	beforeNavigate((nav) => {
+		// `willUnload=true` cubre F5/cerrar pestaña/escribir URL nueva —
+		// casos donde `cancel()` no funciona y donde, por decisión del
+		// proyecto, no interceptamos (coherente con los wizards, que
+		// también pierden borradores en F5).
+		if (!grafoDirty || nav.willUnload || !nav.to) return;
+		nav.cancel();
+		const targetUrl = nav.to.url;
+		accionPostDescarteGrafo = () => {
+			void goto(targetUrl);
+		};
+		mostrarConfirmDescartarGrafo = true;
 	});
 
 	async function refresh() {
@@ -322,16 +369,73 @@
 	}
 
 	// Cambio de vista (Grafo / Lista) desde el toggle del sub-header.
-	// Si hay modal abierto con cambios sin guardar, el AlertDialog
-	// "¿Descartar?" del host se interpone; el cambio de vista solo
-	// ocurre tras confirmar el descarte.
+	// Orden de comprobaciones (T-9.b.it3):
+	//   1. Si el grafo tiene cambios sin guardar Y vamos a salir de la
+	//      vista grafo (target='lista'), abrimos el AlertDialog del
+	//      grafo. Tras "Descartar", limpiamos `grafoDirty` y seguimos.
+	//   2. Si tras eso hay un wizard sucio, el AlertDialog del modal
+	//      host se interpone (diálogo secuencial — ver decisión arriba).
+	// Pasar de Lista a Grafo no necesita confirmación del grafo (el
+	// estado del grafo se mantiene tal cual al volver).
 	function requestVistaChange(target: 'grafo' | 'lista') {
 		if (target === vistaPrincipal) return;
-		if (modalHost) {
-			modalHost.attemptCloseAll(() => (vistaPrincipal = target));
-		} else {
-			vistaPrincipal = target;
+		const proceed = () => {
+			if (modalHost) {
+				modalHost.attemptCloseAll(() => (vistaPrincipal = target));
+			} else {
+				vistaPrincipal = target;
+			}
+		};
+		if (target === 'lista' && grafoDirty) {
+			accionPostDescarteGrafo = proceed;
+			mostrarConfirmDescartarGrafo = true;
+			return;
 		}
+		proceed();
+	}
+
+	function handleConfirmDescartarGrafo() {
+		// Confirmación de descarte del grafo. Bajamos el flag ANTES de
+		// llamar a la acción pendiente (regla del proyecto sesión 7: el
+		// dirty handler debe estar limpio antes de tocar el stack/vista).
+		// La página recargará layouts desde BD la próxima vez que el
+		// componente GrafoMapa se monte; mientras tanto, las posiciones
+		// en pantalla quedan tal cual (sin re-hidratación). Es coherente
+		// con el patrón del proyecto: descartar = perder los cambios en
+		// memoria, no rehacer un layout.
+		const cb = accionPostDescarteGrafo;
+		accionPostDescarteGrafo = null;
+		mostrarConfirmDescartarGrafo = false;
+		grafoDirty = false;
+		cb?.();
+	}
+
+	function handleConfirmDescartarGrafoOpenChange(value: boolean) {
+		if (!value) {
+			accionPostDescarteGrafo = null;
+			mostrarConfirmDescartarGrafo = false;
+		}
+	}
+
+	async function handleGuardarOrganizacion() {
+		if (!grafoComponent || savingLayout) return;
+		savingLayout = true;
+		try {
+			await grafoComponent.saveLayout();
+			// `dirty` lo baja el propio componente al éxito; no tocamos
+			// `grafoDirty` aquí (llegará vía el binding bindable).
+		} catch (err) {
+			console.error('[mapa] saveLayout failed:', err);
+			// TODO(toast): cuando el proyecto tenga un toast global,
+			// mostrar error legible. De momento solo console.error —
+			// `grafoDirty` se mantiene true para que el usuario reintente.
+		} finally {
+			savingLayout = false;
+		}
+	}
+
+	function handleReorganizar() {
+		grafoComponent?.reorganize();
 	}
 </script>
 
@@ -486,8 +590,12 @@
 				  compactos. Patrón vacío = todos pasan (igual que la vista
 				  Técnicas). El badge del contador aparece solo si hay
 				  selección activa en esa dimensión.
+				  T-9.b.it3: al final de la fila aparecen los botones
+				  "Reorganizar" (siempre visible en vista grafo) y "Guardar
+				  organización" (solo si grafoDirty). En móvil hacen wrap
+				  natural a la siguiente fila gracias a `flex-wrap`.
 				-->
-				<div class="flex min-h-9 flex-wrap gap-2">
+				<div class="flex min-h-9 flex-wrap items-center gap-2">
 					<FilterDropdown
 						label="Tipo"
 						options={tipoOptions}
@@ -509,6 +617,33 @@
 						onChange={(v) => (categoriasGrafo = v)}
 						ariaLabel="Filtrar grafo por categoría de posición"
 					/>
+					<div class="ml-auto flex flex-wrap items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={handleReorganizar}
+							aria-label="Reorganizar grafo"
+							title="Reorganizar grafo"
+						>
+							<RefreshCwIcon class="size-4" />
+							<span class="hidden sm:inline">Reorganizar</span>
+						</Button>
+						{#if grafoDirty}
+							<Button
+								variant="default"
+								size="sm"
+								disabled={savingLayout}
+								onclick={handleGuardarOrganizacion}
+								aria-label="Guardar organización del grafo"
+							>
+								<SaveIcon class="size-4" />
+								<span class="hidden sm:inline"
+									>{savingLayout ? 'Guardando…' : 'Guardar organización'}</span
+								>
+								<span class="sm:hidden">{savingLayout ? '…' : 'Guardar'}</span>
+							</Button>
+						{/if}
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -523,6 +658,8 @@
 			-->
 			<div class="-mx-4 h-[70vh] bg-muted/20">
 				<GrafoMapa
+					bind:this={grafoComponent}
+					bind:dirty={grafoDirty}
 					nodes={grafoElements.nodes}
 					edges={grafoElements.edges}
 					tipos={tiposGrafo}
@@ -685,3 +822,35 @@
 {/if}
 
 <MapaModalHost bind:this={modalHost} onCatalogChanged={refresh} {presentation} />
+
+<!--
+  AlertDialog "¿Descartar cambios del grafo?" (T-9.b.it3). Se abre
+  cuando el usuario intenta cambiar a vista Lista con `grafoDirty=true`.
+  Patrón controlado (open + onOpenChange, NO bind:open) idéntico al del
+  MapaModalHost. Decisión: diálogo separado del de cambios en wizards;
+  los dos son ortogonales y secuenciales evitan ambigüedad sobre qué
+  se está descartando — ver razonamiento en el bloque <script>.
+-->
+<AlertDialog.Root
+	open={mostrarConfirmDescartarGrafo}
+	onOpenChange={handleConfirmDescartarGrafoOpenChange}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>¿Descartar cambios del grafo?</AlertDialog.Title>
+			<AlertDialog.Description>
+				Tienes cambios sin guardar en la organización del grafo. Si cambias de vista
+				ahora, se perderán.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={handleConfirmDescartarGrafo}
+				class={buttonVariants({ variant: 'destructive' })}
+			>
+				Descartar
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

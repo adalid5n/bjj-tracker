@@ -42,6 +42,15 @@
 
 - No tocar `vite.config.ts`, `svelte.config.js`, `+layout.svelte`,
   `+layout.ts`, `.github/workflows/deploy.yml` sin pedirlo explícitamente.
+- **No crear ni ejecutar tests automatizados (Playwright, vitest-browser,
+  scripts headless de cualquier tipo) sin consentimiento explícito del
+  owner.** Aplica tanto a subagentes como al orquestador en main. Si una
+  tarea parece beneficiarse de validación automatizada, parar y
+  preguntar — describir el alcance (qué se va a probar, qué artefactos
+  se crean, dónde viven) antes de ejecutar. Para `pnpm check`,
+  `pnpm test:unit` (suite existente), `pnpm build` y `pnpm preview` no
+  hace falta consentimiento; son comandos de verificación rutinarios.
+  Para tests E2E del repo, ver `tests/e2e/README.md`.
 - No añadir dependencias no acordadas. Sin Drizzle, Prisma, Dexie, Kysely.
 - SQL crudo. API mínima de DB: `init`, `run`, `query`.
 - SQLite-WASM solo en cliente, nunca durante SSR/prerender.

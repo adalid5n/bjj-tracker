@@ -12,6 +12,14 @@ Cada entrada debería responder:
 
 ## UX
 
+### Long-press para activar el drag de nodos en el grafo
+
+- **Origen:** T-9.b.it3, feedback Adalid 2026-05-18
+- **Estado actual:** drag instantáneo de Cytoscape (Adalid esperaba que requiriera mantener pulsado unos ms antes de activarse).
+- **Idea:** capturar `mousedown`/`touchstart` + timer de ~250 ms, sólo permitir `grabbable: true` si el tiempo se cumple. Restaurar al `mouseup`/`touchend`.
+- **Por qué:** evita drag accidentales al hacer scroll/zoom táctil en móvil, y diferencia mejor "tap para abrir modal" de "arrastrar nodo".
+- **Cuándo:** revisar tras uso real en móvil. Si hay drag accidentales o tap+drag confusos, abrir tarea con datos concretos. Coste estimado: 1-3 h pelea con Cytoscape (no trae long-press out of the box).
+
 ### ~~Reducir read-only de chips en /rolls y /sesion/[id]~~ — HECHO 2026-05-16 (parcial)
 
 - **Origen:** T-3.it2.b, feedback Adalid 2026-05-16
