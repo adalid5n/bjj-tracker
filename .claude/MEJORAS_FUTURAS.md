@@ -68,10 +68,20 @@ cubierto: en modo navegación los nodos no son grabbable.
 ### Roll editor — sugerir compañero por defecto + selector inteligente
 
 - **Origen:** T-6, feedback Adalid 2026-05-09
-- **Idea (sugerencia):** al añadir un roll nuevo, pre-seleccionar un compañero como sugerencia. Algoritmo a decidir: último compañero de la sesión actual, o más frecuente del usuario, o último de la app en general.
-- **Idea (selector):** sustituir el `Select` simple por un autocompletado tipo combobox. El usuario escribe un nombre, se filtran las coincidencias. Si no hay match, opción "Crear como nuevo compañero" inline (sin abrir modal).
-- **Por qué:** captura más rápida en el caso primario (CU-1 tras clase). Reducir taps y modales anidados.
-- **Cuándo:** tras cerrar Iteración 0 si la fricción de los modales anidados se nota en uso real.
+- **Parte A — sugerencia automática (PENDIENTE):** al añadir un roll
+  nuevo, pre-seleccionar un compañero como sugerencia. Algoritmo a
+  decidir: último compañero de la sesión actual, o más frecuente del
+  usuario, o último de la app en general. Diferido a iteración con
+  foco en captura (decisión 2026-05-19 al formalizar it.4).
+- **~~Parte B — selector tipo combobox~~ — HECHA** (probablemente en
+  T-10/T-11 de it.1, confirmado y cerrado oficialmente en sesión 29 al
+  abordar T-2.it4). El componente `src/lib/components/CompaneroCombobox.svelte`
+  ya implementa autocompletado + opción "+ Crear nuevo" inline; está
+  integrado en `RollEditor.svelte:689-694` (step 1, "¿Con quién?").
+- **Por qué (de la entrada original):** captura más rápida en el caso
+  primario (CU-1 tras clase). Reducir taps y modales anidados.
+- **Cuándo (solo aplicable a Parte A):** iteración con foco en captura.
+  Requiere antes decisión de algoritmo y validación en uso real.
 
 ### ~~Botón "+ Nuevo compañero" debe ser FAB igual que "+ Nueva sesión"~~ — HECHO en T-9+T-10 (commit pendiente)
 

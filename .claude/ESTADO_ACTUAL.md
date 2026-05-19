@@ -1,8 +1,34 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 28, T-5.it4 cerrada — home con headers por día + helper compartido)
-**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅; quedan T-2/T-4 (en ese orden).
-**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md` (v1.1). Scope: T-1 ✅, T-3 ✅, T-5 ✅, T-2 (combobox compañero en RollEditor), T-4 (auditoría tokens). Cierre con tag `v0.4.1-it4`.
+**Última actualización:** 2026-05-19 (sesión 29, T-2.it4 cerrada como ya hecha — feature ya existía en código)
+**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅, T-2.it4 ✅; queda **solo T-4** para cerrar la iteración.
+**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md` (v1.1). Scope: T-1 ✅, T-3 ✅, T-5 ✅, T-2 ✅, T-4 (auditoría tokens). Cierre con tag `v0.4.1-it4`.
+
+---
+
+## Sesión 29 (2026-05-19) — T-2.it4 cerrada sin código (feature ya existía)
+
+**Hecho — T-2.it4 (combobox compañero en RollEditor) marcada ✅ tras descubrir que la feature ya estaba implementada antes de ser promovida a it.4. Cero código nuevo; solo limpieza documental.**
+
+**Hallazgo:** al arrancar la fase Plan de T-2 (`grep companero src/lib/components/RollEditor.svelte` + listado de componentes), apareció `src/lib/components/CompaneroCombobox.svelte` — un componente que:
+- Filtra `companeros` por `query` en vivo (`$derived` `filtered`).
+- Muestra opción `+ Crear nuevo: "<query>"` cuando no hay match exacto (`showCreate`).
+- Dispara `onCreate(nombre)` sin abrir modal externo.
+- Está integrado en `RollEditor.svelte:689-694` en el step 1 "¿Con quién?".
+
+Esto cubre literalmente la Parte B del backlog "Roll editor — sugerir compañero por defecto + selector inteligente". Probablemente se construyó en T-10 o T-11 (it.1) y nadie volvió a tachar la entrada del backlog.
+
+**Lección documentada como sparring note:** revisar el código actual contra cada entrada del backlog antes de promoverla a una iteración. La formalización de it.4 (s26) hubiera detectado esto si se hubiera verificado contra el repo en lugar de tirar del backlog crudo. Coste: ~5 min de investigación previa habrían evitado promover una tarea fantasma.
+
+**Backlog actualizado:**
+- La entrada "Roll editor — sugerir compañero por defecto + selector inteligente" se reescribió: Parte B marcada como HECHA con referencia a `CompaneroCombobox.svelte`; Parte A (sugerencia automática) sigue activa como diferida a futura iteración de captura.
+
+**Validación:**
+- Sin cambios en código → `pnpm check` queda como en s28 (1054/0/0).
+- Validación visual no requerida explícitamente por el owner; se confía en la lectura de código del componente como evidencia.
+
+**Próximo paso concreto:**
+- Arrancar **T-4.it4** — auditoría tokens semánticos en `src/`. Última tarea de it.4. Tras cerrarla, aplicar tag `v0.4.1-it4` y cerrar iteración.
 
 ---
 

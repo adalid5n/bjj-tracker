@@ -1,7 +1,7 @@
 # Iteración 4 — Pulido post-grafo y consistencia UX
 
 **Versión:** 1.1 (re-formalizada en sesión 27 con T-5.it4 añadida)
-**Estado:** 🟢 En curso — T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅; quedan T-2/T-4
+**Estado:** 🟢 En curso — T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅, T-2.it4 ✅; queda T-4
 **Predecesor:** Iteración 3 (cerrada con `v0.4-it3`, 2026-05-19)
 
 ---
@@ -79,33 +79,43 @@ hallazgos sobre Cytoscape; sin regresiones en `pnpm check`.
 
 ---
 
-### T-2.it4 — Combobox compañero en RollEditor
+### T-2.it4 — Combobox compañero en RollEditor ✅
 
-**Origen:** `MEJORAS_FUTURAS.md §Roll editor — sugerir compañero por defecto + selector inteligente` (Parte B).
+**Estado:** ✅ Cerrada (sesión 29 — 2026-05-19). **Sin código nuevo:
+la feature ya estaba implementada antes de promover la tarea a it.4.**
 
-**Qué entra:**
-- Sustituir el `Select` simple del campo "compañero" del RollEditor por
-  un combobox con autocompletado (filtrado en vivo según lo tecleado).
-- Si lo tecleado no coincide con ningún compañero existente, mostrar
-  opción inline **"Crear como nuevo compañero"** que cree la entidad
-  sin abrir un modal/wizard adicional.
+**Lo que se encontró:**
+- `src/lib/components/CompaneroCombobox.svelte` ya existe (construido
+  probablemente en T-10/T-11 de it.1) y cumple las dos capacidades que
+  T-2.it4 pedía:
+  - **Autocompletado real**: filtra `companeros` por `query` mientras
+    se teclea (`$derived` `filtered`).
+  - **"Crear nuevo" inline**: cuando `query` no matchea exactamente
+    ningún nombre existente, aparece la opción `+ Crear nuevo: "<query>"`
+    que dispara `onCreate(nombre)` sin abrir wizard externo.
+- `RollEditor.svelte:689-694` lo usa en el step 1 ("¿Con quién?") con
+  los handlers correctos. Al crear inline, se abre un sub-panel
+  opcional para añadir cinturón/peso/notas (líneas 696-731) — flow
+  validado y consistente con lo que el owner buscaba.
 
-**Qué NO entra:**
-- Sugerencia/preselección automática al abrir el editor (Parte A del
-  backlog). Sigue en `MEJORAS_FUTURAS.md` como entrada activa.
-
-**Implementación esperada:**
-- Reusar el `Combobox.svelte` propio (creado en T-10 sobre primitives
-  de bits-ui). Aplica si se identifica un patrón equivalente entre
-  posiciones (T-10) y compañeros.
-- Si "crear inline" requiere algo más que un nombre, abrir wizard
-  completo en lugar de inline (caso por confirmar al implementar).
+**Por qué la tarea entró al backlog y luego se promovió pese a estar
+hecha:** la entrada original del backlog (`Roll editor — sugerir
+compañero por defecto + selector inteligente`, anotada en T-6
+2026-05-09) era anterior al Combobox. Nadie volvió a la entrada para
+tacharla cuando la feature aterrizó en T-10/T-11. Lección: revisar
+backlog antes de cada formalización de iteración.
 
 **Validación:**
-- `pnpm check` limpio.
-- Verificación manual: abrir RollEditor, escribir nombre parcial,
-  seleccionar de sugerencias; escribir nombre nuevo, ejecutar "Crear
-  como nuevo compañero", confirmar que aparece en el catálogo.
+- Visual: pendiente verificar con uso real, pero el código revisado
+  (combobox + opción crear inline + integración en RollEditor) cumple
+  literalmente lo descrito en la Parte B del backlog.
+- `pnpm check`: sin cambios, queda como estaba (1054/0/0 desde T-5).
+
+**Lo que NO se hizo (sigue en backlog activo):**
+- **Parte A del backlog**: sugerencia automática de compañero al abrir
+  el editor (último de la sesión / más frecuente / último global).
+  Requiere decisión de algoritmo. Diferido a iteración con foco en
+  captura.
 
 ---
 
@@ -228,12 +238,9 @@ hallazgos sobre Cytoscape; sin regresiones en `pnpm check`.
 1. **T-1.it4** ✅ Cerrada (sesión 25, commits `93baea6` + `4cbacae`).
 2. **T-3.it4** ✅ Cerrada (sesión 27, commit `90aa1a7`).
 3. **T-5.it4** ✅ Cerrada (sesión 28, commit `0d50b00`).
-4. **T-2.it4** (siguiente activa) — combobox compañero en RollEditor.
-   Riesgo medio (toca componente con dirty handler y wizard de
-   creación). Ejecutar con `pnpm dev` abierto y validar inline.
-5. **T-4.it4** — auditoría tokens semánticos en `src/`. Mecánica pero
-   extensa. Al final para no mezclar diffs visuales con cambios
-   funcionales de T-5/T-2.
+4. **T-2.it4** ✅ Cerrada (sesión 29, sin código — feature ya existía).
+5. **T-4.it4** (única pendiente) — auditoría tokens semánticos en `src/`.
 
-Orden confirmado por owner en sesión 27 (T-5 → T-2 → T-4). Si emerge
-razón para reordenar, se documenta en `ESTADO_ACTUAL.md` y se sigue.
+Orden confirmado por owner en sesión 27 (T-5 → T-2 → T-4). El descubrimiento
+de que T-2 ya estaba hecha acelera el cierre de it.4 — solo queda T-4 para
+aplicar tag `v0.4.1-it4`.
