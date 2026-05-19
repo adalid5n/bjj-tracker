@@ -23,8 +23,26 @@
 	let errorMessage = $state('');
 	let editorOpen = $state(false);
 	let diaSeleccionado = $state(todayIso());
+	let initialized = $state(false);
+
+	const DIA_STORAGE_KEY = 'home:diaSeleccionado';
 
 	onMount(async () => {
+		// Restaurar día seleccionado desde sessionStorage si existe y es
+		// válido. Persistencia por tab: al navegar a /sesion/[id] y volver,
+		// el día se mantiene. Si el user cierra el tab y vuelve, default
+		// a hoy (sessionStorage se limpia al cerrar tab). Esto evita el
+		// reseteo a hoy reportado por el owner en sesión 34.
+		try {
+			const stored = sessionStorage.getItem(DIA_STORAGE_KEY);
+			if (stored && /^\d{4}-\d{2}-\d{2}$/.test(stored)) {
+				diaSeleccionado = stored;
+			}
+		} catch {
+			// sessionStorage puede fallar en modos privados restrictivos; ignorar.
+		}
+		initialized = true;
+
 		try {
 			api = await import('$lib/sesiones');
 			sesiones = await api.listSesiones();
@@ -33,6 +51,20 @@
 			errorMessage = err instanceof Error ? err.message : String(err);
 			status = 'error';
 			console.error('[home] init failed:', err);
+		}
+	});
+
+	// Persistir cambios en `diaSeleccionado` a sessionStorage. La flag
+	// `initialized` evita que el effect escriba el default `todayIso()`
+	// sobre el valor stored antes de que onMount haya tenido oportunidad
+	// de restaurarlo.
+	$effect(() => {
+		const v = diaSeleccionado;
+		if (!initialized) return;
+		try {
+			sessionStorage.setItem(DIA_STORAGE_KEY, v);
+		} catch {
+			// ignorar
 		}
 	});
 
