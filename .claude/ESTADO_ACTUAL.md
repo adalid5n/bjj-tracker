@@ -1,8 +1,31 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 27, T-3.it4 cerrada + T-5.it4 promovida — pivot organizado al rediseño de home)
-**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 ✅, T-3.it4 ✅; quedan T-5/T-2/T-4 (en ese orden).
-**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md` (v1.1, re-formalizado en s27). Scope: T-1 ✅, T-3 ✅, T-5 (agrupar sesiones en home), T-2 (combobox compañero), T-4 (auditoría tokens). Cierre con tag `v0.4.1-it4`.
+**Última actualización:** 2026-05-19 (sesión 28, T-5.it4 cerrada — home con headers por día + helper compartido)
+**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅; quedan T-2/T-4 (en ese orden).
+**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md` (v1.1). Scope: T-1 ✅, T-3 ✅, T-5 ✅, T-2 (combobox compañero en RollEditor), T-4 (auditoría tokens). Cierre con tag `v0.4.1-it4`.
+
+---
+
+## Sesión 28 (2026-05-19) — T-5.it4 cerrada — home con headers por día
+
+**Hecho — T-5.it4 implementada y validada visualmente en un solo paso (commit `0d50b00`). Home pasa de lista plana a agrupada por día con headers "Hoy" / "Ayer" / fecha formateada.**
+
+**Decisiones de producto cerradas pre-implementación:**
+- **Formato de fecha con año** (`lun, 12 may 2026`) en lugar del `lun, 12 may` previo de home. Consistencia con `/rolls` + permite distinguir sesiones de años anteriores en uso prolongado.
+- **Extraer helper** (`src/lib/day-headers.ts`) en lugar de duplicar. Dos consumidores reales (`/rolls` y home), ~15 líneas de lógica — DRY justificado.
+
+**Cambio de UI emergente (no estaba explícito en el plan de T-5):**
+- En el card de home se eliminó la fecha (`formatFecha(s.fecha)`) porque ahora la comunica el header del grupo, y se promocionó el tipo de sesión (`BJJ` / `Grappling` / `Open mat`) a la posición principal del card. Es consistente con el principio que el owner anotó hace minutos ("Reducir copy / texto inicial en cada pantalla"): si la info ya está visible por otro vector, eliminarla del segundo punto.
+
+**Refactor incidental:**
+- `/rolls/+page.svelte` perdió ~30 líneas duplicadas (las funciones `todayIso`, `yesterdayIso`, `headerFmt`, `dayHeaderLabel` se movieron al helper). Sin cambio visual ni funcional en `/rolls`.
+
+**Validación:**
+- `pnpm check` 1054/0/0.
+- Verificación visual del owner OK: headers correctos en bloques Hoy / Ayer / días previos; card sin fecha se entiende; tap sesión → detalle sigue funcionando.
+
+**Próximo paso concreto:**
+- Arrancar **T-2.it4** — combobox compañero en RollEditor (solo Parte B del backlog: combobox autocompletado + opción "Crear como nuevo compañero" inline si no hay match). Reusar `Combobox.svelte` propio (existente desde T-10).
 
 ---
 

@@ -1,7 +1,7 @@
 # Iteración 4 — Pulido post-grafo y consistencia UX
 
 **Versión:** 1.1 (re-formalizada en sesión 27 con T-5.it4 añadida)
-**Estado:** 🟢 En curso — T-1.it4 ✅, T-3.it4 ✅; quedan T-5/T-2/T-4
+**Estado:** 🟢 En curso — T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅; quedan T-2/T-4
 **Predecesor:** Iteración 3 (cerrada con `v0.4-it3`, 2026-05-19)
 
 ---
@@ -132,54 +132,41 @@ hallazgos sobre Cytoscape; sin regresiones en `pnpm check`.
 
 ---
 
-### T-5.it4 — Agrupar sesiones en home con headers por día
+### T-5.it4 — Agrupar sesiones en home con headers por día ✅
 
-**Origen:** Pieza concreta promovida desde la entrada paraguas "Rediseño
-de home" de `MEJORAS_FUTURAS.md §UX` (anotada por el owner el 2026-05-19;
-promovida a it.4 en sesión 27 — opción B del plan de pivot organizado).
+**Estado:** ✅ Cerrada (commit `0d50b00`, sesión 28 — 2026-05-19).
 
-**Estado actual:** la home (`src/routes/+page.svelte`) muestra una lista
-plana de sesiones sin separación temporal. Cuando hay muchas sesiones
-el scroll se vuelve denso y la noción de "qué pasó hoy / ayer" se
-pierde.
+**Lo que se hizo:**
+- **Nuevo `src/lib/day-headers.ts`**: helper compartido con `todayIso`,
+  `yesterdayIso` y `dayHeaderLabel` (devuelve "Hoy" / "Ayer" /
+  "lun, 12 may 2026" con `Intl.DateTimeFormat` en `es-ES`). Decisión
+  pre-implementación: **extraer** (vs duplicar) porque dos consumidores
+  reales con ~15 líneas de lógica compartida — DRY justificado.
+- **`/rolls/+page.svelte`**: importa `dayHeaderLabel` del helper,
+  elimina ~30 líneas duplicadas inline. Sin cambio visual.
+- **`/+page.svelte` (home)**: añade `sesionesPorDia` derived
+  (agrupamiento secuencial — la query `listSesiones` ya devuelve
+  `ORDER BY s.fecha DESC, s.created_at DESC`). Lista plana →
+  `<section>` por día con `<h2>` en mismo estilo que `/rolls`. La
+  fecha se elimina del card (ahora la comunica el header del grupo);
+  el tipo de sesión pasa a la posición principal del card.
 
-**Qué entra:**
-- Aplicar a la lista de sesiones de la home el patrón de agrupamiento
-  por día ya existente en `/rolls/+page.svelte`: función
-  `dayHeaderLabel` ("Hoy" / "Ayer" / fecha formateada `lun, 12 may 2026`)
-  + `$derived` que reagrupa sesiones por fecha.
-- Decisión al implementar: **extraer `dayHeaderLabel` y el formatter a
-  un util compartido** (p. ej. `src/lib/date-headers.ts`) **vs duplicar**.
-  Recomendación: si el helper se reduce a ~10-15 líneas y dos rutas lo
-  consumen, extraer. Si añade peso (timezone, tests, edge cases),
-  duplicar con nota de TODO.
-- Si la home renderea las sesiones desde un componente intermedio (no
-  inline en `+page.svelte`), el agrupamiento se hace en el wrapper, no
-  en el componente de fila.
+**Cambio de copy en home:**
+- Antes: `formatFecha(s.fecha)` → "lun, 12 may" (sin año).
+- Ahora: header del grupo → "Hoy" / "Ayer" / "lun, 12 may 2026" (con
+  año). Decisión del owner pre-implementación: usar el formato con año
+  para consistencia con `/rolls` y permitir distinguir sesiones de
+  años anteriores en uso prolongado.
 
-**Qué NO entra:**
-- **Calendario en home** (vista mensual marcando días con sesiones).
-  Sigue en backlog, candidato a it.5.
-- **Rediseño general de qué información merece la primera pantalla**
-  (stats, próxima clase, últimos rolls, etc.). Sigue en backlog,
-  candidato a it.5.
-
-**Por qué:** la home es la primera pantalla en cada apertura de la PWA.
-Hoy es funcional pero plana. Agrupar por día da estructura temporal sin
-romper el flujo actual de tap → detalle de sesión.
+**Lo que NO se hizo (sigue en backlog para it.5):**
+- Calendario en home (vista mensual marcando días con sesiones).
+- Rediseño general de qué información merece la primera pantalla.
 
 **Validación:**
-- `pnpm check` limpio.
-- Verificación manual: abrir home con sesiones de Hoy, Ayer y días
-  previos; confirmar que aparecen N bloques con sus headers correctos.
-- Edge case: si no hay sesiones de "Hoy" pero sí de "Ayer", el bloque
-  "Hoy" debe omitirse (no header sin items).
-- Comprobar que el flow de tap sesión → detalle (`/sesion/[id]`) sigue
-  funcionando.
-
-**Estimación de coste:** baja. ≤1 hora si se reusa limpiamente el
-patrón de `/rolls`; algo más si home tiene estructura distinta que
-obligue a adaptar.
+- `pnpm check` 1054/0/0 (1 fichero más que antes: el nuevo helper).
+- Verificación visual del owner OK: headers `HOY` / `AYER` / fecha
+  formateada aparecen correctamente; card sin fecha se entiende; tap
+  sesión → detalle sigue funcionando.
 
 ---
 
@@ -240,13 +227,10 @@ obligue a adaptar.
 
 1. **T-1.it4** ✅ Cerrada (sesión 25, commits `93baea6` + `4cbacae`).
 2. **T-3.it4** ✅ Cerrada (sesión 27, commit `90aa1a7`).
-3. **T-5.it4** (siguiente activa) — agrupar sesiones en home con
-   headers por día. Promovida en sesión 27 como pivot organizado al
-   rediseño de home (opción B). Pequeña, aislada y reusa patrón
-   existente.
-4. **T-2.it4** — combobox compañero en RollEditor. Riesgo medio (toca
-   componente con dirty handler y wizard de creación). Ejecutar con
-   `pnpm dev` abierto y validar inline.
+3. **T-5.it4** ✅ Cerrada (sesión 28, commit `0d50b00`).
+4. **T-2.it4** (siguiente activa) — combobox compañero en RollEditor.
+   Riesgo medio (toca componente con dirty handler y wizard de
+   creación). Ejecutar con `pnpm dev` abierto y validar inline.
 5. **T-4.it4** — auditoría tokens semánticos en `src/`. Mecánica pero
    extensa. Al final para no mezclar diffs visuales con cambios
    funcionales de T-5/T-2.
