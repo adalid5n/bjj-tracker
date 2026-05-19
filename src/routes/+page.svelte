@@ -41,6 +41,12 @@
 	// así que las del mismo día llegan en orden de captura descendente.
 	const sesionesDelDia = $derived(sesiones.filter((s) => s.fecha === diaSeleccionado));
 
+	// T-2.it5: Set de fechas ISO con al menos 1 sesión, para markers del
+	// calendario. Reactivo: se recalcula al cambiar `sesiones` (tras crear
+	// o borrar). Set es eficiente para el lookup `markers.has(iso)` que
+	// hace MonthCalendar por cada cell.
+	const diasConSesion = $derived(new Set(sesiones.map((s) => s.fecha)));
+
 	function openCreate() {
 		editorOpen = true;
 	}
@@ -75,7 +81,7 @@
 		<MonthCalendar
 			selectedDate={diaSeleccionado}
 			onSelectDate={(iso) => (diaSeleccionado = iso)}
-			markers={new Set()}
+			markers={diasConSesion}
 		/>
 
 		<section class="space-y-2">
