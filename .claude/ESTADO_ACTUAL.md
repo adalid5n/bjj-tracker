@@ -1,8 +1,75 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 35, it.5 CERRADA — tag `v0.5-it5` aplicado)
-**Fase activa:** **Iteración 5 ✅ cerrada — "Rediseño de home (calendario + dashboard)".** 4 tareas formalizadas; 3 con código nuevo (T-1 MonthCalendar scroll-driven, T-2 markers, T-3 stats chip); 1 diferida con código construido sin montar (T-4 AnalisisHome, esperando it.6 modo hobbyist/avanzado).
+**Última actualización:** 2026-05-20 (sesión 36, pulido post-it.5 — recorte de 9 campos opcionales en wizards + reorden RollEditor)
+**Fase activa:** Pulido UX post-it.5. Sin iteración formal abierta. Criterio aplicado: solo lo que alimenta el grafo o lo conecta a rolls/sesiones se queda; el resto fuera.
 **Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): modo hobbyist vs avanzado (conectaría AnalisisHome ya construido), reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, tab Sumisiones en `/mapa`, sistematizar sombras en tokens.
+
+---
+
+## Sesión 36 (2026-05-20) — Pulido UX: recorte de opcionales en wizards + reorden RollEditor
+
+**Hecho — barrido de campos opcionales en 6 wizards/editores + reorden de RollEditor para que Técnicas quede inmediatamente tras Posiciones. 12 archivos modificados, sin tag (no es nueva iteración).**
+
+**Criterio del owner:** "lo importante es el grafo y la info que lo alimenta o lo relaciona a rolls/sesiones". Todo lo que no entra en esa intersección se quita de la UI (wizard + edit + read-only). Columnas BD se preservan intactas — migraciones inmutables y respeto a la regla del proyecto.
+
+**Mapa previo (`.claude/agent-reports/20260519-revision-steps-wizards/mapa.md`):** un Explore confirmó que el grafo solo lee `posiciones`, `sumisiones_terminales`, `tecnicas`. Los rolls cruzan al grafo solo vía `roll_posicion` y `roll_tecnica`. El resto de campos opcionales (notas, detalles, errores comunes, foco, técnica clase, observaciones, duración) es metadata decorativa.
+
+**Recortes aplicados (9 campos):**
+- `PosicionWizard` — Notas (Complementaria SE QUEDA: alimenta `PosicionModalContent` "Vista del oponente" y prerellena `TecnicaWizard`).
+- `SumisionWizard` — Notas. Wizard queda con 1 solo paso → indicador de progreso oculto cuando `totalSteps === 1`.
+- `TecnicaWizard` — Detalles, Errores comunes. Wizard pasa de 7 a 6 pasos.
+- `SesionEditor` + `SesionForm` — Foco, Técnica clase, Observaciones profesor. Wizard pasa de 5 a 2 pasos (Fecha + Tipo).
+- `CompaneroEditor` — Notas. Wizard de 4 a 3 pasos.
+- `RollEditor` — Duración. Wizard de 6 a 5 pasos.
+- `+page.svelte` (home) — eliminado el bloque `{#if s.foco}` que mostraba el foco en cada card de sesión (por consistencia con el quitado en editor).
+- Modales (`PosicionModalContent`, `SumisionModalContent`, `TecnicaModalContent`) — eliminados los bloques `{#if ...notas/detalles/errores}` correspondientes.
+
+**Patrón aplicado para preservar datos legacy al editar:**
+Cada wizard/editor mantiene una variable `*Original` que carga el valor existente de BD y lo reenvía intacto en el UPDATE. Resultado: registros con notas/detalles/duración antiguos no se blanquean al editar otros campos — solo dejan de poder verse/editarse desde UI. En creación nueva, los campos van con `''` o `undefined` según la API DAO.
+
+**Reorden RollEditor (mismo commit):**
+Owner pidió "técnicas después de posiciones en crear roll y editar roll". Orden previo: Compañero / Posiciones / Tamaño / Resultado / Técnicas. Orden nuevo: **Compañero / Posiciones / Técnicas / Tamaño / Resultado**. Aplicado tanto al wizard (renumeración de pasos + `handleWizardKeydown` + `canAdvance`) como al form de edición (reorden de bloques visuales).
+
+**Decisiones que pidieron validación y se cerraron en sesión:**
+- Sub-wizard de PosicionWizard ahora termina en "Tipo rol" en vez de Notas. Owner: OK.
+- `s.foco` retirado de la lista del home (no solo del editor). Owner: OK.
+- Barra de progreso de SumisionWizard oculta cuando `totalSteps === 1`. Owner: OK (lógica genérica: cualquier wizard con paso único no muestra indicador).
+- Edit mode + modales read-only se limpian junto con wizard de creación. Owner: OK ("quitar de todos lados").
+
+**Restricciones respetadas:**
+- Migraciones inmutables — no se tocó `src/lib/db/schema.ts`.
+- DAOs (`src/lib/posiciones.ts`, etc.) no se tocaron — siguen leyendo/escribiendo las columnas.
+- Tipos en `src/lib/types/index.ts` no se tocaron — el día que se quieran dropear columnas, también se limpian estos campos.
+- Sin Tailwind crudo, sin nuevas deps, sin tests automatizados.
+
+**Validación:**
+- `pnpm check` 1056/0/0 antes y después.
+- `pnpm build` ✓ 6.50s sin warnings.
+- Owner verificó `pnpm preview` manualmente: "todo testeado, todo OK".
+
+**Lección — recorte guiado por criterio del owner:**
+El criterio "alimenta el grafo o conecta a rolls" fue suficiente para tomar decisiones uniformes sobre 9 campos repartidos en 6 componentes. Cuando hubo duda (Complementaria), verificación en código resolvió la ambigüedad (el subagente miró solo cytoscape, pero Complementaria aparece en la modal del nodo y prerellena el wizard de técnica — sí "alimenta lo que el grafo presenta"). Lección: el mapeo "qué alimenta el grafo" debe incluir las superficies de interacción del grafo, no solo los nodos/aristas.
+
+**Próximo paso concreto:**
+- Decidir próxima iteración o pausar. Candidatos prioritarios (orden de afinidad del owner): modo hobbyist vs avanzado (con conexión de AnalisisHome ya construido), reducir copy en pantallas, sugerencia automática de compañero.
+
+**Archivos modificados (12):**
+- `src/lib/components/PosicionWizard.svelte`
+- `src/lib/components/PosicionModalContent.svelte`
+- `src/lib/components/SumisionWizard.svelte`
+- `src/lib/components/SumisionModalContent.svelte`
+- `src/lib/components/TecnicaWizard.svelte`
+- `src/lib/components/TecnicaModalContent.svelte`
+- `src/lib/components/SesionEditor.svelte`
+- `src/lib/components/SesionForm.svelte`
+- `src/lib/components/CompaneroEditor.svelte`
+- `src/lib/components/RollEditor.svelte`
+- `src/lib/components/mapa-modal-stack.svelte.ts`
+- `src/routes/+page.svelte`
+
+**Reportes en `.claude/agent-reports/20260519-revision-steps-wizards/`:**
+- `mapa.md` — mapa estructural de campos por wizard y qué alimenta el grafo (Explore).
+- `implementacion.md` — log detallado de cambios por archivo (implementer agent).
 
 ---
 
