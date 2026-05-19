@@ -93,7 +93,7 @@ export async function listAllRolls(filters: RollFilters = {}): Promise<RollWithC
 		 LEFT JOIN companeros c ON r.companero_id = c.id
 		 LEFT JOIN sesiones s ON r.sesion_id = s.id
 		 ${whereSql}
-		 ORDER BY s.fecha DESC, r.orden DESC`,
+		 ORDER BY s.fecha DESC, r.created_at DESC`,
 		params
 	);
 }

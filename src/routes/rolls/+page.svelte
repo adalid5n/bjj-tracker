@@ -265,9 +265,10 @@
 	}
 
 	// Agrupa los rolls por `sesion_fecha` manteniendo el orden actual. Como
-	// `listAllRolls` ya devuelve `ORDER BY s.fecha DESC, r.orden DESC`, los
-	// grupos salen automáticamente en orden de fecha descendente y los rolls
-	// dentro de cada grupo conservan el orden original.
+	// `listAllRolls` ya devuelve `ORDER BY s.fecha DESC, r.created_at DESC`,
+	// los grupos salen automáticamente en orden de fecha descendente y los
+	// rolls dentro de cada grupo aparecen del último capturado al primero
+	// (T-3.it4).
 	const rollsPorDia = $derived.by(() => {
 		const grupos: { fecha: string; label: string; items: RollWithContext[] }[] = [];
 		let actual: { fecha: string; label: string; items: RollWithContext[] } | null = null;
