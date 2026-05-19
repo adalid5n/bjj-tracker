@@ -5,8 +5,9 @@
 	import Fab from '$lib/components/Fab.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import SesionEditor from '$lib/components/SesionEditor.svelte';
+	import MonthCalendar from '$lib/components/MonthCalendar.svelte';
 	import { VERSION } from '$lib/version';
-	import { dayHeaderLabel } from '$lib/day-headers';
+	import { dayHeaderLabel, todayIso } from '$lib/day-headers';
 	import type { SesionWithCount } from '$lib/sesiones';
 	import type { TipoSesion } from '$lib/types';
 
@@ -21,6 +22,7 @@
 	let status: 'loading' | 'ready' | 'error' = $state('loading');
 	let errorMessage = $state('');
 	let editorOpen = $state(false);
+	let diaSeleccionado = $state(todayIso());
 
 	onMount(async () => {
 		try {
@@ -34,22 +36,10 @@
 		}
 	});
 
-	// T-5.it4: agrupa las sesiones por `fecha` manteniendo el orden actual.
-	// Como `listSesiones` devuelve ORDER BY s.fecha DESC, s.created_at DESC,
-	// los grupos salen automáticamente en orden descendente y dentro de cada
-	// día la sesión más reciente (por created_at) queda arriba.
-	const sesionesPorDia = $derived.by(() => {
-		const grupos: { fecha: string; label: string; items: SesionWithCount[] }[] = [];
-		let actual: { fecha: string; label: string; items: SesionWithCount[] } | null = null;
-		for (const s of sesiones) {
-			if (!actual || actual.fecha !== s.fecha) {
-				actual = { fecha: s.fecha, label: dayHeaderLabel(s.fecha), items: [] };
-				grupos.push(actual);
-			}
-			actual.items.push(s);
-		}
-		return grupos;
-	});
+	// T-1.it5: sesiones filtradas por el día seleccionado en el calendario.
+	// `listSesiones` ya devuelve ORDER BY s.fecha DESC, s.created_at DESC,
+	// así que las del mismo día llegan en orden de captura descendente.
+	const sesionesDelDia = $derived(sesiones.filter((s) => s.fecha === diaSeleccionado));
 
 	function openCreate() {
 		editorOpen = true;
@@ -73,7 +63,7 @@
 	<title>BJJ Tracker</title>
 </svelte:head>
 
-<main class="mx-auto max-w-2xl space-y-4 p-4 pb-32">
+<main class="mx-auto min-h-[calc(100vh+200px)] max-w-2xl space-y-4 p-4 pb-32 [overflow-anchor:none] [&_*]:[overflow-anchor:none]">
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
 	{:else if status === 'error'}
@@ -81,19 +71,24 @@
 			<p class="font-semibold text-destructive">Error cargando sesiones</p>
 			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
-	{:else if sesiones.length === 0}
-		<div class="rounded border border-dashed border-border p-8 text-center">
-			<p class="text-muted-foreground">Aún no hay sesiones.</p>
-			<p class="text-sm text-muted-foreground">Empieza creando una con el botón de abajo.</p>
-		</div>
 	{:else}
-		{#each sesionesPorDia as grupo (grupo.fecha)}
-			<section class="space-y-2">
-				<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-					{grupo.label}
-				</h2>
+		<MonthCalendar
+			selectedDate={diaSeleccionado}
+			onSelectDate={(iso) => (diaSeleccionado = iso)}
+			markers={new Set()}
+		/>
+
+		<section class="space-y-2">
+			<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+				{dayHeaderLabel(diaSeleccionado)}
+			</h2>
+			{#if sesionesDelDia.length === 0}
+				<p class="rounded border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+					Sin sesiones este día
+				</p>
+			{:else}
 				<ul class="space-y-2">
-					{#each grupo.items as s (s.id)}
+					{#each sesionesDelDia as s (s.id)}
 						<li>
 							<a
 								href={resolve(`/sesion/${s.id}`)}
@@ -113,8 +108,8 @@
 						</li>
 					{/each}
 				</ul>
-			</section>
-		{/each}
+			{/if}
+		</section>
 	{/if}
 
 	<p class="pt-4 text-center text-xs text-muted-foreground/60">v{VERSION}</p>
@@ -126,4 +121,4 @@
 
 <BottomNav />
 
-<SesionEditor bind:open={editorOpen} onSave={handleSesionSave} />
+<SesionEditor bind:open={editorOpen} onSave={handleSesionSave} defaultFecha={diaSeleccionado} />

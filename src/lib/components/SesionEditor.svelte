@@ -26,10 +26,12 @@
 
 	let {
 		open = $bindable(false),
-		onSave
+		onSave,
+		defaultFecha
 	}: {
 		open?: boolean;
 		onSave: (data: SaveData) => void | Promise<void>;
+		defaultFecha?: string;
 	} = $props();
 
 	const totalSteps = 5;
@@ -49,7 +51,7 @@
 
 	$effect(() => {
 		if (open) {
-			fecha = today;
+			fecha = defaultFecha ?? today;
 			tipo = null;
 			foco = '';
 			tecnicaClase = '';
