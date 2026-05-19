@@ -79,6 +79,27 @@
 	// hace MonthCalendar por cada cell.
 	const diasConSesion = $derived(new Set(sesiones.map((s) => s.fecha)));
 
+	// T-3.it5: stats chip de la semana en curso (Lun-Dom).
+	// "Esta semana" = lunes a domingo del día actual (no rolling 7 days).
+	const statsSemana = $derived.by(() => {
+		const now = new Date();
+		const dow = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+		const offsetToMonday = dow === 0 ? 6 : dow - 1;
+		const monday = new Date(now);
+		monday.setDate(now.getDate() - offsetToMonday);
+		const sunday = new Date(monday);
+		sunday.setDate(monday.getDate() + 6);
+		const fmt = (d: Date) =>
+			`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		const start = fmt(monday);
+		const end = fmt(sunday);
+		const ses = sesiones.filter((s) => s.fecha >= start && s.fecha <= end);
+		return {
+			sesiones: ses.length,
+			rolls: ses.reduce((acc, s) => acc + s.rolls_count, 0)
+		};
+	});
+
 	function openCreate() {
 		editorOpen = true;
 	}
@@ -110,6 +131,14 @@
 			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else}
+		{#if statsSemana.sesiones > 0}
+			<p class="text-center text-xs text-muted-foreground">
+				{statsSemana.sesiones}
+				{statsSemana.sesiones === 1 ? 'sesión' : 'sesiones'} · {statsSemana.rolls}
+				{statsSemana.rolls === 1 ? 'roll' : 'rolls'} esta semana
+			</p>
+		{/if}
+
 		<MonthCalendar
 			selectedDate={diaSeleccionado}
 			onSelectDate={(iso) => (diaSeleccionado = iso)}
