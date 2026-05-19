@@ -1,7 +1,7 @@
 # Iteración 5 — Rediseño de home (calendario + dashboard)
 
-**Versión:** 1.0 (planificación)
-**Estado:** 🟡 En planificación — pendiente OK final del owner
+**Versión:** 2.0 (re-formalizada en sesión 32 tras pivot semanal→mensual scroll-driven)
+**Estado:** 🟢 En curso — T-1.it5 ✅; quedan T-2/T-3/T-4
 **Predecesor:** Iteración 4 (cerrada con `v0.4.1-it4`, 2026-05-19)
 
 ---
@@ -54,98 +54,39 @@ las 4 tareas son auto-verificables visualmente.
 
 ## ALCANCE FUNCIONAL
 
-### T-1.it5 — Calendario semanal + reorganización del home en dos secciones
+### T-1.it5 — MonthCalendar scroll-driven + reorganización del home ✅
 
-**Es el pilar de la iteración.** Sin esto, las otras tareas no tienen
-contexto. Toca la estructura completa del `+page.svelte`.
+**Estado:** ✅ Cerrada (commit `cd4583a`, sesión 32 — 2026-05-19).
 
-**Layout objetivo (mobile-first):**
+**Pivot del plan original (decidido en sesión 32 tras feedback del owner sobre el prototipo inicial):**
+- ❌ **Semanal** → ✅ **Mensual**. El plan original planteaba vista semanal de 7 días. Tras ver el prototipo, el owner pidió mensual (más contexto). Decisión: calendario muestra siempre el mes completo (42 cells = 6 filas × 7 cols).
+- ❌ **Click-driven compact (cambio modo semana)** → ✅ **Scroll-driven compactación**. El owner clarificó "no transformación a semana, solo se hace pequeño". La compactación es 100 % por scroll: al scrollear el calendario reduce cells (aspect-square → h-7), oculta weekday headers y botón Hoy, mantiene mes completo.
+- ❌ **Botón Hoy visible en compact** → ✅ **Hoy solo visible en expanded**. Al ocultarse en compact se resuelve colateralmente el bug observado de "Hoy reseteaba a tamaño normal" — para usar Hoy hay que estar expanded.
 
-```
-┌─────────────────────────────┐
-│ AppHeader                    │
-├─────────────────────────────┤
-│ [stats chip — T-3.it5]      │  ← discreto, "3 sesiones · 12 rolls"
-├─────────────────────────────┤
-│ CALENDARIO SEMANAL          │
-│ ← Lun Mar Mié [Jue] Vie ... │  ← día seleccionado
-│   ·       ·       ·          │  ← markers (T-2.it5)
-├─────────────────────────────┤
-│ Sesiones del [Jue]          │  ← header con día seleccionado
-│ ┌─────────────────────────┐ │
-│ │ BJJ — 3 rolls           │ │
-│ │ Guardia + escapes       │ │
-│ └─────────────────────────┘ │
-│                              │
-│ (si día vacío → placeholder │
-│  discreto + FAB sigue ahí)  │
-├─────────────────────────────┤
-│ [insights — T-4.it5]        │
-└─────────────────────────────┘
-   FAB: + Nueva sesión
-```
+**Lo que se implementó (commit `cd4583a`):**
+- **Nuevo `src/lib/components/MonthCalendar.svelte`** (~230 líneas): mes completo siempre. Sticky `top-14` debajo del AppHeader. Soporte navegación ← →, swipe horizontal, botón "Hoy" (visible en expanded). Markers preparados como slot para T-2.it5.
+- **Refactor `src/routes/+page.svelte`**: `diaSeleccionado` state, sesiones filtradas por día, MonthCalendar + sección abajo. Día vacío → placeholder "Sin sesiones este día". FAB pasa `defaultFecha={diaSeleccionado}` al editor. `<main>` con `min-h-[calc(100vh+200px)]` para forzar scroll disponible.
+- **`src/lib/components/SesionEditor.svelte`**: nueva prop `defaultFecha?` (pisa today al abrir).
 
-**Qué entra:**
-- Componente nuevo `WeeklyCalendar.svelte` (o nombre similar) en
-  `src/lib/components/`. Renderiza 7 días (Lun-Dom de la semana en
-  curso) con:
-  - **Día seleccionado por defecto**: hoy (decisión owner). Si se
-    navega a otra semana, el "hoy" sigue marcado visualmente pero el
-    "seleccionado" puede no coincidir.
-  - **Navegación entre semanas**: botones `←` `→` arriba del calendario
-    + soporte swipe horizontal en móvil. Botón "Hoy" para volver a la
-    semana actual.
-  - **Markers** placeholder (los implementa T-2.it5 — esta tarea
-    define el slot, no la lógica).
-- Refactor de `+page.svelte` para que tenga la estructura del layout
-  objetivo: stats arriba (placeholder hasta T-3), calendario (T-1),
-  sesiones del día (T-1), insights (placeholder hasta T-4).
-- **Lógica del día seleccionado**: `$state` local `diaSeleccionado:
-  string` (ISO `YYYY-MM-DD`). Default `todayIso()` (reusar
-  `src/lib/day-headers.ts`).
-- **Sesiones del día**: query/filter sobre las sesiones ya cargadas
-  (`listSesiones()` ya devuelve todo). Filtra client-side por
-  `s.fecha === diaSeleccionado`. Si la sesiones por usuario crecen
-  mucho, considerar paginación o query por fecha — fuera de scope
-  inicial.
-- **Día vacío**: placeholder discreto (decisión owner): texto
-  pequeño "Sin sesiones este día" + FAB sigue visible y operativo
-  (al crear, pre-rellenar `fecha` con `diaSeleccionado`, no con hoy).
+**Decisión técnica clave — 3 capas anti-loop para scroll-driven:**
+Tras 3 approaches descartados (sentinel + IntersectionObserver falló por scroll anchoring del browser; scroll listener simple falló por jitter durante transición CSS), la versión final combina:
+1. **`overflow-anchor: none`** en `<main>` + descendants (en home). Deshabilita el reajuste automático de scroll del browser al cambiar altura de elementos.
+2. **Hysteresis**: compact=true cuando `scrollY > 100`, compact=false cuando `scrollY < 50`. Zona muerta 50–100px.
+3. **Lockout temporal**: tras cada toggle, ignorar el listener durante 250ms (200ms de transición CSS + 50ms margen).
 
-**Qué NO entra (en T-1, sí en otras tareas o fuera de scope):**
+**Decisión de primitive**: `bits-ui Calendar` (ya en deps) se evaluó pero no encaja para compactación scroll-driven y customización fina de cells. Construir custom con `@internationalized/date` (la lib que bits-ui Calendar usa internamente) da control completo con ~230 líneas.
+
+**Caso "app vacía" (sin ninguna sesión jamás):** primera apertura tras instalar. El calendario renderiza el mes actual con hoy seleccionado; la sección inferior muestra "Sin sesiones este día"; el FAB queda como único CTA claro.
+
+**Lo que NO entró en T-1 (sigue para tareas posteriores):**
 - Markers en días con sesión → T-2.it5.
 - Stats chip → T-3.it5.
 - Insights → T-4.it5.
-- Vista mensual del calendario → fuera de scope it.5 (la entrada
-  original del backlog mencionaba mensual; el owner cerró "semanal" en
-  sesión 31).
-
-**Caso "app vacía" (sin ninguna sesión jamás):** primera apertura tras
-instalar. El calendario sigue renderizándose con la semana actual y el
-día de hoy seleccionado; la sección inferior muestra el placeholder
-"Sin sesiones este día" + FAB visible. El chip de stats (T-3) queda
-oculto (definido en T-3). Los markers (T-2) no aparecen al no haber
-fechas en el `Set`. Los insights (T-4) muestran mensaje "Aún no hay
-datos suficientes" o se ocultan — decisión al implementar T-4. Es un
-estado degradado limpio; el usuario sigue teniendo un único call to
-action claro (FAB → crear primera sesión).
-
-**Decisiones técnicas a confirmar al implementar:**
-- ¿`bits-ui Calendar` (disponible según `CONTEXTO_AGENTE.md`) sirve
-  como base, o se construye desde cero por ser muy específico (7 días
-  visibles, markers custom)? Recomendación: probar `bits-ui` primero
-  por la regla del proyecto "antes de construir un primitive de UI,
-  revisar qué hay disponible".
-- ¿`WeeklyCalendar.svelte` recibe `markers: Set<string>` como prop
-  (delegando el cómputo a home) o consume directamente las queries?
-  Recomendación: prop. Mantiene el componente puro y testeable.
+- Animación del cambio de mes (← → cambia instantáneamente). Si emerge fricción real, valorar CSS view transitions como follow-up post-it.5.
 
 **Validación:**
-- `pnpm check` limpio.
-- Manual: navegar entre semanas, seleccionar días distintos, confirmar
-  que la sección inferior se actualiza. Tap día vacío → placeholder
-  + FAB. Tap "Hoy" cuando estás en otra semana → vuelve a la actual y
-  selecciona hoy.
+- `pnpm check` 1055/0/0.
+- Visual del owner OK tras varias iteraciones de feedback ("mensual no semanal", "compactable no colapsable", "scroll-driven no click-driven", fixes del loop por jitter durante scroll lento).
 
 ---
 
@@ -236,52 +177,32 @@ como subtitle implícito de la pantalla. Las secciones más densas
 
 ---
 
-## DECISIONES DE PRODUCTO TOMADAS (sesión 31, 2026-05-19)
+## DECISIONES DE PRODUCTO TOMADAS
 
-- **Vista del calendario:** semanal (no mensual). Mensual sigue en
-  backlog para iteración futura si emerge la necesidad.
-- **Tamaño del calendario en home:** panel grande arriba (1/3 del
-  viewport en móvil aproximadamente, ajustable).
-- **Interacción tap día:** la sección inferior se actualiza con las
-  sesiones de ese día. Día por defecto = hoy.
-- **Día sin sesión:** placeholder discreto + FAB sigue visible. Sin
-  CTA grande.
-- **Markers:** punto simple bajo el día. Sin variantes por tipo ni
-  count.
-- **Navegación entre semanas:** botones `←` `→` + swipe horizontal
-  + botón "Hoy".
-- **Layout:** dashboard con secciones modulares (no "lista de
-  sesiones + calendario añadido").
-- **Mobile-first**: el diseño se piensa primero para móvil; desktop
-  adapta. Si en móvil el calendario semanal funciona bien y en
-  desktop sobra espacio, valorar al implementar si añadir contenido
-  lateral, pero sin bloquear cierre por ello.
-- **Sin "próxima clase"** en scope. No hay modelo de datos para
-  clases programadas.
-- **Sin uso real como criterio de cierre.** 4 tareas cerradas + tag =
-  cierre.
-- **Tag de cierre:** `v0.5-it5` (minor — introduce cambios funcionales
-  visibles).
+**Sesión 31 (planificación inicial), revisadas en sesión 32 (tras prototipo de T-1):**
+
+- ❌ ~~**Vista del calendario: semanal**~~ → ✅ **Mensual** (revisado s32). El mes completo da más contexto. La compactación scroll-driven evita la pérdida de espacio cuando ya hay un día seleccionado.
+- ✅ **Tamaño del calendario en home:** panel arriba, sticky `top-14`.
+- ✅ **Interacción tap día:** la sección inferior se actualiza con las sesiones de ese día. Día por defecto = hoy.
+- ✅ **Día sin sesión:** placeholder discreto + FAB sigue visible. Sin CTA grande.
+- ✅ **Markers:** punto simple bajo el día (lo implementa T-2.it5).
+- ❌ ~~**Toggle compact por click**~~ → ✅ **Scroll-driven** (revisado s32). El owner clarificó: el mes COMPLETO se compacta visualmente (no se transforma a semana).
+- ✅ **Navegación entre meses:** botones `←` `→` + swipe horizontal.
+- ❌ ~~**Botón "Hoy" siempre visible**~~ → ✅ **Hoy visible solo en expanded** (revisado s32). Al ocultarse en compact se resuelve el bug "Hoy reseteaba a tamaño normal". Para usar Hoy desde compact: scroll-up → expand.
+- ✅ **Layout:** dashboard con secciones modulares.
+- ✅ **Mobile-first**.
+- ✅ **Sin "próxima clase"** en scope.
+- ✅ **Sin uso real como criterio de cierre.** 4 tareas cerradas + tag = cierre.
+- ✅ **Tag de cierre:** `v0.5-it5` (minor).
 
 ---
 
 ## ORDEN SUGERIDO DE EJECUCIÓN
 
-1. **T-1.it5** (pilar) — calendario semanal + reorganización home en
-   dos secciones (calendario + sesiones del día seleccionado).
-   Estimación: 2-4 horas dependiendo de si bits-ui Calendar encaja o
-   hay que construir custom.
-2. **T-2.it5** — markers en calendario. Encaja inmediatamente tras
-   T-1 porque T-1 deja el slot definido. Estimación: 30 min.
-3. **T-4.it5** — insights simplificados en home. Antes que T-3 porque
-   los insights consumen más espacio visual y conviene definirlos en
-   contexto del layout existente.
-4. **T-3.it5** — stats chip arriba. Refinamiento final al tener el
-   resto en su sitio. Estimación: 30-60 min.
-
-Orden no vinculante. Si emerge razón para reordenar (e.g., T-1 se
-parte en sub-tareas por complejidad), se documenta en
-`ESTADO_ACTUAL.md`.
+1. **T-1.it5** ✅ Cerrada (sesión 32, commit `cd4583a`).
+2. **T-2.it5** (siguiente activa) — markers en calendario. T-1 deja el slot definido. Estimación: 30 min.
+3. **T-4.it5** — insights simplificados. Antes que T-3 porque consumen más espacio visual y conviene definirlos en contexto del layout.
+4. **T-3.it5** — stats chip arriba. Refinamiento final.
 
 ---
 

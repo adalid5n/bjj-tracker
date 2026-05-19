@@ -1,8 +1,44 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 31, it.5 ABIERTA con plan formal — Rediseño de home)
-**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v1.0). 4 tareas T-1.it5 a T-4.it5. Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
+**Última actualización:** 2026-05-19 (sesión 32, T-1.it5 cerrada — MonthCalendar scroll-driven + reorganización home)
+**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v2.0, re-formalizado en s32). T-1.it5 ✅; quedan T-2 (markers), T-4 (insights), T-3 (stats chip). Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
 **Iteración previa:** it.4 ✅ cerrada con `v0.4.1-it4` (2026-05-19).
+
+---
+
+## Sesión 32 (2026-05-19) — T-1.it5 cerrada tras pivot semanal→mensual scroll-driven
+
+**Hecho — T-1.it5 cerrada (commit `cd4583a`). El plan original de "calendario semanal" se reescribió a "mensual con compactación scroll-driven" tras feedback del owner sobre el primer prototipo. Plan formal ITERACION_5.md actualizado a v2.0 con las decisiones revisadas.**
+
+**Cronología del pivot dentro de T-1:**
+1. Prototipo inicial: `WeeklyCalendar.svelte` (7 días, semana actual). Owner pidió mensual.
+2. Refactor a `MonthCalendar.svelte` con toggle click compact (mes ↔ semana). Owner clarificó "no transformación a semana, solo se hace pequeño" + "compactar al scrollear, no al click".
+3. Refactor a scroll-driven con sentinel + IntersectionObserver. Funcionó pero loop por scroll anchoring del browser.
+4. Refactor a scroll listener directo. Funcionó pero loop por jitter de scrollY durante la transición CSS.
+5. Versión final: **3 capas anti-loop combinadas** — `overflow-anchor:none` en main + hysteresis 50/100 + lockout temporal 250ms. Estable.
+
+**Decisiones de producto cerradas en s32 (revisaron las de s31):**
+- Mensual (no semanal).
+- Scroll-driven (no click-driven).
+- Mes completo siempre — compactación reduce cells, oculta weekday headers + botón Hoy, pero NO elimina filas.
+- Botón "Hoy" visible solo en expanded (resuelve colateralmente el bug "Hoy reseteaba a tamaño normal" observado en s32).
+- Resto de decisiones de s31 mantenidas (markers como punto simple, día vacío con placeholder + FAB, mobile-first).
+
+**Implementación (commit `cd4583a`):**
+- `src/lib/components/MonthCalendar.svelte` (nuevo, ~230 líneas).
+- `src/routes/+page.svelte`: `diaSeleccionado` state, sesiones filtradas, MonthCalendar + sección filtrada, `min-h-[calc(100vh+200px)]` + `[overflow-anchor:none]`.
+- `src/lib/components/SesionEditor.svelte`: prop `defaultFecha?` (pisa today al abrir).
+
+**Decisión técnica notable — bits-ui Calendar descartado.** Disponible y validado primero (regla del proyecto). No encaja para compactación scroll-driven y customización fina. Construir custom con `@internationalized/date` (lib que bits-ui usa internamente) da control completo. Documentado en el plan.
+
+**Lección — varios pivots dentro de la misma tarea.** T-1 tuvo 5 versiones distintas antes del OK final. Sparring note futuro: en tareas con componentes UI visuales y feedback iterativo, conviene prototipar más rápido (con stubs o mockups) antes de pulir transiciones y estados anti-loop. La inversión en "scroll-driven robusto" (3 capas anti-loop) llegó solo al final, tras descartar el approach inicial.
+
+**Validación:**
+- `pnpm check` 1055/0/0.
+- Visual owner OK ("perfecto").
+
+**Próximo paso concreto:**
+- Arrancar **T-2.it5** — markers en calendario (computar `Set<string>` de fechas con sesión desde home, pasarlo como prop al MonthCalendar; el slot ya existe en T-1).
 
 ---
 
