@@ -39,7 +39,17 @@ Cada entrada debería responder:
 - **Por qué:** primera impresión más limpia al abrir cualquier pantalla. Reduce carga cognitiva en captura post-clase (CU-1). Coherente con la dirección de "modo edición" en grafo (UI no satura por defecto).
 - **Cuándo:** transversal. Puede ir como tarea de pulido propia (lista de pantallas a auditar) o entrar pieza a pieza cuando se toque una pantalla por otro motivo. Recomendado: barrido formal al cerrar features grandes para mantener consistencia.
 
-### Rediseño de home — calendario + agrupamiento de sesiones
+### ~~Rediseño de home — calendario + agrupamiento de sesiones~~ — PROMOVIDO a it.5 (2026-05-19)
+
+Estado: el agrupamiento por día con headers se entregó en T-5.it4 (commit
+`0d50b00`). El calendario y la visión general de "qué información merece la
+primera pantalla" entran en **Iteración 5 — Rediseño de home (calendario +
+dashboard)**, plan formal en `ITERACION_5.md`. Esta entrada queda como
+referencia histórica; el seguimiento activo vive en el plan de it.5.
+
+Entrada original (preservada para contexto histórico):
+
+### [Entrada original — antes de promover]
 
 - **Origen:** Adalid, 2026-05-19 (sesión 26)
 - **Estado actual:** home es una lista plana de sesiones (sin agrupamiento por proximidad temporal, sin vista de calendario).

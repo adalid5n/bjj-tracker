@@ -1,8 +1,45 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 30, it.4 CERRADA — tag `v0.4.1-it4` aplicado)
-**Fase activa:** **Iteración 4 ✅ cerrada — "Pulido post-grafo y consistencia UX".** 5 tareas formalizadas; 3 con código nuevo (T-1, T-3, T-5); 2 ya implementadas o cumplidas sin código (T-2, T-4).
-**Próxima iteración:** sin decidir. Backlog activo en `MEJORAS_FUTURAS.md`. Candidatos para it.5 (anotados durante it.4): rediseño completo de home (calendario + visión general), modo hobbyist vs avanzado, sugerencia automática de compañero, "Forzar actualización" en /ajustes, Node 24 en workflow, tab Sumisiones en /mapa.
+**Última actualización:** 2026-05-19 (sesión 31, it.5 ABIERTA con plan formal — Rediseño de home)
+**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v1.0). 4 tareas T-1.it5 a T-4.it5. Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
+**Iteración previa:** it.4 ✅ cerrada con `v0.4.1-it4` (2026-05-19).
+
+---
+
+## Sesión 31 (2026-05-19) — Apertura it.5 con plan formal (doc-coauthoring)
+
+**Hecho — Iteración 5 "Rediseño de home (calendario + dashboard)" abierta con plan formal en `ITERACION_5.md`. Plan co-redactado vía skill `doc-coauthoring` y validado por reader test con sub-agente sin contexto.**
+
+**Decisiones de producto cerradas (todas en esta sesión):**
+- **Vista del calendario:** semanal (no mensual). Mensual sigue en backlog.
+- **Tamaño en home:** panel grande arriba.
+- **Tap día:** la sección inferior se filtra mostrando las sesiones de ese día seleccionado. Día default = hoy.
+- **Día sin sesión:** placeholder discreto + FAB visible. Sin CTA grande.
+- **Markers:** punto simple bajo días con sesión. Sin variantes por tipo ni count.
+- **Navegación calendario:** botones ← →, swipe horizontal en móvil, botón "Hoy".
+- **Layout:** dashboard con secciones modulares (no "lista de sesiones + calendario añadido").
+- **Mobile-first.**
+- **Sin uso real como criterio de cierre.** 4 tareas + tag = cierre.
+
+**Scope final (4 tareas):**
+- T-1.it5 (pilar) — WeeklyCalendar + reorganización del home en dos secciones.
+- T-2.it5 — markers en calendario.
+- T-3.it5 — stats chip arriba ("3 sesiones · 12 rolls").
+- T-4.it5 — insights simplificados en home (versión reducida de `AnalisisPanel`).
+
+**Orden:** T-1 → T-2 → T-4 → T-3.
+
+**Reader test (doc-coauthoring Stage 3):** sub-agente Explore sin contexto del proyecto leyó el plan y respondió 8 preguntas predichas + checks de ambigüedad. Resultado: doc accionable; detectó 2 gaps menores que se corrigieron antes de cerrar el plan:
+1. Caso "app totalmente vacía" (sin ninguna sesión jamás) no estaba documentado — añadido bloque explícito.
+2. `CU-1` usado sin glosar — añadida referencia a `REQUISITOS.md §2`.
+
+**Sparring note nueva (memoria):** owner observó que estaba pidiendo "confirmaciones vacías" (preguntar "¿procedo?" tras un OK ya dado). Regla guardada: tras OK explícito sobre un plan, ejecutar los pasos evidentes sin re-confirmar. Reservar preguntas para info nueva o decisiones reales.
+
+**Backlog:**
+- Entrada "Rediseño de home — calendario + agrupamiento de sesiones" tachada como **promovida a it.5** (con notas — el agrupamiento ya entró en T-5.it4; el resto entra ahora).
+
+**Próximo paso concreto:**
+- Arrancar **T-1.it5** — investigar si `bits-ui Calendar` encaja para la vista semanal o hay que construir custom; refactor home con la nueva estructura.
 
 ---
 
