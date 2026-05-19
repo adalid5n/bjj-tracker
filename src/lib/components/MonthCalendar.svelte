@@ -143,24 +143,28 @@
 	// ── Compactación scroll-driven ────────────────────────────────────
 	// Triple fix combinado tras varios intentos:
 	// 1) `overflow-anchor: none` en `<main>` y descendants (en home).
-	// 2) Hysteresis: compact=true >100px, compact=false <50px.
+	// 2) Hysteresis asimétrica: compact=true >100px, compact=false <5px.
+	//    El threshold de desactivación es muy bajo intencionalmente —
+	//    decisión owner s32: cuando el user scrollea arriba con compact
+	//    activo, primero el primer card de sesión llega al top de la
+	//    sección visible; solo cuando el user "tira" hasta cerca del top
+	//    absoluto, el calendario expande. Da sensación de "tensión" en
+	//    el scroll en lugar de expansión prematura.
 	// 3) Lockout temporal: tras cambiar compact, ignorar el listener
 	//    durante 250ms (cubre los 200ms de transición CSS + 50ms de
-	//    margen). Esto evita que jitter de scrollY durante la transición
-	//    dispare un toggle inverso → loop. Sin este lock, el browser
-	//    podía reajustar scroll durante el cambio de altura del wrapper
-	//    sticky, cruzando threshold y re-disparando el toggle.
+	//    margen). Evita que jitter de scrollY durante la transición
+	//    dispare un toggle inverso.
 	//
 	// Histórico: probamos antes IntersectionObserver+sentinel; falló por
 	// scroll anchoring. Luego scroll listener simple; falló por jitter
-	// durante transición. Esta versión combina los 3 fixes para
-	// estabilidad robusta.
+	// durante transición. Hysteresis 50/100 expandía demasiado pronto.
+	// Esta versión es la final.
 	let scrollLockUntil = 0;
 
 	function handleScroll() {
 		if (Date.now() < scrollLockUntil) return;
 		const y = window.scrollY;
-		if (compact && y < 50) {
+		if (compact && y < 5) {
 			compact = false;
 			scrollLockUntil = Date.now() + 250;
 		} else if (!compact && y > 100) {
