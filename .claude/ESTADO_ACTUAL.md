@@ -1,8 +1,38 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 34, T-4.it5 cerrada como diferido a it.6 + fix sessionStorage de diaSeleccionado)
-**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v2.0). T-1.it5 ✅, T-2.it5 ✅, T-4.it5 ✅; queda T-3 (stats chip). Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
-**Iteración previa:** it.4 ✅ cerrada con `v0.4.1-it4` (2026-05-19).
+**Última actualización:** 2026-05-19 (sesión 35, it.5 CERRADA — tag `v0.5-it5` aplicado)
+**Fase activa:** **Iteración 5 ✅ cerrada — "Rediseño de home (calendario + dashboard)".** 4 tareas formalizadas; 3 con código nuevo (T-1 MonthCalendar scroll-driven, T-2 markers, T-3 stats chip); 1 diferida con código construido sin montar (T-4 AnalisisHome, esperando it.6 modo hobbyist/avanzado).
+**Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): modo hobbyist vs avanzado (conectaría AnalisisHome ya construido), reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, tab Sumisiones en `/mapa`, sistematizar sombras en tokens.
+
+---
+
+## Sesión 35 (2026-05-19) — T-3.it5 cerrada + it.5 cerrada con tag `v0.5-it5`
+
+**Hecho — T-3.it5 (stats chip de la semana) cerrada y aplicado tag `v0.5-it5` con bump de versión 0.4.1 → 0.5.0. Iteración 5 completa.**
+
+**T-3.it5 (commit `aaff495`):**
+- `statsSemana` derived en home: cuenta sesiones entre lunes y domingo de la semana en curso y suma sus rolls. Sin queries nuevas a BD — filter sobre `sesiones` ya cargadas.
+- Render como `<p>` discreto encima del MonthCalendar: `"N sesiones · M rolls esta semana"` (plural correcto). Oculto si `statsSemana.sesiones === 0`.
+- "Esta semana" = Lun–Dom, no rolling 7 days.
+
+**Cierre de it.5:**
+- Tag `v0.5-it5` aplicado.
+- Bump de versión `0.4.1 → 0.5.0` en `package.json`. Minor — la iteración introduce cambios funcionales visibles en la pantalla más importante de la app (home).
+- 4 tareas formalizadas:
+  - T-1 (MonthCalendar scroll-driven + reorganización home).
+  - T-2 (markers en calendario).
+  - T-3 (stats chip de la semana).
+  - T-4 (AnalisisHome, código construido sin montar, esperando it.6).
+- Fix adicional en s34 (`0805fa6`): persistencia de `diaSeleccionado` en sessionStorage — resolvió bug del reset al volver de /sesion/[id].
+
+**Resumen meta — qué nos llevamos de it.5:**
+- **Home rediseñada de lista plana a dashboard con calendario:** el user ve la semana de un vistazo, selecciona un día, ve sus sesiones; tiene contexto temporal en chip arriba. Cambio cualitativo de UX en la pantalla más visitada.
+- **Patrón `scroll-driven compactation`** documentado: 3 capas anti-loop (overflow-anchor:none + hysteresis + lockout temporal). Reusable si otra pantalla necesita un header sticky que se compacta.
+- **Patrón "componente construido, sin montar"** consolidado: T-4 cerrada con código presente pero desconectado, esperando otra iteración. Misma lógica que T-2.it4 (componente ya existía); aquí el componente se construye proactivamente para reusar después.
+- **Lecciones sparring** acumuladas durante T-1 (5 versiones distintas con pivots seguidos del owner) y sesión 33 ("no preguntar confirmaciones vacías"). Guardadas en memoria del proyecto.
+
+**Próximo paso concreto:**
+- Decidir próxima iteración o pausar. Candidatos prioritarios (orden de afinidad expresada): modo hobbyist vs avanzado (con conexión de AnalisisHome), reducir copy en pantallas, sugerencia automática de compañero.
 
 ---
 

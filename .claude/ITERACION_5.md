@@ -1,7 +1,7 @@
 # Iteración 5 — Rediseño de home (calendario + dashboard)
 
 **Versión:** 2.0 (re-formalizada en sesión 32 tras pivot semanal→mensual scroll-driven)
-**Estado:** 🟢 En curso — T-1.it5 ✅, T-2.it5 ✅, T-4.it5 ✅ (diferido a it.6); queda T-3 (stats chip)
+**Estado:** ✅ Cerrada — `v0.5-it5` aplicado (2026-05-19)
 **Predecesor:** Iteración 4 (cerrada con `v0.4.1-it4`, 2026-05-19)
 
 ---
@@ -107,32 +107,23 @@ Tras 3 approaches descartados (sentinel + IntersectionObserver falló por scroll
 
 ---
 
-### T-3.it5 — Stats chip arriba (passive info)
+### T-3.it5 — Stats chip arriba (passive info) ✅
 
-**Qué entra:**
-- Chip pequeño en la parte superior de home (encima del calendario)
-  con info agregada:
-  - **N sesiones esta semana** (de Lunes a Domingo de la semana en
-    curso, no rolling-7-days).
-  - **M rolls totales esta semana**.
-- Formato: `3 sesiones · 12 rolls` (separador discreto, `text-xs
-  text-muted-foreground`).
-- Hidden si no hay sesiones (no mostrar "0 sesiones · 0 rolls" —
-  ruido vacío).
+**Estado:** ✅ Cerrada (commit `aaff495`, sesión 35 — 2026-05-19).
 
-**Por qué arriba y no abajo:** el dashboard tiene jerarquía vertical
-clara. Stats agregadas son contexto general (no acción) → arriba
-como subtitle implícito de la pantalla. Las secciones más densas
-(calendario + sesiones del día) van debajo.
-
-**Lo que NO entra (sigue en backlog si te interesa después):**
-- Stats mensuales / acumuladas / por compañero.
-- Distribución Dominé/Equilibrado/Me dominaron en el chip. Visualmente
-  pesa y el `AnalisisPanel` ya lo cubre.
+**Lo que se hizo:**
+- `statsSemana` derived en home (`+page.svelte`): cuenta sesiones cuya
+  `fecha` está entre lunes y domingo de la semana actual y suma sus
+  `rolls_count`. Sin queries nuevas a BD — filter sobre `sesiones` ya
+  cargadas.
+- Render como `<p>` discreto encima del `MonthCalendar`:
+  `"N sesiones · M rolls esta semana"` (plural correcto). `text-xs
+  text-muted-foreground` centrado.
+- Oculto si `statsSemana.sesiones === 0`.
 
 **Validación:**
-- Manual: crear/eliminar sesiones de la semana en curso → el chip
-  actualiza counts. Semana sin sesiones → chip oculto.
+- `pnpm check` 1056/0/0.
+- Visual owner OK.
 
 ---
 
@@ -183,9 +174,9 @@ como subtitle implícito de la pantalla. Las secciones más densas
 1. **T-1.it5** ✅ Cerrada (sesión 32, commit `cd4583a`; fix de threshold en s33 commit `fe41907`).
 2. **T-2.it5** ✅ Cerrada (sesión 33, commit `d09157d`).
 3. **T-4.it5** ✅ Cerrada (sesión 34, commit `b7cf755`, diferido a it.6 — componente construido sin montar).
-4. **T-3.it5** (única pendiente) — stats chip arriba. Refinamiento final.
+4. **T-3.it5** ✅ Cerrada (sesión 35, commit `aaff495`).
 
-Fix adicional en s34 (commit `0805fa6`): `diaSeleccionado` se persiste en sessionStorage. Resuelve bug donde al navegar a /sesion/[id] y volver con back, el calendario se reseteaba a hoy.
+Iteración cerrada con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`. 4 tareas formalizadas; 3 con código nuevo (T-1, T-2, T-3); T-4 diferida con código construido. Un fix adicional en s34 (commit `0805fa6`) resolvió el bug del `diaSeleccionado` que se reseteaba al volver de /sesion/[id].
 
 ---
 
