@@ -12,13 +12,52 @@ Cada entrada debería responder:
 
 ## UX
 
-### Long-press para activar el drag de nodos en el grafo
+### Modo "hobbyist" vs "avanzado" — perfiles de uso
 
-- **Origen:** T-9.b.it3, feedback Adalid 2026-05-18
-- **Estado actual:** drag instantáneo de Cytoscape (Adalid esperaba que requiriera mantener pulsado unos ms antes de activarse).
-- **Idea:** capturar `mousedown`/`touchstart` + timer de ~250 ms, sólo permitir `grabbable: true` si el tiempo se cumple. Restaurar al `mouseup`/`touchend`.
-- **Por qué:** evita drag accidentales al hacer scroll/zoom táctil en móvil, y diferencia mejor "tap para abrir modal" de "arrastrar nodo".
-- **Cuándo:** revisar tras uso real en móvil. Si hay drag accidentales o tap+drag confusos, abrir tarea con datos concretos. Coste estimado: 1-3 h pelea con Cytoscape (no trae long-press out of the box).
+- **Origen:** Adalid, 2026-05-19 (sesión 26)
+- **Idea:** ofrecer dos perfiles de uso configurables (probablemente en `/ajustes`):
+  - **Hobbyist:** captura mínima. Solo los campos imprescindibles para registrar una sesión y un roll. Modelo de datos intacto; lo que se oculta son campos de UI, no columnas de BD.
+  - **Avanzado:** todo lo que ya existe hoy (compañero detallado, posiciones problema, tipo/foco/observaciones, técnica clase, etc.).
+- **Sospecha del owner:** muchos de los campos actuales aportan poco o nada al grafo (la salida principal de la app). Reducirlos al mínimo en modo hobbyist hace la captura mucho más rápida sin perder la información que de verdad alimenta el análisis.
+- **Investigación pendiente (cuando toque, NO ahora):** auditar campo por campo qué datos contribuyen al grafo / análisis (consultas C1/C2, vista grafo) y cuáles son ornamentales / sin consumo downstream. Esa auditoría es prerequisito de diseñar el modo hobbyist con criterio — si no, es decisión arbitraria.
+- **Por qué:** la fricción en captura post-clase (CU-1) es el cuello de botella real. Un modo simplificado para el caso primario, con la opción de subir a "avanzado" si el uso real lo pide, encaja mejor con el flujo natural de usuario.
+- **Cuándo:** post-it.4. Probablemente iteración dedicada (el cambio toca múltiples editores: SesionEditor, RollEditor, CompaneroEditor). Empezar por la auditoría de datos antes de tocar UI.
+
+### Reducir copy / texto inicial en cada pantalla
+
+- **Origen:** Adalid, 2026-05-19 (sesión 26)
+- **Estado actual:** muchas pantallas tienen títulos largos, descripciones explicativas, labels redundantes o textos de ayuda que pesan visualmente al entrar.
+- **Pantalla ancla — `/rolls`** (señalada por owner como "se muestra mucho de golpe"). Puntos concretos detectados:
+  - **Labels de chip-picker read-only en cada card** ("Posiciones que fueron bien", "Posiciones que fallé", "Técnicas que fueron bien", "Técnicas que fallé") — hasta 4 filas con label largo en cada roll. Candidatos: icono ✓/✗ + categoría corta, o quitar label si el color del chip ya indica resultado. Ya estaba anotado como pendiente en la entrada "Reducir read-only de chips".
+  - **Filtro de Posición desplegado**: 5 sub-labels de categoría (`Guardia`, `Control superior`, `Espalda`, `Transición`, `Otro`) + chips de cada. Cuando se abre Filtros, el bloque se vuelve denso. Opción: categorías colapsables por defecto, o chips planos con prefijo de categoría.
+  - **Contador `{rolls.length} roll(s)`** sobre la lista — texto pequeño pero awkward por el "(s)" plural. Eliminar o convertir en chip discreto al lado del título.
+  - **Labels de filtros redundantes con su `Select` placeholder** ("Resultado" arriba + "Cualquiera" dentro del trigger). En filtros opcionales, el placeholder solo basta.
+- **Idea (transversal):** auditar pantalla por pantalla qué texto se puede:
+  - Eliminar si no aporta (instrucciones obvias, descripciones redundantes con un icono).
+  - Acortar (títulos largos a 1-3 palabras).
+  - Mover a tooltip / popover (ayuda accesible bajo demanda en lugar de siempre visible).
+- **Por qué:** primera impresión más limpia al abrir cualquier pantalla. Reduce carga cognitiva en captura post-clase (CU-1). Coherente con la dirección de "modo edición" en grafo (UI no satura por defecto).
+- **Cuándo:** transversal. Puede ir como tarea de pulido propia (lista de pantallas a auditar) o entrar pieza a pieza cuando se toque una pantalla por otro motivo. Recomendado: barrido formal al cerrar features grandes para mantener consistencia.
+
+### Rediseño de home — calendario + agrupamiento de sesiones
+
+- **Origen:** Adalid, 2026-05-19 (sesión 26)
+- **Estado actual:** home es una lista plana de sesiones (sin agrupamiento por proximidad temporal, sin vista de calendario).
+- **Idea:**
+  - **Calendario en home:** vista mensual (o semanal) que marque los días con sesiones; tap en un día abre la sesión / las sesiones de ese día. Reusar el `Calendar` de bits-ui (ya disponible según `CONTEXTO_AGENTE.md`) para no construir desde cero.
+  - **Agrupar sesiones con headers por día (patrón `/rolls`):** "Hoy" y "Ayer" como labels reservados; el resto de días con su fecha formateada como header (`lun, 12 may 2026`). Decisión owner 2026-05-19: usar el mismo patrón que ya existe en `/rolls` (no collapse agresivo de "Antiguos").
+  - **Visión general "mejor home":** paraguas para revisar qué información merece estar en la primera pantalla (¿stats rápidas? ¿próxima clase? ¿últimos rolls?). A concretar.
+- **Por qué:** home es la primera pantalla en cada apertura de la PWA. Hoy es funcional pero pobre (lista plana). Calendario + agrupamiento dan navegación temporal y reducen scroll para ir a sesiones recientes.
+- **Cuándo:** post-it.4. Probablemente como iteración dedicada (it.5 o it.6) — el rediseño general de home no encaja en una tarea de pulido suelta; conviene plan formal. Las piezas concretas (calendario y agrupamiento) podrían adelantarse como tareas sueltas si una de ellas duele especialmente antes de la iteración formal.
+
+### ~~Long-press para activar el drag de nodos en el grafo~~ — HECHA en T-1.it4 (commits `93baea6` + `4cbacae`, 2026-05-19)
+
+Resuelto con solución distinta a la planteada aquí: en lugar de long-press
+(approach inicial que se descartó por incompatibilidad con Cytoscape — ver
+`ESTADO_ACTUAL.md §Sesión 25` para detalle técnico), se introdujo un **modo
+edición explícito** vía botón "Mover nodos" en el sub-header de `/mapa`. El
+problema original (drag accidentales en móvil al panear/scrollear) quedó
+cubierto: en modo navegación los nodos no son grabbable.
 
 ### ~~Reducir read-only de chips en /rolls y /sesion/[id]~~ — HECHO 2026-05-16 (parcial)
 

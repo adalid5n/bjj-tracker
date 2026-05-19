@@ -1,8 +1,39 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 26, it.4 formalizada y renombrada — plan en `ITERACION_4.md`, REQUISITOS §6 alineado)
-**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 cerrada; quedan T-2/T-3/T-4.
-**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md`. Scope congelado: T-1 ✅, T-2 (combobox compañero en RollEditor), T-3 (orden `/rolls` por `created_at DESC`), T-4 (auditoría tokens semánticos). Cierre con tag `v0.4.1-it4`.
+**Última actualización:** 2026-05-19 (sesión 27, T-3.it4 cerrada + T-5.it4 promovida — pivot organizado al rediseño de home)
+**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 ✅, T-3.it4 ✅; quedan T-5/T-2/T-4 (en ese orden).
+**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md` (v1.1, re-formalizado en s27). Scope: T-1 ✅, T-3 ✅, T-5 (agrupar sesiones en home), T-2 (combobox compañero), T-4 (auditoría tokens). Cierre con tag `v0.4.1-it4`.
+
+---
+
+## Sesión 27 (2026-05-19) — T-3 cerrada + pivot organizado a home (opción B)
+
+**Hecho — T-3.it4 cerrada con validación visual + T-5.it4 promovida desde backlog como pieza concreta del rediseño de home. Plan it.4 re-formalizado a v1.1 con orden T-5 → T-2 → T-4.**
+
+**Contexto:** dentro de la misma jornada (s26 → s27), tras cerrar T-3 el owner pidió pivotar al rediseño de home (anotado en backlog hace minutos). Yo señalé que entra en colisión con la formalización recién hecha y propuse 4 opciones (A: respetar plan; B: promover una pieza concreta; C: pausar it.4; D: abandonar plan). Eligió B.
+
+**Decisiones tomadas (s27):**
+- **T-3.it4 ✅ cerrada** con orden `s.fecha DESC, r.created_at DESC` (commit `90aa1a7`). Decisión pre-implementación: Opción B del análisis (mantener `s.fecha` como criterio primario) en lugar de la Opción A literal del backlog, que habría duplicado headers de día.
+- **T-5.it4 promovida**: "Agrupar sesiones en home con headers por día (patrón `/rolls`)". El resto del paraguas "Rediseño de home" (calendario + visión general) queda en backlog para it.5.
+- **Orden de ejecución it.4:** T-5 → T-2 → T-4.
+- **Criterio de cierre actualizado**: ahora son 5 tareas, no 4. Tag `v0.4.1-it4` sin cambio.
+
+**Backlog actualizado (sesiones 26-27):**
+- Nueva entrada: "Reducir copy/texto inicial en cada pantalla" con `/rolls` como ancla concreta (4 puntos detectados: labels de chip-picker read-only, sub-labels de categoría en filtro Posición, contador "N roll(s)", labels redundantes en Selects).
+- Nueva entrada paraguas: "Rediseño de home" (calendario + agrupamiento + visión general). El agrupamiento por día queda promovido a T-5.it4; calendario y visión general siguen en backlog.
+- Nueva entrada: "Modo hobbyist vs avanzado" — dos perfiles de uso para reducir fricción de captura. Lleva investigación pendiente de auditoría de qué datos alimentan el grafo (NO ahora).
+- Limpieza: entrada "Long-press para activar drag de nodos" marcada como HECHA con referencia a T-1.it4 (resuelta con solución distinta — modo edición).
+
+**Validación T-3.it4:**
+- `pnpm check` 1053/0/0.
+- Verificación visual del owner OK: dentro del bloque "Hoy", el último roll capturado aparece arriba; headers de día siguen agrupando bien; filtros siguen funcionando.
+
+**Sparring note (por qué importa el pivot organizado):**
+El owner intentó pivotar al rediseño de home 30 minutos después de formalizar it.4 con scope congelado, y 10 minutos después de anotar en el backlog que el rediseño "no encaja en tarea de pulido suelta, conviene plan formal en it.5". Era scope creep clásico. La opción B (promover una pieza concreta) salva el activo de la formalización sin frustrar el deseo de tocar home ya. Lección para futuro: cuando una idea grande quiere colarse en una iteración cerrada, identificar la pieza más pequeña accionable y dejar el resto fuera.
+
+**Próximo paso concreto:**
+- Arrancar T-5.it4: investigar `src/routes/+page.svelte`, decidir si extraer `dayHeaderLabel` + agrupador de `/rolls/+page.svelte` a util compartido (`src/lib/date-headers.ts` o similar) o duplicar.
+- Aplicar el patrón a la lista de sesiones de home. Validación visual del owner antes de cerrar.
 
 ---
 
