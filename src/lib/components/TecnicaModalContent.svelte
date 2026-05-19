@@ -444,26 +444,6 @@
 			{/if}
 		</div>
 
-		<!-- Setup / detalles -->
-		{#if tecnica.detalles.trim().length > 0}
-			<div>
-				<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Setup</h3>
-				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{tecnica.detalles}</p>
-			</div>
-		{/if}
-
-		<!-- Errores comunes -->
-		{#if tecnica.errores_comunes.trim().length > 0}
-			<div>
-				<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-					Errores comunes
-				</h3>
-				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
-					{tecnica.errores_comunes}
-				</p>
-			</div>
-		{/if}
-
 		<!-- Contras conocidas (T-6 read-only + T-11 editable: ✕ por item, + Añadir contra) -->
 		<div>
 			<h3 class="text-sm font-semibold">

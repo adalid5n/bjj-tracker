@@ -2,12 +2,9 @@
 	import { onMount, onDestroy } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
-	import { capitalizeFirst } from '$lib/utils';
 	import type { TipoSesion } from '$lib/types';
 
 	const TIPOS: { value: TipoSesion; label: string }[] = [
@@ -16,6 +13,9 @@
 		{ value: 'open_mat', label: 'Open mat' }
 	];
 
+	// `foco`, `tecnica_clase`, `obs_profesor` siguen en BD por la migración
+	// inmutable, pero la UI ya no los expone. En creación se envían como
+	// `undefined` → null en BD; en edición se preservan via SesionForm.
 	type SaveData = {
 		fecha: string;
 		tipo: TipoSesion;
@@ -34,14 +34,11 @@
 		defaultFecha?: string;
 	} = $props();
 
-	const totalSteps = 5;
+	const totalSteps = 2;
 	const today = new Date().toISOString().slice(0, 10);
 
 	let fecha = $state(today);
 	let tipo = $state<TipoSesion | null>(null);
-	let foco = $state('');
-	let tecnicaClase = $state('');
-	let obsProfesor = $state('');
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -53,9 +50,6 @@
 		if (open) {
 			fecha = defaultFecha ?? today;
 			tipo = null;
-			foco = '';
-			tecnicaClase = '';
-			obsProfesor = '';
 			currentStep = 1;
 			visitedSteps = new Set([1]);
 			errorMsg = '';
@@ -76,18 +70,12 @@
 
 	function handleTipoChange(v: string | null) {
 		tipo = (v ?? null) as TipoSesion | null;
-		if (v) advance();
-	}
-
-	function handleFocoKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			advance();
-		}
+		// Tipo es ahora el último paso (totalSteps=2). No avanzamos al
+		// elegir; el usuario pulsa Guardar (o Enter) para confirmar.
 	}
 
 	const canAdvance = $derived(
-		currentStep === 1 ? fecha.length === 10 : currentStep === 2 ? !!tipo : true
+		currentStep === 1 ? fecha.length === 10 : !!tipo
 	);
 	const canSave = $derived(fecha.length === 10 && !!tipo && !saving);
 
@@ -153,13 +141,9 @@
 		saving = true;
 		errorMsg = '';
 		try {
-			await onSave({
-				fecha,
-				tipo,
-				foco: foco.trim() || undefined,
-				tecnica_clase: tecnicaClase.trim() || undefined,
-				obs_profesor: obsProfesor.trim() || undefined
-			});
+			// `foco`, `tecnica_clase`, `obs_profesor` se omiten — la UI ya
+			// no los edita. En creación quedan undefined → null en BD.
+			await onSave({ fecha, tipo });
 			open = false;
 		} catch (err) {
 			errorMsg = err instanceof Error ? err.message : String(err);
@@ -226,51 +210,6 @@
 					</div>
 				{/if}
 
-				{#if currentStep === 3}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Foco que traía</h3>
-						<Label for="foco" class="sr-only">Foco</Label>
-						<Input
-							id="foco"
-							bind:value={foco}
-							placeholder="p. ej. trabajar paso de guardia"
-							onkeydown={handleFocoKeydown}
-							oninput={(e) => {
-								foco = capitalizeFirst(e.currentTarget.value);
-							}}
-						/>
-					</div>
-				{/if}
-
-				{#if currentStep === 4}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Técnica enseñada en clase</h3>
-						<Label for="tecnica" class="sr-only">Técnica</Label>
-						<Textarea
-							id="tecnica"
-							bind:value={tecnicaClase}
-							rows={3}
-							oninput={(e) => {
-								tecnicaClase = capitalizeFirst(e.currentTarget.value);
-							}}
-						/>
-					</div>
-				{/if}
-
-				{#if currentStep === 5}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Observaciones del profesor</h3>
-						<Label for="obs" class="sr-only">Observaciones</Label>
-						<Textarea
-							id="obs"
-							bind:value={obsProfesor}
-							rows={3}
-							oninput={(e) => {
-								obsProfesor = capitalizeFirst(e.currentTarget.value);
-							}}
-						/>
-					</div>
-				{/if}
 			</div>
 
 			{#if errorMsg}

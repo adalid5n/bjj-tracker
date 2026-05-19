@@ -292,10 +292,6 @@
 		</span>
 	</div>
 
-	{#if posicion.notas.trim().length > 0}
-		<p class="text-sm whitespace-pre-wrap text-muted-foreground">{posicion.notas}</p>
-	{/if}
-
 	{#if status === 'loading'}
 		<p class="text-sm text-muted-foreground">Cargando técnicas…</p>
 	{:else if status === 'error'}

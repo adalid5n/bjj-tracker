@@ -138,10 +138,6 @@
   renderiza el host.
 -->
 <div class="space-y-3">
-	{#if sumision.notas.trim().length > 0}
-		<p class="text-sm whitespace-pre-wrap text-muted-foreground">{sumision.notas}</p>
-	{/if}
-
 	{#if status === 'loading'}
 		<p class="text-sm text-muted-foreground">Cargando sumisión…</p>
 	{:else if status === 'error'}

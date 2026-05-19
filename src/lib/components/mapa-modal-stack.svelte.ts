@@ -233,8 +233,6 @@ export type TecnicaWizardDraftState = {
 	sumisionDestinoId: string | null;
 	tipo: 'ataque' | 'sweep' | 'escape' | 'transicion' | 'sumision' | undefined;
 	estado: 'probando' | 'funciona' | 'descartada' | undefined;
-	detalles: string;
-	erroresComunes: string;
 	currentStep: number;
 	visitedSteps: number[];
 };
@@ -274,7 +272,6 @@ export type PosicionWizardDraftState = {
 	categoria: 'guardia' | 'control_superior' | 'espalda' | 'transicion' | 'otro' | undefined;
 	tipo: 'ofensiva' | 'defensiva' | 'neutral' | undefined;
 	complementariaId: string | null;
-	notas: string;
 	currentStep: number;
 	visitedSteps: number[];
 };

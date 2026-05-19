@@ -2,11 +2,8 @@
 	import { untrack } from 'svelte';
 	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import DateInput from '$lib/components/DateInput.svelte';
-	import { capitalizeFirst } from '$lib/utils';
 	import type { Sesion, TipoSesion } from '$lib/types';
 
 	const TIPOS: { value: TipoSesion; label: string }[] = [
@@ -32,9 +29,13 @@
 
 	let fecha = $state(init?.fecha ?? today);
 	let tipo = $state<TipoSesion>(init?.tipo ?? 'bjj');
-	let foco = $state(init?.foco ?? '');
-	let tecnicaClase = $state(init?.tecnica_clase ?? '');
-	let obsProfesor = $state(init?.obs_profesor ?? '');
+	// `foco`, `tecnica_clase`, `obs_profesor` ya no se editan desde la UI.
+	// Las columnas siguen en BD por la migración inmutable. Guardamos los
+	// valores originales del `initial` para reenviarlos intactos en el
+	// submit (no queremos pisarlos con undefined al editar).
+	const focoOriginal = init?.foco;
+	const tecnicaClaseOriginal = init?.tecnica_clase;
+	const obsProfesorOriginal = init?.obs_profesor;
 	let saving = $state(false);
 	let errorMsg = $state('');
 
@@ -49,9 +50,9 @@
 			await onSubmit({
 				fecha,
 				tipo,
-				foco: foco.trim() || undefined,
-				tecnica_clase: tecnicaClase.trim() || undefined,
-				obs_profesor: obsProfesor.trim() || undefined
+				foco: focoOriginal,
+				tecnica_clase: tecnicaClaseOriginal,
+				obs_profesor: obsProfesorOriginal
 			});
 		} catch (err) {
 			errorMsg = err instanceof Error ? err.message : String(err);
@@ -79,42 +80,6 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-	</div>
-
-	<div class="space-y-1.5">
-		<Label for="foco">Foco que traía</Label>
-		<Input
-			id="foco"
-			bind:value={foco}
-			placeholder="p. ej. trabajar paso de guardia"
-			oninput={(e) => {
-				foco = capitalizeFirst(e.currentTarget.value);
-			}}
-		/>
-	</div>
-
-	<div class="space-y-1.5">
-		<Label for="tecnica">Técnica enseñada en clase</Label>
-		<Textarea
-			id="tecnica"
-			bind:value={tecnicaClase}
-			rows={2}
-			oninput={(e) => {
-				tecnicaClase = capitalizeFirst(e.currentTarget.value);
-			}}
-		/>
-	</div>
-
-	<div class="space-y-1.5">
-		<Label for="obs">Observaciones del profesor</Label>
-		<Textarea
-			id="obs"
-			bind:value={obsProfesor}
-			rows={3}
-			oninput={(e) => {
-				obsProfesor = capitalizeFirst(e.currentTarget.value);
-			}}
-		/>
 	</div>
 
 	{#if errorMsg}

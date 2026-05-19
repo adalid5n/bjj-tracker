@@ -95,14 +95,17 @@
 	} = $props();
 
 	const mode = $derived<'wizard' | 'form'>(roll ? 'form' : 'wizard');
-	// T-12 añade un paso "posiciones problema" entre compañero y tamaño,
-	// por lo que el wizard pasa de 5 a 6 pasos.
-	const totalSteps = 6;
+	// T-12 añadió un paso "posiciones problema" entre compañero y tamaño;
+	// luego se retiró el paso de duración. Pasos actuales (wizard, modo crear):
+	// 1=Compañero, 2=Posiciones, 3=Tamaño, 4=Resultado, 5=Técnicas.
+	const totalSteps = 5;
 
 	let companeros = $state<Companero[]>([]);
 	let companeroId = $state<string | null>(null);
 	let tamanoRelativo = $state<PesoRelativo | undefined>(undefined);
-	let duracionStr = $state<string>('');
+	// `duracion_min` ya no se edita desde la UI. La columna sigue en BD;
+	// guardamos el valor original cargado del `roll` para reenviarlo intacto.
+	let duracionMinOriginal = $state<number | undefined>(undefined);
 	let resultado = $state<ResultadoRoll | undefined>(undefined);
 
 	// T-3.it2.b: catálogo completo de posiciones (recargable) y selecciones
@@ -170,7 +173,7 @@
 			companeroId = roll?.companero_id ?? null;
 			lastCompaneroId = roll?.companero_id ?? null;
 			tamanoRelativo = roll?.tamano_relativo;
-			duracionStr = roll?.duracion_min?.toString() ?? '';
+			duracionMinOriginal = roll?.duracion_min;
 			resultado = roll?.resultado;
 			currentStep = 1;
 			visitedSteps = new Set([1]);
@@ -492,13 +495,6 @@
 		if (v && mode === 'wizard') advance();
 	}
 
-	function handleDuracionKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			advance();
-		}
-	}
-
 	const canAdvance = $derived(
 		currentStep === 1 ? !!companeroId : currentStep === 5 ? !!resultado : true
 	);
@@ -544,23 +540,19 @@
 			return;
 		}
 		if (currentStep === 3) {
+			// Paso Técnicas (movido tras Posiciones).
 			intercept();
 			advance();
 			return;
 		}
 		if (currentStep === 4) {
+			// Paso Tamaño relativo.
 			intercept();
 			advance();
 			return;
 		}
-		if (currentStep === 5) {
-			if (resultado) {
-				intercept();
-				advance();
-			}
-			return;
-		}
 		if (currentStep === totalSteps) {
+			// Paso Resultado (último). Solo guarda si hay resultado.
 			if (canSaveWizard) {
 				intercept();
 				handleSave();
@@ -594,13 +586,15 @@
 		saving = true;
 		errorMsg = '';
 		try {
-			const dur = duracionStr.trim();
+			// `duracion_min` ya no se edita desde la UI. Se reenvía el valor
+			// original cargado (undefined en creación, el número guardado en
+			// edición) para no pisar valores existentes.
 			await onSave({
 				id: roll?.id ?? crypto.randomUUID(),
 				sesion_id: sesionId,
 				companero_id: companeroId ?? undefined,
 				tamano_relativo: tamanoRelativo,
-				duracion_min: dur === '' ? undefined : Number(dur),
+				duracion_min: duracionMinOriginal,
 				resultado,
 				// T-3.it2.b: la UI ya no escribe estos textos libres. Para
 				// preservar el histórico de rolls antiguos, reenviamos el
@@ -827,42 +821,6 @@
 				{/if}
 
 				{#if currentStep === 3}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Tamaño relativo</h3>
-						<Chips
-							options={PESOS}
-							value={tamanoRelativo ?? null}
-							onChange={handleTamanoChange}
-							ariaLabel="Tamaño relativo"
-						/>
-					</div>
-				{/if}
-
-				{#if currentStep === 4}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Duración (min)</h3>
-						<Input
-							inputmode="numeric"
-							bind:value={duracionStr}
-							placeholder="p. ej. 5"
-							onkeydown={handleDuracionKeydown}
-						/>
-					</div>
-				{/if}
-
-				{#if currentStep === 5}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Resultado *</h3>
-						<Chips
-							options={RESULTADOS}
-							value={resultado ?? null}
-							onChange={handleResultadoChange}
-							ariaLabel="Resultado del roll"
-						/>
-					</div>
-				{/if}
-
-				{#if currentStep === 6}
 					<!-- T-3.it2.c: técnicas unificadas en un solo buscador +
 					     tabs "Fue bien" / "Fue mal". El chip "+ Crear nueva"
 					     interno añade al set del tab activo. -->
@@ -946,6 +904,30 @@
 								accent="warning"
 							/>
 						{/if}
+					</div>
+				{/if}
+
+				{#if currentStep === 4}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Tamaño relativo</h3>
+						<Chips
+							options={PESOS}
+							value={tamanoRelativo ?? null}
+							onChange={handleTamanoChange}
+							ariaLabel="Tamaño relativo"
+						/>
+					</div>
+				{/if}
+
+				{#if currentStep === 5}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Resultado *</h3>
+						<Chips
+							options={RESULTADOS}
+							value={resultado ?? null}
+							onChange={handleResultadoChange}
+							ariaLabel="Resultado del roll"
+						/>
 					</div>
 				{/if}
 				</div>
@@ -1091,41 +1073,8 @@
 					{/if}
 				</div>
 
-				<div class="space-y-1.5">
-					<Label>Tamaño relativo</Label>
-					<Chips
-						options={PESOS}
-						value={tamanoRelativo ?? null}
-						onChange={(v) => (tamanoRelativo = (v ?? undefined) as PesoRelativo | undefined)}
-						ariaLabel="Tamaño relativo"
-					/>
-				</div>
-
-				<div class="space-y-1.5">
-					<Label for="duracion-form">Duración (min)</Label>
-					<Input
-						id="duracion-form"
-						inputmode="numeric"
-						bind:value={duracionStr}
-						placeholder="p. ej. 5"
-					/>
-				</div>
-
-				<div class="space-y-1.5">
-					<Label>Resultado *</Label>
-					<Chips
-						options={RESULTADOS}
-						value={resultado ?? null}
-						onChange={(v) => (resultado = (v ?? undefined) as ResultadoRoll | undefined)}
-						ariaLabel="Resultado"
-					/>
-					{#if !resultado}
-						<p class="text-xs text-muted-foreground italic">El resultado es obligatorio.</p>
-					{/if}
-				</div>
-
 				<!-- T-3.it2.c: técnicas unificadas (modo editar). Mismo
-				     patrón que el paso 6 del wizard. El Input legacy de
+				     patrón que el paso 3 del wizard. El Input legacy de
 				     "Posiciones donde tuve problema" se eliminó — la columna
 				     BD se preserva intacta. -->
 				<div class="space-y-4">
@@ -1207,6 +1156,29 @@
 							ariaLabel="Técnicas que fallé"
 							accent="warning"
 						/>
+					{/if}
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Tamaño relativo</Label>
+					<Chips
+						options={PESOS}
+						value={tamanoRelativo ?? null}
+						onChange={(v) => (tamanoRelativo = (v ?? undefined) as PesoRelativo | undefined)}
+						ariaLabel="Tamaño relativo"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Resultado *</Label>
+					<Chips
+						options={RESULTADOS}
+						value={resultado ?? null}
+						onChange={(v) => (resultado = (v ?? undefined) as ResultadoRoll | undefined)}
+						ariaLabel="Resultado"
+					/>
+					{#if !resultado}
+						<p class="text-xs text-muted-foreground italic">El resultado es obligatorio.</p>
 					{/if}
 				</div>
 

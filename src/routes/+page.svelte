@@ -168,9 +168,6 @@
 										{s.rolls_count === 1 ? 'roll' : 'rolls'}
 									</span>
 								</div>
-								{#if s.foco}
-									<div class="mt-1 truncate text-sm text-foreground">{s.foco}</div>
-								{/if}
 							</a>
 						</li>
 					{/each}

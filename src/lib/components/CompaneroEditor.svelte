@@ -4,7 +4,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import CinturonChips from '$lib/components/CinturonChips.svelte';
 	import { capitalizeFirst } from '$lib/utils';
@@ -37,12 +36,14 @@
 	} = $props();
 
 	const mode = $derived<'wizard' | 'form'>(companero ? 'form' : 'wizard');
-	const totalSteps = 4;
+	const totalSteps = 3;
 
 	let nombre = $state('');
 	let cinturon = $state<Cinturon | undefined>(undefined);
 	let pesoRelativo = $state<PesoRelativo | undefined>(undefined);
-	let notas = $state('');
+	// `notas` ya no se edita desde la UI. La columna sigue en BD; guardamos
+	// el valor original cargado del `companero` para reenviarlo intacto.
+	let notasOriginal = $state<string | undefined>(undefined);
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -55,7 +56,7 @@
 			nombre = companero?.nombre ?? '';
 			cinturon = companero?.cinturon;
 			pesoRelativo = companero?.peso_relativo;
-			notas = companero?.notas ?? '';
+			notasOriginal = companero?.notas;
 			currentStep = 1;
 			visitedSteps = new Set([1]);
 			errorMsg = '';
@@ -161,7 +162,9 @@
 				nombre: nombre.trim(),
 				cinturon,
 				peso_relativo: pesoRelativo,
-				notas: notas.trim() || undefined
+				// `notas`: en creación queda undefined → null. En edición se
+				// reenvía el valor original cargado para preservarlo.
+				notas: notasOriginal
 			});
 			open = false;
 		} catch (err) {
@@ -246,19 +249,6 @@
 						</div>
 					{/if}
 
-					{#if currentStep === 4}
-						<div class="space-y-3">
-							<h3 class="text-sm font-semibold">Notas (opcional)</h3>
-							<Textarea
-								id="notas"
-								bind:value={notas}
-								rows={3}
-								oninput={(e) => {
-									notas = capitalizeFirst(e.currentTarget.value);
-								}}
-							/>
-						</div>
-					{/if}
 				</div>
 
 				{#if errorMsg}
@@ -322,18 +312,6 @@
 							value={pesoRelativo ?? null}
 							onChange={(v) => (pesoRelativo = (v ?? undefined) as PesoRelativo | undefined)}
 							ariaLabel="Peso relativo"
-						/>
-					</div>
-
-					<div class="space-y-1.5">
-						<Label for="notas-form">Notas</Label>
-						<Textarea
-							id="notas-form"
-							bind:value={notas}
-							rows={3}
-							oninput={(e) => {
-								notas = capitalizeFirst(e.currentTarget.value);
-							}}
 						/>
 					</div>
 

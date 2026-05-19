@@ -3,10 +3,13 @@
 	 * Wizard de SUMISION terminal (T-9) — crear / editar.
 	 *
 	 * Mismo patrón que `PosicionWizard` pero simplificado: no hay chips
-	 * skippables (no hay categoría ni tipo de rol). Solo 2 pasos:
+	 * skippables (no hay categoría ni tipo de rol). Un único paso:
 	 *
-	 *   1. Nombre (obligatorio, sin auto-avance — es texto).
-	 *   2. Notas (textarea opcional, botón Guardar).
+	 *   1. Nombre (obligatorio, sin auto-avance — es texto). Botón Guardar.
+	 *
+	 * Nota: la columna `sumisiones_terminales.notas` sigue en BD (migración
+	 * inmutable). La UI ya no la expone — al crear se persiste cadena vacía,
+	 * al editar se reenvía el valor original intacto.
 	 *
 	 * NO es un Dialog en sí — el Dialog lo provee `MapaModalHost`. Aquí
 	 * solo renderizamos el contenido interno y nos integramos con el
@@ -28,7 +31,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import type { SumisionTerminal } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 	import { capitalizeFirst } from '$lib/utils';
@@ -47,7 +49,7 @@
 		onRequestClose?: () => void;
 	} = $props();
 
-	const totalSteps = 2;
+	const totalSteps = 1;
 
 	// T-2.it2: en modo `editar` el componente renderiza un form plano con
 	// todos los campos visibles a la vez (mismo patrón que `RollEditor`).
@@ -55,7 +57,10 @@
 	const viewMode = $derived<'wizard' | 'form'>(modo === 'editar' ? 'form' : 'wizard');
 
 	let nombre = $state('');
-	let notas = $state('');
+	// `notas` ya no se edita desde la UI (campo retirado). La columna sigue
+	// en BD; guardamos el valor original cargado para reenviarlo intacto al
+	// actualizar.
+	let notasOriginal = $state('');
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -76,7 +81,7 @@
 
 	// Snapshot para detectar dirty en modo editar; en modo crear se
 	// compara contra los defaults vacíos.
-	let snapshot = $state<{ nombre: string; notas: string }>({ nombre: '', notas: '' });
+	let snapshot = $state<{ nombre: string }>({ nombre: '' });
 
 	onMount(async () => {
 		// Registra el dirty handler en el stack para que el host lo
@@ -114,8 +119,8 @@
 				return;
 			}
 			nombre = s.nombre;
-			notas = s.notas;
-			snapshot = { nombre: s.nombre, notas: s.notas };
+			notasOriginal = s.notas;
+			snapshot = { nombre: s.nombre };
 			status = 'ready';
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : String(err);
@@ -130,9 +135,7 @@
 
 	// Hay cambios sin guardar si algún campo difiere del snapshot inicial.
 	// Trim para no marcar dirty por espacios incidentales.
-	const isDirty = $derived(
-		nombre.trim() !== snapshot.nombre.trim() || notas.trim() !== snapshot.notas.trim()
-	);
+	const isDirty = $derived(nombre.trim() !== snapshot.nombre.trim());
 
 	// Limpia el error inline cuando el usuario edita el nombre. Antes esto
 	// vivía en un `$effect` que leía `nombre` para "trackear" cambios, pero
@@ -170,6 +173,10 @@
 	}
 
 	function tryAdvanceFromStep1() {
+		// Con un solo paso (Nombre), "Continuar" se reemplaza por "Guardar":
+		// validamos duplicado inline y, si pasa, intentamos guardar
+		// directamente. `handleSave` también captura el UNIQUE de SQLite por
+		// si entra una carrera entre pestañas.
 		const n = nombre.trim();
 		if (!n) return;
 		if (nombreYaExiste(n)) {
@@ -177,7 +184,7 @@
 			return;
 		}
 		nombreError = '';
-		advance();
+		void handleSave();
 	}
 
 	function handleNombreKeydown(e: KeyboardEvent) {
@@ -213,18 +220,14 @@
 			e.preventDefault();
 			e.stopImmediatePropagation();
 		};
+		// Único paso: pulsar Enter en el input dispara el guardado (vía
+		// tryAdvanceFromStep1, que valida duplicado y llama a handleSave).
 		if (currentStep === 1) {
-			if (canAdvanceFromStep1) {
+			if (canAdvanceFromStep1 && !saving) {
 				intercept();
 				tryAdvanceFromStep1();
 			}
 			return;
-		}
-		if (currentStep === totalSteps) {
-			if (!saving && nombre.trim().length > 0) {
-				intercept();
-				handleSave();
-			}
 		}
 	}
 
@@ -265,9 +268,11 @@
 		try {
 			if (modo === 'crear') {
 				const { createSumision } = await import('$lib/sumisiones');
+				// La UI ya no edita Notas — persistimos cadena vacía. La
+				// columna sigue en BD por la migración inmutable.
 				const nueva = await createSumision({
 					nombre: nombreFinal,
-					notas: notas.trim()
+					notas: ''
 				});
 				onSaved?.(nueva.id, 'crear');
 				// Tras guardar ya no hay cambios pendientes: desactiva el
@@ -292,10 +297,12 @@
 					throw new Error('Falta sumisionId en modo editar.');
 				}
 				const { updateSumision } = await import('$lib/sumisiones');
+				// `notas` ya no se edita desde la UI — reenviamos el valor
+				// original cargado de BD para preservar lecturas existentes.
 				const update: Omit<SumisionTerminal, 'created_at' | 'updated_at'> = {
 					id: sumisionId,
 					nombre: nombreFinal,
-					notas: notas.trim()
+					notas: notasOriginal
 				};
 				await updateSumision(update);
 				onSaved?.(sumisionId, 'editar');
@@ -336,28 +343,31 @@
 	-->
 	<div class="flex h-full min-h-0 flex-col">
 		{#if viewMode === 'wizard'}
-		<!-- Indicador de progreso (mismo patrón que PosicionWizard). -->
-		<div class="flex items-center gap-1 pt-2">
-			{#each Array(totalSteps) as _, i (i)}
-				{@const step = i + 1}
-				{@const visited = visitedSteps.has(step)}
-				{@const isCurrent = step === currentStep}
-				<button
-					type="button"
-					class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
-						? 'bg-primary'
-						: visited
-							? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
-							: 'bg-muted'}"
-					disabled={!visited || isCurrent}
-					onclick={() => goToStep(step)}
-					aria-label="Ir al paso {step}"
-				></button>
-			{/each}
-		</div>
-		<p class="text-center text-xs text-muted-foreground">
-			Paso {currentStep} de {totalSteps}
-		</p>
+		<!-- Indicador de progreso (mismo patrón que PosicionWizard). Oculto cuando
+		     el wizard tiene un único paso: la barra "siempre llena" estorba. -->
+		{#if totalSteps > 1}
+			<div class="flex items-center gap-1 pt-2">
+				{#each Array(totalSteps) as _, i (i)}
+					{@const step = i + 1}
+					{@const visited = visitedSteps.has(step)}
+					{@const isCurrent = step === currentStep}
+					<button
+						type="button"
+						class="h-1.5 flex-1 rounded-full transition-colors {isCurrent
+							? 'bg-primary'
+							: visited
+								? 'bg-primary/40 hover:bg-primary/60 cursor-pointer'
+								: 'bg-muted'}"
+						disabled={!visited || isCurrent}
+						onclick={() => goToStep(step)}
+						aria-label="Ir al paso {step}"
+					></button>
+				{/each}
+			</div>
+			<p class="text-center text-xs text-muted-foreground">
+				Paso {currentStep} de {totalSteps}
+			</p>
+		{/if}
 
 		<!--
 		  Body scrollable. Todos los pasos viven montados (clave del fix del
@@ -380,23 +390,7 @@
 				{#if nombreError}
 					<p id="sumision-nombre-error" class="text-sm text-destructive">{nombreError}</p>
 				{/if}
-				<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
-			</div>
-
-			<div class="space-y-3" class:hidden={currentStep !== 2}>
-				<h3 class="text-sm font-semibold">Notas (opcional)</h3>
-				<div class="space-y-1.5">
-					<Label for="sumision-notas">Notas</Label>
-					<Textarea
-						id="sumision-notas"
-						bind:value={notas}
-						rows={4}
-						placeholder="Anota lo que quieras recordar sobre esta sumisión."
-						oninput={(e) => {
-							notas = capitalizeFirst(e.currentTarget.value);
-						}}
-					/>
-				</div>
+				<p class="text-xs text-muted-foreground">Pulsa Enter o "Guardar" para crear la sumisión.</p>
 			</div>
 
 			{#if errorMsg}
@@ -422,15 +416,11 @@
 					</Button>
 				{/if}
 
-				{#if currentStep === totalSteps}
-					<Button size="sm" onclick={handleSave} disabled={saving || !nombre.trim()}>
-						{saving ? 'Guardando…' : 'Guardar'}
-					</Button>
-				{:else if currentStep === 1}
-					<Button size="sm" onclick={tryAdvanceFromStep1} disabled={!canAdvanceFromStep1}>
-						Continuar
-					</Button>
-				{/if}
+				<!-- Con un solo paso, currentStep siempre vale 1 = totalSteps:
+				     mostramos directamente Guardar. -->
+				<Button size="sm" onclick={tryAdvanceFromStep1} disabled={saving || !canAdvanceFromStep1}>
+					{saving ? 'Guardando…' : 'Guardar'}
+				</Button>
 			</div>
 		</div>
 		{:else}
@@ -448,19 +438,6 @@
 					{#if nombreError}
 						<p id="sumision-form-nombre-error" class="text-sm text-destructive">{nombreError}</p>
 					{/if}
-				</div>
-
-				<div class="space-y-1.5">
-					<Label for="sumision-form-notas">Notas</Label>
-					<Textarea
-						id="sumision-form-notas"
-						bind:value={notas}
-						rows={4}
-						placeholder="Anota lo que quieras recordar sobre esta sumisión."
-						oninput={(e) => {
-							notas = capitalizeFirst(e.currentTarget.value);
-						}}
-					/>
 				</div>
 
 				{#if errorMsg}

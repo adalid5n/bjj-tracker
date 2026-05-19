@@ -33,12 +33,16 @@
 	 * elegir destino, limpiamos el destino del otro tipo (paso de
 	 * "ataque" a "sumision" o viceversa). Evita guardar incoherencias y
 	 * fuerza una selección consciente.
+	 *
+	 * Nota: las columnas `tecnicas.detalles` y `tecnicas.errores_comunes`
+	 * siguen existiendo en BD (migración inmutable). La UI ya no las edita
+	 * — al crear se persiste cadena vacía, al editar se reenvía el valor
+	 * original cargado de BD.
 	 */
 	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
 	import type {
@@ -98,7 +102,11 @@
 		{ value: 'descartada', label: 'Descartada' }
 	];
 
-	const totalSteps = 7;
+	// 6 pasos: Nombre, Variante, Posición origen, Tipo, Destino, Estado.
+	// El antiguo paso 7 (Detalles + Errores comunes) se retiró; las columnas
+	// siguen en BD y se preservan al editar (ver `detallesOriginal` /
+	// `erroresComunesOriginal`).
+	const totalSteps = 6;
 
 	// T-2.it2: en modo `editar` el componente renderiza un form plano con
 	// todos los campos visibles a la vez (mismo patrón que `RollEditor`).
@@ -116,8 +124,11 @@
 	// "no elegido" de "el usuario eligió probando" en el botón skippable.
 	let tipo = $state<TipoTecnica | undefined>(undefined);
 	let estado = $state<EstadoTecnica | undefined>(undefined);
-	let detalles = $state('');
-	let erroresComunes = $state('');
+	// `detalles` y `errores_comunes` ya no se editan desde la UI. La columna
+	// sigue en BD; guardamos los valores originales para reenviarlos intactos
+	// al actualizar.
+	let detallesOriginal = $state('');
+	let erroresComunesOriginal = $state('');
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -143,8 +154,6 @@
 		sumisionDestinoId: string | null;
 		tipo: TipoTecnica | undefined;
 		estado: EstadoTecnica | undefined;
-		detalles: string;
-		erroresComunes: string;
 	};
 	let snapshot = $state<Snapshot>({
 		nombre: '',
@@ -153,9 +162,7 @@
 		posicionDestinoId: null,
 		sumisionDestinoId: null,
 		tipo: undefined,
-		estado: undefined,
-		detalles: '',
-		erroresComunes: ''
+		estado: undefined
 	});
 
 	// Discriminador del draft: 'crear' para crear, 'editar:<id>' para editar.
@@ -228,8 +235,6 @@
 			sumisionDestinoId = draft.sumisionDestinoId;
 			tipo = draft.tipo;
 			estado = draft.estado;
-			detalles = draft.detalles;
-			erroresComunes = draft.erroresComunes;
 			currentStep = draft.currentStep;
 			visitedSteps = new Set(draft.visitedSteps);
 			// El snapshot se sigue cargando desde BD (modo editar) o
@@ -278,9 +283,11 @@
 				sumisionDestinoId = t.sumision_destino_id ?? null;
 				tipo = t.tipo;
 				estado = t.estado;
-				detalles = t.detalles;
-				erroresComunes = t.errores_comunes;
 			}
+			// Preserva los textos existentes — la UI no los edita, pero no
+			// queremos pisarlos con '' al guardar.
+			detallesOriginal = t.detalles;
+			erroresComunesOriginal = t.errores_comunes;
 			snapshot = {
 				nombre: t.nombre,
 				variante: t.variante ?? '',
@@ -288,9 +295,7 @@
 				posicionDestinoId: t.posicion_destino_id ?? null,
 				sumisionDestinoId: t.sumision_destino_id ?? null,
 				tipo: t.tipo,
-				estado: t.estado,
-				detalles: t.detalles,
-				erroresComunes: t.errores_comunes
+				estado: t.estado
 			};
 			status = 'ready';
 		} catch (err) {
@@ -334,8 +339,6 @@
 			sumisionDestinoId,
 			tipo,
 			estado,
-			detalles,
-			erroresComunes,
 			currentStep,
 			visitedSteps: [...visitedSteps]
 		});
@@ -348,9 +351,7 @@
 			posicionDestinoId !== snapshot.posicionDestinoId ||
 			sumisionDestinoId !== snapshot.sumisionDestinoId ||
 			tipo !== snapshot.tipo ||
-			estado !== snapshot.estado ||
-			detalles.trim() !== snapshot.detalles.trim() ||
-			erroresComunes.trim() !== snapshot.erroresComunes.trim()
+			estado !== snapshot.estado
 	);
 
 	// En `standalone`, propaga dirty al padre cada vez que cambia. En
@@ -482,11 +483,9 @@
 			}
 			return;
 		}
-		if (currentStep === 6) {
-			intercept();
-			(estado !== undefined ? handleContinueStep6 : handleSkipEstado)();
-			return;
-		}
+		// Paso 6 (Estado) es ahora el último: Enter dispara Guardar
+		// directamente (el estado vacío materializa el default 'probando'
+		// en handleSave). totalSteps = 6 desde la retirada del paso 7.
 		if (currentStep === totalSteps) {
 			if (!saving && nombre.trim().length > 0 && posicionOrigenId && tipo) {
 				intercept();
@@ -510,17 +509,9 @@
 	}
 
 	function handleEstadoChange(v: string | null) {
+		// Estado es ahora el último paso (totalSteps=6). No avanzamos al
+		// elegir; el usuario pulsa Guardar (o Enter) para confirmar.
 		estado = (v ?? undefined) as EstadoTecnica | undefined;
-		if (v) advance();
-	}
-
-	function handleSkipEstado() {
-		estado = undefined;
-		advance();
-	}
-
-	function handleContinueStep6() {
-		advance();
 	}
 
 	// "+ Crear nueva posición" inline en paso 3 (origen). Mismo patrón
@@ -734,6 +725,9 @@
 
 			if (modo === 'crear') {
 				const { createTecnica } = await import('$lib/tecnicas');
+				// La UI ya no edita `detalles` ni `errores_comunes` — persistimos
+				// cadenas vacías. Las columnas siguen en BD por la migración
+				// inmutable.
 				const nueva = await createTecnica({
 					nombre: nombreFinal,
 					variante: varianteFinal,
@@ -742,8 +736,8 @@
 					sumision_destino_id: sumisionDestinoFinal,
 					tipo,
 					estado: estadoFinal,
-					detalles: detalles.trim(),
-					errores_comunes: erroresComunes.trim()
+					detalles: '',
+					errores_comunes: ''
 				});
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
@@ -776,6 +770,8 @@
 					throw new Error('Falta tecnicaId en modo editar.');
 				}
 				const { updateTecnica } = await import('$lib/tecnicas');
+				// `detalles` y `errores_comunes` ya no se editan desde la UI
+				// — reenviamos los valores originales cargados de BD.
 				await updateTecnica({
 					id: tecnicaId,
 					nombre: nombreFinal,
@@ -785,8 +781,8 @@
 					sumision_destino_id: sumisionDestinoFinal,
 					tipo,
 					estado: estadoFinal,
-					detalles: detalles.trim(),
-					errores_comunes: erroresComunes.trim()
+					detalles: detallesOriginal,
+					errores_comunes: erroresComunesOriginal
 				});
 				if (mode === 'stack') {
 					onSaved?.(tecnicaId, 'editar');
@@ -998,35 +994,6 @@
 			</p>
 		</div>
 
-		<!-- Paso 7: Detalles + errores comunes -->
-		<div class="space-y-3" class:hidden={currentStep !== 7}>
-			<h3 class="text-sm font-semibold">Detalles (opcional)</h3>
-			<div class="space-y-1.5">
-				<Label for="tecnica-detalles">Setup / ejecución</Label>
-				<Textarea
-					id="tecnica-detalles"
-					bind:value={detalles}
-					rows={4}
-					placeholder="Anota cómo se ejecuta la técnica, claves del setup, etc."
-					oninput={(e) => {
-						detalles = capitalizeFirst(e.currentTarget.value);
-					}}
-				/>
-			</div>
-			<div class="space-y-1.5">
-				<Label for="tecnica-errores">Errores comunes</Label>
-				<Textarea
-					id="tecnica-errores"
-					bind:value={erroresComunes}
-					rows={3}
-					placeholder="Qué falla habitualmente, mistakes que detectas en rolls, etc."
-					oninput={(e) => {
-						erroresComunes = capitalizeFirst(e.currentTarget.value);
-					}}
-				/>
-			</div>
-		</div>
-
 		{#if errorMsg}
 			<p class="text-sm text-destructive">{errorMsg}</p>
 		{/if}
@@ -1059,15 +1026,6 @@
 					<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
 						Continuar
 					</Button>
-				{:else if currentStep === 6}
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={estado !== undefined ? handleContinueStep6 : handleSkipEstado}
-						disabled={saving}
-					>
-						Continuar
-					</Button>
 				{/if}
 
 				{#if currentStep === 1}
@@ -1079,6 +1037,8 @@
 				{:else if currentStep === 5}
 					<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep5}>Continuar</Button>
 				{:else if currentStep === totalSteps}
+					<!-- Paso 6 (Estado) es ahora el último. Estado skippable: si
+					     queda undefined, materializa 'probando' en handleSave. -->
 					<Button
 						size="sm"
 						onclick={handleSave}
@@ -1195,32 +1155,6 @@
 						value={estado ?? null}
 						onChange={handleEstadoChange}
 						ariaLabel="Estado de la técnica"
-					/>
-				</div>
-
-				<div class="space-y-1.5">
-					<Label for="tecnica-form-detalles">Setup / ejecución</Label>
-					<Textarea
-						id="tecnica-form-detalles"
-						bind:value={detalles}
-						rows={4}
-						placeholder="Anota cómo se ejecuta la técnica, claves del setup, etc."
-						oninput={(e) => {
-							detalles = capitalizeFirst(e.currentTarget.value);
-						}}
-					/>
-				</div>
-
-				<div class="space-y-1.5">
-					<Label for="tecnica-form-errores">Errores comunes</Label>
-					<Textarea
-						id="tecnica-form-errores"
-						bind:value={erroresComunes}
-						rows={3}
-						placeholder="Qué falla habitualmente, mistakes que detectas en rolls, etc."
-						oninput={(e) => {
-							erroresComunes = capitalizeFirst(e.currentTarget.value);
-						}}
 					/>
 				</div>
 
