@@ -1,8 +1,31 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 32, T-1.it5 cerrada — MonthCalendar scroll-driven + reorganización home)
-**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v2.0, re-formalizado en s32). T-1.it5 ✅; quedan T-2 (markers), T-4 (insights), T-3 (stats chip). Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
+**Última actualización:** 2026-05-19 (sesión 33, T-2.it5 cerrada — markers en calendario + tensión en scroll)
+**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v2.0). T-1.it5 ✅, T-2.it5 ✅; quedan T-4 (insights), T-3 (stats chip). Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
 **Iteración previa:** it.4 ✅ cerrada con `v0.4.1-it4` (2026-05-19).
+
+---
+
+## Sesión 33 (2026-05-19) — T-2.it5 cerrada (markers) + fix UX scroll de T-1
+
+**Hecho — T-2.it5 cerrada con cambio mínimo en home (4 líneas) + fix UX en T-1 (threshold de expansión bajado de 50 a 5 para crear "tensión" antes de expandir).**
+
+**T-2.it5 (commit `d09157d`):**
+- `const diasConSesion = $derived(new Set(sesiones.map((s) => s.fecha)));` en home.
+- Pasado como prop `markers` al `MonthCalendar`. El slot del marker (punto bajo el día) ya existía en T-1.
+- Reactivo: el Set se recomputa al crear/eliminar sesiones.
+
+**Fix UX de T-1 (commit `fe41907`):**
+- Owner reportó que al scrollear arriba con el calendario compacto, este expandía demasiado pronto — antes de que el primer card de sesión llegara al top.
+- Hysteresis bajada: `compact = false` cuando `scrollY < 5` (antes 50). El threshold de activación se mantiene en `> 100`.
+- Resultado: el card llega al top, se queda visible debajo del calendario compacto. Solo cuando el user "tira" hasta el top absoluto (scrollY < 5), el calendario expande. Sensación de "tensión" intencional.
+
+**Validación:**
+- `pnpm check` 1055/0/0.
+- Visual owner OK ("perfecto" para markers + "perfecto" tras fix de threshold).
+
+**Próximo paso concreto:**
+- Arrancar **T-4.it5** — insights simplificados en home. Antes que T-3 (stats chip) según orden acordado en s31 (los insights consumen más espacio visual y conviene definirlos en contexto del layout). Pendiente revisar `AnalisisPanel.svelte` para decidir qué insights priorizar (2-3) y si extraer un componente compacto vs reusar el existente.
 
 ---
 

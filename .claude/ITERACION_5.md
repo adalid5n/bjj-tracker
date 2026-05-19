@@ -1,7 +1,7 @@
 # Iteración 5 — Rediseño de home (calendario + dashboard)
 
 **Versión:** 2.0 (re-formalizada en sesión 32 tras pivot semanal→mensual scroll-driven)
-**Estado:** 🟢 En curso — T-1.it5 ✅; quedan T-2/T-3/T-4
+**Estado:** 🟢 En curso — T-1.it5 ✅, T-2.it5 ✅; quedan T-3 (stats chip) y T-4 (insights)
 **Predecesor:** Iteración 4 (cerrada con `v0.4.1-it4`, 2026-05-19)
 
 ---
@@ -90,26 +90,20 @@ Tras 3 approaches descartados (sentinel + IntersectionObserver falló por scroll
 
 ---
 
-### T-2.it5 — Markers en calendario (días con sesión)
+### T-2.it5 — Markers en calendario (días con sesión) ✅
 
-**Qué entra:**
-- Cómputo en home de un `Set<string>` con las fechas ISO que tienen
-  al menos 1 sesión (derivar de `sesiones` ya cargadas).
-- Pasarlo como prop al `WeeklyCalendar` (slot definido en T-1).
-- Render del marker: **punto simple** debajo del número del día
-  (decisión owner sesión 31). Color: token `bg-foreground/60` o
-  similar (no destacar excesivamente; el marker es info passive).
+**Estado:** ✅ Cerrada (commit `d09157d`, sesión 33 — 2026-05-19).
 
-**Qué NO entra:**
-- Variantes de marker por tipo de sesión (BJJ/Grappling/Open mat).
-  El owner descartó "más info por marker" en sesión 31.
-- Count de rolls como marker. Misma razón.
+**Lo que se hizo:**
+- En `src/routes/+page.svelte`: `const diasConSesion = $derived(new Set(sesiones.map((s) => s.fecha)));` — Set reactivo de fechas ISO con al menos 1 sesión.
+- Reemplazo de `markers={new Set()}` por `markers={diasConSesion}` en la invocación a `MonthCalendar`. El slot del marker ya estaba implementado en T-1 (punto bajo el número del día, color `bg-foreground/60` y `bg-primary-foreground` cuando el día está seleccionado).
 
 **Validación:**
-- Manual: días con sesión muestran punto debajo del número; días sin
-  sesión no.
-- El marker se actualiza al crear/eliminar sesiones (reactividad
-  Svelte).
+- `pnpm check` 1055/0/0.
+- Visual owner OK ("Los días con sesión se muestran con un punto, perfecto").
+
+**Fix colateral de T-1 (mismo bloque de validación, commit `fe41907`):**
+- Bajada del threshold de expansión scroll-driven: hysteresis 50/100 → **5/100**. Razón: la expansión ocurría demasiado pronto al scrollear arriba (antes de que el primer card llegara al top). Con threshold 5, la expansión solo dispara cerca del top absoluto, dando sensación de "tensión" — el card llega al top y se queda visible bajo el calendario compacto hasta que el user "tira" hasta arriba.
 
 ---
 
@@ -199,9 +193,9 @@ como subtitle implícito de la pantalla. Las secciones más densas
 
 ## ORDEN SUGERIDO DE EJECUCIÓN
 
-1. **T-1.it5** ✅ Cerrada (sesión 32, commit `cd4583a`).
-2. **T-2.it5** (siguiente activa) — markers en calendario. T-1 deja el slot definido. Estimación: 30 min.
-3. **T-4.it5** — insights simplificados. Antes que T-3 porque consumen más espacio visual y conviene definirlos en contexto del layout.
+1. **T-1.it5** ✅ Cerrada (sesión 32, commit `cd4583a`; fix de threshold en s33 commit `fe41907`).
+2. **T-2.it5** ✅ Cerrada (sesión 33, commit `d09157d`).
+3. **T-4.it5** (siguiente activa) — insights simplificados. Antes que T-3 porque consumen más espacio visual y conviene definirlos en contexto del layout.
 4. **T-3.it5** — stats chip arriba. Refinamiento final.
 
 ---
