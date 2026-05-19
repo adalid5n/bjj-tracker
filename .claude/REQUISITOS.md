@@ -313,11 +313,24 @@ Propuesta inicial. Iteraremos sobre esto.
 
 **Criterio de éxito:** la vista grafo me hace ver una técnica/contra que en lista no había notado.
 
-### Iteración 4 — Móvil
-- App móvil con captura + lectura y edición del mapa
-- Export/import JSON entre móvil y desktop
+### Iteración 4 — Pulido post-grafo y consistencia UX
+- Pulido y consistencia UX tras cerrar el grafo (it.3).
+- Tareas concretas: long-press → modo edición en grafo + UX móvil del
+  grafo, combobox compañero en RollEditor, orden `/rolls` por
+  `created_at DESC`, auditoría de tokens semánticos en `src/`.
+- Plan detallado en `ITERACION_4.md`.
 
-**Criterio de éxito:** capturo desde el móvil tras una clase y consigo importar en desktop sin pérdida.
+**Criterio de éxito:** las 4 tareas cerradas con commit en `main` + tag
+`v0.4.1-it4` aplicado.
+
+> **Nota — la "it.4 = Móvil" original quedó fusionada:** la propuesta
+> inicial de esta sección (2026-05-09) hablaba de "app móvil con
+> captura + edición del mapa + export/import JSON". El uso real
+> reveló que conviene tratar móvil como responsive (no app separada).
+> El export/import JSON se entregó en it.0 (F-5). La edición del mapa
+> en móvil se decidió en sesión 6 (2026-05-13: *Móvil del mapa
+> también edita*) y entró en it.1. El contenido actual de it.4 surge
+> por tanto de pulido emergido durante it.1-it.3, no del plan original.
 
 ### Iteración 5+ — Backlog
 - Backup automático (si no se hizo antes)

@@ -1,8 +1,40 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 25, T-1.it4 cerrada — rework a modo edición + UX grafo móvil, push en `4cbacae`)
-**Fase activa:** Iteración 4 abierta. T-1.it4 cerrada y validada en local.
-**Iteración en curso:** it.4. Sin plan formal (no se ha escrito `ITERACION_4.md`); scope decidido tarea-a-tarea desde el backlog de `MEJORAS_FUTURAS.md`.
+**Última actualización:** 2026-05-19 (sesión 26, it.4 formalizada y renombrada — plan en `ITERACION_4.md`, REQUISITOS §6 alineado)
+**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 cerrada; quedan T-2/T-3/T-4.
+**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md`. Scope congelado: T-1 ✅, T-2 (combobox compañero en RollEditor), T-3 (orden `/rolls` por `created_at DESC`), T-4 (auditoría tokens semánticos). Cierre con tag `v0.4.1-it4`.
+
+---
+
+## Sesión 26 (2026-05-19) — formalización y renombrado de it.4
+
+**Hecho — it.4 pasa de "scope libre desde backlog" a iteración formal con plan, nombre y criterio de cierre.**
+
+**Contexto:** s25 dejó it.4 abierta sin plan, con un único entregable (T-1.it4) y una lista informal de candidatos del backlog. El owner pidió formalizar antes de seguir.
+
+**Decisiones de producto (confirmadas vía AskUserQuestion):**
+- **Nombre:** "Pulido post-grafo y consistencia UX". Refleja origen (post-it.3) + hilo conductor (consistencia, no funcionalidad nueva).
+- **Scope final** (4 tareas):
+  - T-1.it4 ✅ — long-press → modo edición en grafo + UX móvil del grafo.
+  - T-2.it4 — combobox compañero en RollEditor (solo Parte B del backlog: combobox + crear inline; la Parte A — sugerencia automática — se difiere).
+  - T-3.it4 — orden `/rolls` por `created_at DESC`.
+  - T-4.it4 — auditoría de tokens semánticos en `src/`.
+- **Fuera (diferido a backlog):** tab Sumisiones en `/mapa`, botón "Forzar actualización" en `/ajustes`, sugerencia automática de compañero, bump a Node 24 en workflow.
+- **Tag de cierre:** `v0.4.1-it4` (patch, no minor — pulido sin features nuevas).
+- **Sin "captura de N sesiones reales"** como criterio de cierre; las 4 tareas son auto-verificables.
+
+**Renumeración / alineación con REQUISITOS:**
+- La "it.4 = Móvil" original de REQUISITOS §6 quedó fusionada en iteraciones previas: export/import JSON entregado en it.0; móvil del mapa edita desde decisión de s6 (2026-05-13). Nota explícita añadida en REQUISITOS §6 documentándolo.
+- Numeración conservada (sigue siendo it.4); cambia solo el contenido y el nombre.
+
+**Artefactos creados/modificados (todavía sin commit, pendiente OK):**
+- `.claude/ITERACION_4.md` (nuevo) — plan formal con objetivo, scope, criterio, T-1.it4 marcada cerrada, orden sugerido de ejecución para T-2/T-3/T-4.
+- `.claude/REQUISITOS.md` §6 — entrada de it.4 reescrita con nuevo nombre + nota sobre fusión del móvil original.
+- `.claude/ESTADO_ACTUAL.md` (este fichero) — header + esta sesión.
+
+**Próximo paso concreto:**
+- OK explícito del owner sobre el plan → commit `docs(it-4): formalizar y renombrar iteración 4` agrupando los 3 cambios.
+- Tras el commit, elegir entre T-3.it4 (más pequeña, recomendada como recalibrado), T-2.it4 (medio) o T-4.it4 (mecánica pero extensa).
 
 ---
 
