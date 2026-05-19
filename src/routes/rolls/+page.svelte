@@ -11,6 +11,7 @@
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import ChipPicker from '$lib/components/ChipPicker.svelte';
 	import AnalisisPanel from '$lib/components/AnalisisPanel.svelte';
+	import { dayHeaderLabel } from '$lib/day-headers';
 	import type {
 		CategoriaPosicion,
 		Companero,
@@ -228,40 +229,6 @@
 		await deleteRoll(editingRoll.id);
 		await refresh();
 		analisisReloadKey++;
-	}
-
-	// T-13: helpers para agrupar rolls por día. La fecha viene en
-	// `r.sesion_fecha` como ISO `YYYY-MM-DD` (sin hora). Para "Hoy"/"Ayer"
-	// comparamos contra la fecha local del navegador formateada igual.
-	function todayIso(): string {
-		const d = new Date();
-		const y = String(d.getFullYear()).padStart(4, '0');
-		const m = String(d.getMonth() + 1).padStart(2, '0');
-		const day = String(d.getDate()).padStart(2, '0');
-		return `${y}-${m}-${day}`;
-	}
-
-	function yesterdayIso(): string {
-		const d = new Date();
-		d.setDate(d.getDate() - 1);
-		const y = String(d.getFullYear()).padStart(4, '0');
-		const m = String(d.getMonth() + 1).padStart(2, '0');
-		const day = String(d.getDate()).padStart(2, '0');
-		return `${y}-${m}-${day}`;
-	}
-
-	// Formatter de día completo para headers: "lun, 12 may 2026".
-	const headerFmt = new Intl.DateTimeFormat('es-ES', {
-		weekday: 'short',
-		day: 'numeric',
-		month: 'short',
-		year: 'numeric'
-	});
-
-	function dayHeaderLabel(iso: string): string {
-		if (iso === todayIso()) return 'Hoy';
-		if (iso === yesterdayIso()) return 'Ayer';
-		return headerFmt.format(new Date(iso + 'T00:00:00'));
 	}
 
 	// Agrupa los rolls por `sesion_fecha` manteniendo el orden actual. Como

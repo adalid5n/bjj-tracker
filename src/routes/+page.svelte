@@ -6,6 +6,7 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import SesionEditor from '$lib/components/SesionEditor.svelte';
 	import { VERSION } from '$lib/version';
+	import { dayHeaderLabel } from '$lib/day-headers';
 	import type { SesionWithCount } from '$lib/sesiones';
 	import type { TipoSesion } from '$lib/types';
 
@@ -33,10 +34,22 @@
 		}
 	});
 
-	function formatFecha(iso: string): string {
-		const d = new Date(iso + 'T00:00:00');
-		return d.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short' });
-	}
+	// T-5.it4: agrupa las sesiones por `fecha` manteniendo el orden actual.
+	// Como `listSesiones` devuelve ORDER BY s.fecha DESC, s.created_at DESC,
+	// los grupos salen automáticamente en orden descendente y dentro de cada
+	// día la sesión más reciente (por created_at) queda arriba.
+	const sesionesPorDia = $derived.by(() => {
+		const grupos: { fecha: string; label: string; items: SesionWithCount[] }[] = [];
+		let actual: { fecha: string; label: string; items: SesionWithCount[] } | null = null;
+		for (const s of sesiones) {
+			if (!actual || actual.fecha !== s.fecha) {
+				actual = { fecha: s.fecha, label: dayHeaderLabel(s.fecha), items: [] };
+				grupos.push(actual);
+			}
+			actual.items.push(s);
+		}
+		return grupos;
+	});
 
 	function openCreate() {
 		editorOpen = true;
@@ -74,28 +87,34 @@
 			<p class="text-sm text-muted-foreground">Empieza creando una con el botón de abajo.</p>
 		</div>
 	{:else}
-		<ul class="space-y-2">
-			{#each sesiones as s (s.id)}
-				<li>
-					<a
-						href={resolve(`/sesion/${s.id}`)}
-						class="block rounded-lg border border-border bg-card p-3 shadow-xs transition-colors hover:bg-accent"
-					>
-						<div class="flex items-baseline justify-between">
-							<span class="font-medium">{formatFecha(s.fecha)}</span>
-							<span class="text-xs text-muted-foreground">
-								{s.rolls_count}
-								{s.rolls_count === 1 ? 'roll' : 'rolls'}
-							</span>
-						</div>
-						<div class="mt-0.5 text-xs text-muted-foreground">{TIPO_LABEL[s.tipo]}</div>
-						{#if s.foco}
-							<div class="mt-1 truncate text-sm text-foreground">{s.foco}</div>
-						{/if}
-					</a>
-				</li>
-			{/each}
-		</ul>
+		{#each sesionesPorDia as grupo (grupo.fecha)}
+			<section class="space-y-2">
+				<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+					{grupo.label}
+				</h2>
+				<ul class="space-y-2">
+					{#each grupo.items as s (s.id)}
+						<li>
+							<a
+								href={resolve(`/sesion/${s.id}`)}
+								class="block rounded-lg border border-border bg-card p-3 shadow-xs transition-colors hover:bg-accent"
+							>
+								<div class="flex items-baseline justify-between">
+									<span class="font-medium">{TIPO_LABEL[s.tipo]}</span>
+									<span class="text-xs text-muted-foreground">
+										{s.rolls_count}
+										{s.rolls_count === 1 ? 'roll' : 'rolls'}
+									</span>
+								</div>
+								{#if s.foco}
+									<div class="mt-1 truncate text-sm text-foreground">{s.foco}</div>
+								{/if}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/each}
 	{/if}
 
 	<p class="pt-4 text-center text-xs text-muted-foreground/60">v{VERSION}</p>
