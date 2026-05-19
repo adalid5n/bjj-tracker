@@ -1,8 +1,35 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 33, T-2.it5 cerrada — markers en calendario + tensión en scroll)
-**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v2.0). T-1.it5 ✅, T-2.it5 ✅; quedan T-4 (insights), T-3 (stats chip). Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
+**Última actualización:** 2026-05-19 (sesión 34, T-4.it5 cerrada como diferido a it.6 + fix sessionStorage de diaSeleccionado)
+**Fase activa:** **Iteración 5 abierta — "Rediseño de home (calendario + dashboard)".** Plan en `ITERACION_5.md` (v2.0). T-1.it5 ✅, T-2.it5 ✅, T-4.it5 ✅; queda T-3 (stats chip). Cierre con tag `v0.5-it5` + bump `0.4.1 → 0.5.0`.
 **Iteración previa:** it.4 ✅ cerrada con `v0.4.1-it4` (2026-05-19).
+
+---
+
+## Sesión 34 (2026-05-19) — T-4.it5 cerrada (diferida a it.6) + fix sessionStorage de fecha
+
+**Hecho — T-4.it5 cerrada con cambio de scope (componente construido pero no montado, diferido a it.6 modo hobbyist/avanzado) + fix de bug reportado durante la sesión: `diaSeleccionado` se reseteaba a hoy al volver de /sesion/[id].**
+
+**T-4.it5 (commit `b7cf755`):**
+- Nuevo `src/lib/components/AnalisisHome.svelte` (~109 líneas): versión compacta del AnalisisPanel — solo C1 (problemas recurrentes), top 3 posiciones + top 3 técnicas, ventana fija de 5 sesiones.
+- **NO montado en home.** Decisión owner: "no lo pongas, o esconderlo bajo un ajuste de Modo Hobbyist vs Análisis". Como el toggle es feature de it.6 (existe en backlog), se difiere la integración. El componente queda construido y listo para conectar.
+- Razón rechazo del approach inline: implementar el toggle hobbyist/avanzado en it.5 sería scope creep significativo (toca settings, persistencia, branching en múltiples pantallas).
+- `MEJORAS_FUTURAS.md §Modo hobbyist vs avanzado` actualizado para anotar el "activo construido" listo para reusar.
+
+**Fix bug `diaSeleccionado` (commit `0805fa6`):**
+- Reportado por owner: al entrar a una sesión desde un día no-hoy y volver con back, el calendario se reseteaba a hoy.
+- Causa: `let diaSeleccionado = $state(todayIso())` se reinicializaba en cada mount del componente home (SvelteKit remonta al volver).
+- Fix: persistir en sessionStorage (clave `home:diaSeleccionado`). En onMount, restaurar si hay valor válido. Flag `initialized` evita que el `$effect` de persistencia escriba el default sobre el valor stored antes de que onMount restaure.
+- sessionStorage (no localStorage): el día solo persiste durante la sesión actual del tab. Al cerrar tab y volver un día distinto, default a hoy. Preserva el comportamiento "abrir app día nuevo → hoy" sin que back rompa selección.
+
+**Lección — diferir features con código ya construido:** misma conclusión que T-2.it4 (feature ya existía) en variante distinta: una tarea puede cerrarse con código construido pero sin exponerlo en UI si la exposición depende de otra feature aún no implementada. Documentar bien la razón.
+
+**Validación:**
+- `pnpm check` 1056/0/0 tras los dos commits.
+- Visual owner OK ("perfect") tras el fix de fecha.
+
+**Próximo paso concreto:**
+- Arrancar **T-3.it5** — stats chip arriba ("3 sesiones · 12 rolls" de la semana en curso). Última tarea de it.5. Tras cerrarla, aplicar tag `v0.5-it5` + bump 0.4.1 → 0.5.0.
 
 ---
 

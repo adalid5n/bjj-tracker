@@ -1,7 +1,7 @@
 # Iteración 5 — Rediseño de home (calendario + dashboard)
 
 **Versión:** 2.0 (re-formalizada en sesión 32 tras pivot semanal→mensual scroll-driven)
-**Estado:** 🟢 En curso — T-1.it5 ✅, T-2.it5 ✅; quedan T-3 (stats chip) y T-4 (insights)
+**Estado:** 🟢 En curso — T-1.it5 ✅, T-2.it5 ✅, T-4.it5 ✅ (diferido a it.6); queda T-3 (stats chip)
 **Predecesor:** Iteración 4 (cerrada con `v0.4.1-it4`, 2026-05-19)
 
 ---
@@ -136,38 +136,25 @@ como subtitle implícito de la pantalla. Las secciones más densas
 
 ---
 
-### T-4.it5 — Insights simplificados en home
+### T-4.it5 — Insights simplificados en home ✅ (diferido)
 
-**Qué entra:**
-- Sección en home debajo de "sesiones del día seleccionado" con una
-  versión simplificada del `AnalisisPanel` existente (vive hoy en
-  `/rolls`).
-- "Simplificada" = decisión al implementar tras revisar
-  `AnalisisPanel`: si tiene N tipos de insight, en home se muestran
-  los 2-3 más relevantes para la apertura diaria. El resto sigue solo
-  en `/rolls`.
-- Si la lógica del panel es compleja y reusar es costoso, extraer
-  un sub-componente `AnalisisCompacto.svelte` que comparta queries
-  con `AnalisisPanel` pero renderice menos.
+**Estado:** ✅ Cerrada con cambio de scope (commit `b7cf755`, sesión 34 — 2026-05-19). **Componente construido, NO montado en home — uso diferido a it.6 (modo hobbyist vs avanzado).**
 
-**Qué NO entra:**
-- Gráficos nuevos / visualizaciones avanzadas. Eso es backlog (it.5+).
-- Insights que requieran queries nuevas a la BD. Esta tarea solo
-  reusa lógica existente con presentación reducida.
+**Lo que se hizo:**
+- Nuevo `src/lib/components/AnalisisHome.svelte` (~109 líneas): versión compacta del `AnalisisPanel` con solo C1 (problemas recurrentes), ventana fija de 5 sesiones, top 3 posiciones + top 3 técnicas, sin `<details>` plegable. Reusa la query `getProblemasRecurrentes` existente.
+- **NO montado** en `+page.svelte`. Decisión owner s34: en lugar de aparecer por defecto en home, los insights deben quedar escondidos bajo un toggle "Modo hobbyist vs avanzado" — feature de it.6 según el backlog `MEJORAS_FUTURAS.md §Modo hobbyist vs avanzado`.
 
-**Decisiones a tomar al implementar:**
-- ¿Cuántos y qué insights en home? Pendiente de revisar
-  `AnalisisPanel.svelte` y consensuar 2-3 priorizados con el owner
-  antes de implementar.
-- ¿La sección de insights está colapsada por defecto (`<details>`) o
-  visible? Recomendación: visible si los insights son ≤2 líneas cada
-  uno; colapsada si son densos.
+**Por qué se cierra T-4 ahora pese a no montar:**
+- El componente está construido y validado (`pnpm check` 1056/0/0).
+- Está documentado dentro de su propio fichero la razón de "no montado" y la referencia a it.6.
+- El componente representa el trabajo planeado de T-4 (versión reducida del análisis para home); el siguiente paso (montarlo en home con toggle) es trabajo de it.6, no de it.5.
+- Alternativa rechazada: implementar el toggle hobbyist/avanzado dentro de it.5. Eso es scope creep significativo — el toggle toca settings, persistencia, branching en múltiples pantallas. Es it.6 entero.
+
+**Lecciones:** misma conclusión que T-2.it4 ("la feature ya existía") en una variante distinta: una tarea puede cerrarse con código construido pero sin exponerlo en UI si la exposición depende de otra feature aún no implementada. Documentar bien el "por qué no se monta" para que sea recuperable cuando llegue su iteración.
 
 **Validación:**
-- Manual: insights aparecen abajo, son legibles, no saturan.
-- Tap en un insight (si tiene interactividad) → navega al sitio
-  relevante (`/rolls` con filtro? `/mapa` con posición destacada?).
-  Definir al implementar.
+- `pnpm check` 1056/0/0.
+- El componente compila y no se queja por estar sin uso (Svelte no marca componentes importables como unused).
 
 ---
 
@@ -195,8 +182,10 @@ como subtitle implícito de la pantalla. Las secciones más densas
 
 1. **T-1.it5** ✅ Cerrada (sesión 32, commit `cd4583a`; fix de threshold en s33 commit `fe41907`).
 2. **T-2.it5** ✅ Cerrada (sesión 33, commit `d09157d`).
-3. **T-4.it5** (siguiente activa) — insights simplificados. Antes que T-3 porque consumen más espacio visual y conviene definirlos en contexto del layout.
-4. **T-3.it5** — stats chip arriba. Refinamiento final.
+3. **T-4.it5** ✅ Cerrada (sesión 34, commit `b7cf755`, diferido a it.6 — componente construido sin montar).
+4. **T-3.it5** (única pendiente) — stats chip arriba. Refinamiento final.
+
+Fix adicional en s34 (commit `0805fa6`): `diaSeleccionado` se persiste en sessionStorage. Resuelve bug donde al navegar a /sesion/[id] y volver con back, el calendario se reseteaba a hoy.
 
 ---
 

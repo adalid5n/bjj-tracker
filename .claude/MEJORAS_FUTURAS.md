@@ -22,6 +22,7 @@ Cada entrada debería responder:
 - **Investigación pendiente (cuando toque, NO ahora):** auditar campo por campo qué datos contribuyen al grafo / análisis (consultas C1/C2, vista grafo) y cuáles son ornamentales / sin consumo downstream. Esa auditoría es prerequisito de diseñar el modo hobbyist con criterio — si no, es decisión arbitraria.
 - **Por qué:** la fricción en captura post-clase (CU-1) es el cuello de botella real. Un modo simplificado para el caso primario, con la opción de subir a "avanzado" si el uso real lo pide, encaja mejor con el flujo natural de usuario.
 - **Cuándo:** post-it.4. Probablemente iteración dedicada (el cambio toca múltiples editores: SesionEditor, RollEditor, CompaneroEditor). Empezar por la auditoría de datos antes de tocar UI.
+- **Activo construido para reusar:** `src/lib/components/AnalisisHome.svelte` (creado en T-4.it5, commit `b7cf755`) — versión compacta del análisis (solo C1, top 3 posiciones + top 3 técnicas, ventana fija de 5 sesiones). NO está montado en home. Cuando se implemente el toggle hobbyist/avanzado, conectarlo: visible solo en modo "avanzado". El componente ya tiene su propia reactividad y reload via `reloadKey` prop.
 
 ### Reducir copy / texto inicial en cada pantalla
 
