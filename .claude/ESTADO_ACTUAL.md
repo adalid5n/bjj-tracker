@@ -1,8 +1,37 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-19 (sesión 29, T-2.it4 cerrada como ya hecha — feature ya existía en código)
-**Fase activa:** Iteración 4 abierta — "**Pulido post-grafo y consistencia UX**". T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅, T-2.it4 ✅; queda **solo T-4** para cerrar la iteración.
-**Iteración en curso:** it.4. Plan formal en `ITERACION_4.md` (v1.1). Scope: T-1 ✅, T-3 ✅, T-5 ✅, T-2 ✅, T-4 (auditoría tokens). Cierre con tag `v0.4.1-it4`.
+**Última actualización:** 2026-05-19 (sesión 30, it.4 CERRADA — tag `v0.4.1-it4` aplicado)
+**Fase activa:** **Iteración 4 ✅ cerrada — "Pulido post-grafo y consistencia UX".** 5 tareas formalizadas; 3 con código nuevo (T-1, T-3, T-5); 2 ya implementadas o cumplidas sin código (T-2, T-4).
+**Próxima iteración:** sin decidir. Backlog activo en `MEJORAS_FUTURAS.md`. Candidatos para it.5 (anotados durante it.4): rediseño completo de home (calendario + visión general), modo hobbyist vs avanzado, sugerencia automática de compañero, "Forzar actualización" en /ajustes, Node 24 en workflow, tab Sumisiones en /mapa.
+
+---
+
+## Sesión 30 (2026-05-19) — T-4.it4 cerrada + it.4 cerrada con tag `v0.4.1-it4`
+
+**Hecho — T-4.it4 (auditoría tokens semánticos) cerrada sin código: el barrido confirmó 0 hits de Tailwind crudo en `src/`. It.4 completa cerrada con tag `v0.4.1-it4` y bump de versión 0.4.0 → 0.4.1.**
+
+**Auditoría T-4.it4 (resultado):**
+- Grep exhaustivo en `src/` (excluyendo `src/lib/components/ui/*`) buscando:
+  - `{bg|text|border|ring|from|to|via|fill|stroke|outline|divide|placeholder|caret|accent|shadow}-{color-tailwind}-{shade}` con o sin opacity.
+  - Arbitrary values `bg-[...]`, `text-[...]`, etc.
+  - `bg-white`, `text-black`.
+- **0 hits de colores Tailwind crudos.** La regla del proyecto se respeta literalmente en todo el código propio.
+- Hallazgo lateral: 2 shadows con `rgba(0,0,0,X)` inline en BottomNav y AppHeader. NO violan la regla literal (no son `bg-color-shade`). Decisión del owner: anotar como mejora futura, no promover a T-4 (sería scope creep).
+
+**Cierre de it.4:**
+- Tag `v0.4.1-it4` aplicado.
+- Bump de versión: `0.4.0` → `0.4.1` en `package.json` (patch, coherente con el "es pulido sin features funcionales mayores" — aunque T-5 introdujo agrupamiento en home, que es funcional, el peso global de la iteración sigue siendo pulido).
+- 5 tareas formalizadas: T-1 (long-press → modo edición), T-3 (orden /rolls), T-5 (home con headers), T-2 (combobox compañero — ya estaba), T-4 (auditoría tokens — ya cumplida).
+- 3 con código nuevo; 2 sin código (validación documental).
+
+**Resumen meta — qué nos llevamos de it.4:**
+- **Patrón "modo edición vs navegación"** para canvases interactivos (Cytoscape): tap silenciado en navegación + grabbable en edición. Reusable en otros canvases si emergen.
+- **Helper compartido `src/lib/day-headers.ts`** para agrupamiento por día con headers Hoy/Ayer/fecha. Usable por cualquier vista que liste registros con `fecha` ISO.
+- **Sparring note "revisar backlog vs código antes de promover tareas"**. Aplicar al planificar it.5: leer el código actual contra cada entrada candidata.
+- **Sparring note "pivot organizado vs scope creep"**. Cuando una idea grande quiere colarse, identificar la pieza más pequeña accionable y dejar el resto fuera (opción B del s27).
+
+**Próximo paso concreto:**
+- Decidir si arrancar it.5 ya o pausar. Candidatos prioritarios discutidos durante it.4 (en orden de afinidad expresada): rediseño completo de home (calendario + visión general), modo hobbyist vs avanzado.
 
 ---
 

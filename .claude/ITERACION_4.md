@@ -1,7 +1,7 @@
 # Iteración 4 — Pulido post-grafo y consistencia UX
 
 **Versión:** 1.1 (re-formalizada en sesión 27 con T-5.it4 añadida)
-**Estado:** 🟢 En curso — T-1.it4 ✅, T-3.it4 ✅, T-5.it4 ✅, T-2.it4 ✅; queda T-4
+**Estado:** ✅ Cerrada — `v0.4.1-it4` aplicado (2026-05-19)
 **Predecesor:** Iteración 3 (cerrada con `v0.4-it3`, 2026-05-19)
 
 ---
@@ -180,38 +180,32 @@ backlog antes de cada formalización de iteración.
 
 ---
 
-### T-4.it4 — Auditoría tokens semánticos en `src/`
+### T-4.it4 — Auditoría tokens semánticos en `src/` ✅
 
-**Origen:** `MEJORAS_FUTURAS.md §Sistema de diseño coherente — usar design tokens en lugar de Tailwind raw` y regla del proyecto (`CONTEXTO_AGENTE.md §Restricciones`).
+**Estado:** ✅ Cerrada (sesión 30 — 2026-05-19). **Sin código nuevo:
+la regla del proyecto ya se respeta en todo `src/`.**
 
-**Qué entra:**
-- Grep exhaustivo en `src/` buscando colores Tailwind crudos prohibidos
-  por la regla del proyecto: `bg-{color}-{N}`, `text-{color}-{N}`,
-  `border-{color}-{N}`, `ring-{color}-{N}`, `from-/to-{color}-{N}`,
-  etc. donde `{color}` ∈ `{blue, red, green, yellow, gray, slate,
-  zinc, neutral, stone, orange, amber, lime, emerald, teal, cyan,
-  sky, indigo, violet, purple, fuchsia, pink, rose}` y `{N}` ∈
-  `{50..950}`.
-- Reemplazar cada hit por el token semántico equivalente
-  (`bg-primary`, `text-destructive`, `bg-muted`,
-  `text-muted-foreground`, `border-border`, `bg-success`, `bg-warning`,
-  etc.). Si la variante semántica que se necesita no existe, añadir
-  el token en `src/routes/layout.css` (`:root` + `.dark`), no
-  perpetuar Tailwind crudo.
+**Lo que se hizo:**
+- Barrido exhaustivo con grep en `src/` (excluyendo `src/lib/components/ui/*`
+  por ser wrappers shadcn) buscando:
+  - `{bg|text|border|ring|from|to|via|fill|stroke|outline|divide|placeholder|caret|accent|shadow}-{color}-{shade}` con cualquier opacity (`/N` o sin).
+  - Arbitrary values (`bg-[...]`, `text-[...]`, etc.).
+  - `bg-white`, `text-black`, etc.
+- **Resultado: 0 hits de colores Tailwind crudos.** La regla se respeta
+  literalmente en todo el código propio.
 
-**Qué NO entra:**
-- Tocar `src/lib/components/ui/*` (wrappers shadcn-svelte instalados
-  vía CLI). Estos ficheros se sobrescriben al actualizar componentes
-  desde upstream; si tienen color crudo es responsabilidad del paquete
-  upstream.
-- Tocar utilidades globales en `app.css` (si las hay) — la regla solo
-  prohíbe colores crudos en componentes propios.
+**Hallazgo lateral (NO promovido a T-4):**
+- 2 shadows con `rgba(0,0,0,X)` inline:
+  - `src/lib/components/BottomNav.svelte:42` → `shadow-[0_-2px_8px_rgba(0,0,0,0.18)]`
+  - `src/lib/components/AppHeader.svelte:28` → `shadow-[0_2px_4px_rgba(0,0,0,0.04)]`
+- Estos NO son colores Tailwind crudos en el sentido de la regla (no son
+  `bg-color-shade`); son sombras arbitrarias con valor inline. La regla
+  no los prohíbe. Decisión del owner (sesión 30): no promover a T-4.it4,
+  anotar como mejora futura para sistematizar shadows en tokens.
 
 **Validación:**
-- `pnpm check` limpio.
-- Verificar visualmente que los componentes tocados se ven correctamente
-  en light + dark mode.
-- Re-correr el grep al final; debe devolver 0 hits en componentes propios.
+- Grep limpio (0 hits) — la auditoría es su propia validación.
+- Sin cambios de código → `pnpm check` queda como en s28 (1054/0/0).
 
 ---
 
@@ -239,8 +233,7 @@ backlog antes de cada formalización de iteración.
 2. **T-3.it4** ✅ Cerrada (sesión 27, commit `90aa1a7`).
 3. **T-5.it4** ✅ Cerrada (sesión 28, commit `0d50b00`).
 4. **T-2.it4** ✅ Cerrada (sesión 29, sin código — feature ya existía).
-5. **T-4.it4** (única pendiente) — auditoría tokens semánticos en `src/`.
+5. **T-4.it4** ✅ Cerrada (sesión 30, sin código — auditoría confirmó 0 hits).
 
-Orden confirmado por owner en sesión 27 (T-5 → T-2 → T-4). El descubrimiento
-de que T-2 ya estaba hecha acelera el cierre de it.4 — solo queda T-4 para
-aplicar tag `v0.4.1-it4`.
+Iteración cerrada con tag `v0.4.1-it4`. 5 tareas formalizadas; 3 con
+código nuevo (T-1, T-3, T-5); 2 confirmadas como ya hechas (T-2, T-4).

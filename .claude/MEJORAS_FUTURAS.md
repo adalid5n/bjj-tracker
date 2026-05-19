@@ -342,6 +342,25 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
 - **Cuándo:** post-T-8.it3, valorar en cleanup de it.3 o como tarea
   propia en it.4 si la fricción es palpable en uso real.
 
+### Sistematizar sombras (`shadow-[rgba(...)]` inline → tokens semánticos)
+
+- **Origen:** auditoría T-4.it4, sesión 30 (2026-05-19)
+- **Estado actual:** dos sombras viven con valor inline:
+  - `BottomNav.svelte:42` → `shadow-[0_-2px_8px_rgba(0,0,0,0.18)]`
+  - `AppHeader.svelte:28` → `shadow-[0_2px_4px_rgba(0,0,0,0.04)]`
+- **Idea:** definir tokens `--shadow-nav-top` y `--shadow-header-bottom`
+  en `src/routes/layout.css` (con sus equivalentes en `.dark` si la
+  intensidad debe cambiar). Reemplazar los hits por `shadow-nav-top` /
+  `shadow-header-bottom`.
+- **Por qué:** consistencia con el resto del sistema de diseño (tokens
+  semánticos como single source of truth). Hoy las sombras son
+  excepción al patrón general. Coste muy bajo (~15 min).
+- **Por qué NO se hizo en T-4.it4:** la regla del proyecto prohíbe
+  colores Tailwind crudos (`bg-color-shade`), no shadows con valor
+  inline. Estrictamente la regla se respeta. Sistematizar shadows es
+  expansión de scope, no la auditoría original.
+- **Cuándo:** cualquier sesión de pulido posterior. Sin urgencia.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`
