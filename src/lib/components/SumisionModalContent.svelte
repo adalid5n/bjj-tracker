@@ -23,6 +23,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type { Posicion, SumisionTerminal, Tecnica } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { settings } from '$lib/settings.svelte';
 
 	let { sumision, onChanged }: { sumision: SumisionTerminal; onChanged?: () => void } = $props();
 
@@ -39,6 +40,9 @@
 	let mostrarConfirmBorrar = $state(false);
 
 	onMount(async () => {
+		// Hidrata el state de settings para que `settings.modoAvanzado` sea
+		// leíble sincrónicamente en el render (bloques opcionales T-3.it6).
+		settings.init();
 		try {
 			const [
 				{ getTecnicasQueLleganASumision, countTecnicasBySumisionDestino },
@@ -138,6 +142,11 @@
   renderiza el host.
 -->
 <div class="space-y-3">
+	<!-- Notas (T-3.it6): solo en modo avanzado y si hay contenido. -->
+	{#if settings.modoAvanzado && sumision.notas?.trim().length > 0}
+		<p class="text-sm whitespace-pre-wrap text-muted-foreground">{sumision.notas}</p>
+	{/if}
+
 	{#if status === 'loading'}
 		<p class="text-sm text-muted-foreground">Cargando sumisión…</p>
 	{:else if status === 'error'}

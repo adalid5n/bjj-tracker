@@ -43,6 +43,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
 	import type {
@@ -53,6 +54,7 @@
 		TipoTecnica
 	} from '$lib/types';
 	import { mapaModalStack, tecnicaWizardDraft } from './mapa-modal-stack.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
 	let {
@@ -102,11 +104,16 @@
 		{ value: 'descartada', label: 'Descartada' }
 	];
 
-	// 6 pasos: Nombre, Variante, Posición origen, Tipo, Destino, Estado.
-	// El antiguo paso 7 (Detalles + Errores comunes) se retiró; las columnas
-	// siguen en BD y se preservan al editar (ver `detallesOriginal` /
-	// `erroresComunesOriginal`).
-	const totalSteps = 6;
+	// Pasos semánticos: 1=Nombre, 2=Variante, 3=Posición origen, 4=Tipo,
+	// 5=Destino, 6=Estado, 7=Detalles, 8=Errores comunes.
+	// Los pasos 7 y 8 (textareas) solo aparecen en modo avanzado (T-3.it6).
+	// En hobbyist el wizard tiene 6 pasos; en avanzado pasa a 8. Las
+	// columnas `tecnicas.detalles` y `tecnicas.errores_comunes` siguen en
+	// BD y se preservan al editar via `*Original` (ver carga en `onMount`).
+	const visibleSteps = $derived<number[]>(
+		settings.modoAvanzado ? [1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6]
+	);
+	const totalSteps = $derived(visibleSteps.length);
 
 	// T-2.it2: en modo `editar` el componente renderiza un form plano con
 	// todos los campos visibles a la vez (mismo patrón que `RollEditor`).
@@ -124,10 +131,13 @@
 	// "no elegido" de "el usuario eligió probando" en el botón skippable.
 	let tipo = $state<TipoTecnica | undefined>(undefined);
 	let estado = $state<EstadoTecnica | undefined>(undefined);
-	// `detalles` y `errores_comunes` ya no se editan desde la UI. La columna
-	// sigue en BD; guardamos los valores originales para reenviarlos intactos
-	// al actualizar.
+	// `detalles` y `erroresComunes` (T-3.it6): editables bajo
+	// `settings.modoAvanzado`. En hobbyist no se renderizan los pasos, pero
+	// `*Original` se sigue cargando de BD para preservar el dato existente al
+	// editar (mismo patrón que `notas` en PosicionWizard).
+	let detalles = $state('');
 	let detallesOriginal = $state('');
+	let erroresComunes = $state('');
 	let erroresComunesOriginal = $state('');
 
 	let currentStep = $state(1);
@@ -154,6 +164,8 @@
 		sumisionDestinoId: string | null;
 		tipo: TipoTecnica | undefined;
 		estado: EstadoTecnica | undefined;
+		detalles: string;
+		erroresComunes: string;
 	};
 	let snapshot = $state<Snapshot>({
 		nombre: '',
@@ -162,7 +174,9 @@
 		posicionDestinoId: null,
 		sumisionDestinoId: null,
 		tipo: undefined,
-		estado: undefined
+		estado: undefined,
+		detalles: '',
+		erroresComunes: ''
 	});
 
 	// Discriminador del draft: 'crear' para crear, 'editar:<id>' para editar.
@@ -193,6 +207,9 @@
 	}
 
 	onMount(async () => {
+		// Hidrata el state de settings (idempotente). Permite leer
+		// `settings.modoAvanzado` sincrónicamente desde el render.
+		settings.init();
 		if (mode === 'stack') {
 			mapaModalStack.setDirtyHandler(() => isDirty);
 		}
@@ -235,6 +252,8 @@
 			sumisionDestinoId = draft.sumisionDestinoId;
 			tipo = draft.tipo;
 			estado = draft.estado;
+			detalles = draft.detalles;
+			erroresComunes = draft.erroresComunes;
 			currentStep = draft.currentStep;
 			visitedSteps = new Set(draft.visitedSteps);
 			// El snapshot se sigue cargando desde BD (modo editar) o
@@ -283,9 +302,13 @@
 				sumisionDestinoId = t.sumision_destino_id ?? null;
 				tipo = t.tipo;
 				estado = t.estado;
+				detalles = t.detalles;
+				erroresComunes = t.errores_comunes;
 			}
-			// Preserva los textos existentes — la UI no los edita, pero no
-			// queremos pisarlos con '' al guardar.
+			// Preserva los textos existentes en BD. En hobbyist los pasos no
+			// se renderizan, pero al guardar usamos `*Original` para no pisar
+			// el dato. En avanzado, `detalles` y `erroresComunes` son
+			// editables y arrancan con estos valores.
 			detallesOriginal = t.detalles;
 			erroresComunesOriginal = t.errores_comunes;
 			snapshot = {
@@ -295,7 +318,9 @@
 				posicionDestinoId: t.posicion_destino_id ?? null,
 				sumisionDestinoId: t.sumision_destino_id ?? null,
 				tipo: t.tipo,
-				estado: t.estado
+				estado: t.estado,
+				detalles: t.detalles,
+				erroresComunes: t.errores_comunes
 			};
 			status = 'ready';
 		} catch (err) {
@@ -339,6 +364,8 @@
 			sumisionDestinoId,
 			tipo,
 			estado,
+			detalles,
+			erroresComunes,
 			currentStep,
 			visitedSteps: [...visitedSteps]
 		});
@@ -351,7 +378,10 @@
 			posicionDestinoId !== snapshot.posicionDestinoId ||
 			sumisionDestinoId !== snapshot.sumisionDestinoId ||
 			tipo !== snapshot.tipo ||
-			estado !== snapshot.estado
+			estado !== snapshot.estado ||
+			(settings.modoAvanzado &&
+				(detalles.trim() !== snapshot.detalles.trim() ||
+					erroresComunes.trim() !== snapshot.erroresComunes.trim()))
 	);
 
 	// En `standalone`, propaga dirty al padre cada vez que cambia. En
@@ -483,14 +513,20 @@
 			}
 			return;
 		}
-		// Paso 6 (Estado) es ahora el último: Enter dispara Guardar
-		// directamente (el estado vacío materializa el default 'probando'
-		// en handleSave). totalSteps = 6 desde la retirada del paso 7.
-		if (currentStep === totalSteps) {
+		// Pasos 6 (Estado), 7 (Detalles), 8 (Errores comunes) — todos
+		// permiten avanzar al siguiente con Enter (los 7/8 solo existen en
+		// modo avanzado). El último paso visible dispara Guardar.
+		const lastStep = visibleSteps[visibleSteps.length - 1];
+		if (currentStep === lastStep) {
 			if (!saving && nombre.trim().length > 0 && posicionOrigenId && tipo) {
 				intercept();
 				handleSave();
 			}
+			return;
+		}
+		if (currentStep === 6 || currentStep === 7) {
+			intercept();
+			advance();
 		}
 	}
 
@@ -725,9 +761,12 @@
 
 			if (modo === 'crear') {
 				const { createTecnica } = await import('$lib/tecnicas');
-				// La UI ya no edita `detalles` ni `errores_comunes` — persistimos
-				// cadenas vacías. Las columnas siguen en BD por la migración
-				// inmutable.
+				// Detalles + errores comunes (T-3.it6): editables solo en modo
+				// avanzado. En hobbyist persistimos cadena vacía.
+				const detallesFinal = settings.modoAvanzado ? detalles.trim() : '';
+				const erroresComunesFinal = settings.modoAvanzado
+					? erroresComunes.trim()
+					: '';
 				const nueva = await createTecnica({
 					nombre: nombreFinal,
 					variante: varianteFinal,
@@ -736,8 +775,8 @@
 					sumision_destino_id: sumisionDestinoFinal,
 					tipo,
 					estado: estadoFinal,
-					detalles: '',
-					errores_comunes: ''
+					detalles: detallesFinal,
+					errores_comunes: erroresComunesFinal
 				});
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
@@ -770,8 +809,15 @@
 					throw new Error('Falta tecnicaId en modo editar.');
 				}
 				const { updateTecnica } = await import('$lib/tecnicas');
-				// `detalles` y `errores_comunes` ya no se editan desde la UI
-				// — reenviamos los valores originales cargados de BD.
+				// Detalles + errores comunes (T-3.it6): editables solo en
+				// modo avanzado. En hobbyist reenviamos los valores originales
+				// cargados de BD para no pisar el dato.
+				const detallesFinal = settings.modoAvanzado
+					? detalles.trim()
+					: detallesOriginal;
+				const erroresComunesFinal = settings.modoAvanzado
+					? erroresComunes.trim()
+					: erroresComunesOriginal;
 				await updateTecnica({
 					id: tecnicaId,
 					nombre: nombreFinal,
@@ -781,8 +827,8 @@
 					sumision_destino_id: sumisionDestinoFinal,
 					tipo,
 					estado: estadoFinal,
-					detalles: detallesOriginal,
-					errores_comunes: erroresComunesOriginal
+					detalles: detallesFinal,
+					errores_comunes: erroresComunesFinal
 				});
 				if (mode === 'stack') {
 					onSaved?.(tecnicaId, 'editar');
@@ -994,6 +1040,31 @@
 			</p>
 		</div>
 
+		{#if settings.modoAvanzado}
+			<!-- Paso 7: Detalles (solo modo avanzado, T-3.it6). -->
+			<div class="space-y-3" class:hidden={currentStep !== 7}>
+				<h3 class="text-sm font-semibold">Detalles (opcional)</h3>
+				<Textarea
+					bind:value={detalles}
+					placeholder="Setup, agarres, momento de aplicación…"
+					rows={4}
+				/>
+				<p class="text-xs text-muted-foreground">
+					Texto libre — útil para recordar el detalle clave de la técnica.
+				</p>
+			</div>
+
+			<!-- Paso 8: Errores comunes (solo modo avanzado, T-3.it6). -->
+			<div class="space-y-3" class:hidden={currentStep !== 8}>
+				<h3 class="text-sm font-semibold">Errores comunes (opcional)</h3>
+				<Textarea
+					bind:value={erroresComunes}
+					placeholder="Fallos habituales, contras típicas…"
+					rows={4}
+				/>
+			</div>
+		{/if}
+
 		{#if errorMsg}
 			<p class="text-sm text-destructive">{errorMsg}</p>
 		{/if}
@@ -1037,8 +1108,9 @@
 				{:else if currentStep === 5}
 					<Button size="sm" onclick={advance} disabled={!canAdvanceFromStep5}>Continuar</Button>
 				{:else if currentStep === totalSteps}
-					<!-- Paso 6 (Estado) es ahora el último. Estado skippable: si
-					     queda undefined, materializa 'probando' en handleSave. -->
+					<!-- Último paso: estado en hobbyist (paso 6) o errores
+					     comunes en avanzado (paso 8). Estado skippable:
+					     materializa 'probando' en handleSave si queda undefined. -->
 					<Button
 						size="sm"
 						onclick={handleSave}
@@ -1046,6 +1118,11 @@
 					>
 						{saving ? 'Guardando…' : 'Guardar'}
 					</Button>
+				{:else if currentStep === 6 || currentStep === 7}
+					<!-- Modo avanzado (T-3.it6): paso 6 (Estado) y 7 (Detalles)
+					     no son el último cuando hay paso de Errores comunes
+					     después. -->
+					<Button size="sm" onclick={advance} disabled={saving}>Continuar</Button>
 				{/if}
 			</div>
 		</div>
@@ -1157,6 +1234,18 @@
 						ariaLabel="Estado de la técnica"
 					/>
 				</div>
+
+				{#if settings.modoAvanzado}
+					<div class="space-y-1.5">
+						<Label for="tecnica-form-detalles">Detalles</Label>
+						<Textarea id="tecnica-form-detalles" bind:value={detalles} rows={4} />
+					</div>
+
+					<div class="space-y-1.5">
+						<Label for="tecnica-form-errores">Errores comunes</Label>
+						<Textarea id="tecnica-form-errores" bind:value={erroresComunes} rows={4} />
+					</div>
+				{/if}
 
 				{#if errorMsg}
 					<p class="text-sm text-destructive">{errorMsg}</p>

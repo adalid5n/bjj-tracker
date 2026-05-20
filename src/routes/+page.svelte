@@ -6,6 +6,8 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import SesionEditor from '$lib/components/SesionEditor.svelte';
 	import MonthCalendar from '$lib/components/MonthCalendar.svelte';
+	import AnalisisHome from '$lib/components/AnalisisHome.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import { VERSION } from '$lib/version';
 	import { dayHeaderLabel, todayIso } from '$lib/day-headers';
 	import type { SesionWithCount } from '$lib/sesiones';
@@ -28,6 +30,12 @@
 	const DIA_STORAGE_KEY = 'home:diaSeleccionado';
 
 	onMount(async () => {
+		// T-2.it6: hidrata el state de settings (modo avanzado) en background.
+		// Sin `await` para no retrasar la pintura inicial — el componente
+		// `AnalisisHome` solo se renderiza si `settings.modoAvanzado` es true,
+		// y el getter es reactivo, así que aparecerá cuando el promise resuelva.
+		void settings.init();
+
 		// Restaurar día seleccionado desde sessionStorage si existe y es
 		// válido. Persistencia por tab: al navegar a /sesion/[id] y volver,
 		// el día se mantiene. Si el user cierra el tab y vuelve, default
@@ -154,7 +162,11 @@
 					Sin sesiones este día
 				</p>
 			{:else}
-				<ul class="space-y-2">
+				<ul
+					class={settings.modoAvanzado
+						? 'space-y-2 max-h-48 overflow-y-auto pr-1'
+						: 'space-y-2'}
+				>
 					{#each sesionesDelDia as s (s.id)}
 						<li>
 							<a
@@ -168,12 +180,19 @@
 										{s.rolls_count === 1 ? 'roll' : 'rolls'}
 									</span>
 								</div>
+								{#if settings.modoAvanzado && s.foco}
+									<p class="mt-1 text-xs text-muted-foreground">{s.foco}</p>
+								{/if}
 							</a>
 						</li>
 					{/each}
 				</ul>
 			{/if}
 		</section>
+
+		{#if settings.modoAvanzado}
+			<AnalisisHome reloadKey={sesiones.length} />
+		{/if}
 	{/if}
 
 	<p class="pt-4 text-center text-xs text-muted-foreground/60">v{VERSION}</p>

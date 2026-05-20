@@ -11,6 +11,7 @@
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import ChipPicker from '$lib/components/ChipPicker.svelte';
 	import AnalisisPanel from '$lib/components/AnalisisPanel.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import { dayHeaderLabel } from '$lib/day-headers';
 	import type {
 		CategoriaPosicion,
@@ -93,6 +94,7 @@
 	let analisisReloadKey = $state(0);
 
 	onMount(async () => {
+		settings.init();
 		try {
 			const [{ listCompaneros }, { listPosiciones }, { listTecnicas }] = await Promise.all([
 				import('$lib/companeros'),
@@ -389,7 +391,9 @@
 	</details>
 	</div>
 
-	<AnalisisPanel reloadKey={analisisReloadKey} />
+	{#if settings.modoAvanzado}
+		<AnalisisPanel reloadKey={analisisReloadKey} />
+	{/if}
 
 	{#if status === 'loading'}
 		<p class="text-primary">Cargando…</p>
@@ -417,6 +421,14 @@
 						{@const posFallaron = posicionesByRoll.get(r.id)?.fallaron ?? []}
 						{@const tecBien = tecnicasByRoll.get(r.id)?.fueBien ?? []}
 						{@const tecFallaron = tecnicasByRoll.get(r.id)?.fallaron ?? []}
+						{@const itemsBien = [
+							...posBien.map((id) => ({ value: id, label: posicionLabel(id) ?? '' })),
+							...tecBien.map((id) => ({ value: id, label: tecnicaLabel(id) ?? '' }))
+						].filter((o) => o.label)}
+						{@const itemsMal = [
+							...posFallaron.map((id) => ({ value: id, label: posicionLabel(id) ?? '' })),
+							...tecFallaron.map((id) => ({ value: id, label: tecnicaLabel(id) ?? '' }))
+						].filter((o) => o.label)}
 						<li>
 							<button
 								type="button"
@@ -454,53 +466,18 @@
 								{#if r.que_fallo}
 									<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
 								{/if}
-								<!-- T-3.it2.b: hasta 4 filas read-only de chips
-								     (posiciones fueron bien / fallé, técnicas fueron bien /
-								     fallé). Cada fila se oculta si su lista está vacía.
-								     Los `*Label(id)` devuelven null si el id ya no
-								     existe en el catálogo (defensivo) — filtramos esos. -->
-								{#if posBien.length}
+								<!-- 2 filas read-only mezclando posiciones + técnicas
+								     (sumisiones son técnicas con tipo='sumision', ya
+								     incluidas). Cada fila se oculta si su lista está
+								     vacía. -->
+								{#if itemsBien.length}
 									<div class="mt-2">
-										<ChipPicker
-											mode="readonly"
-											label="Posiciones que fueron bien"
-											items={posBien
-												.map((pid) => ({ value: pid, label: posicionLabel(pid) ?? '' }))
-												.filter((o) => o.label)}
-										/>
+										<ChipPicker mode="readonly" label="Fue bien" items={itemsBien} />
 									</div>
 								{/if}
-								{#if posFallaron.length}
+								{#if itemsMal.length}
 									<div class="mt-1">
-										<ChipPicker
-											mode="readonly"
-											label="Posiciones que fallé"
-											items={posFallaron
-												.map((pid) => ({ value: pid, label: posicionLabel(pid) ?? '' }))
-												.filter((o) => o.label)}
-										/>
-									</div>
-								{/if}
-								{#if tecBien.length}
-									<div class="mt-1">
-										<ChipPicker
-											mode="readonly"
-											label="Técnicas que fueron bien"
-											items={tecBien
-												.map((tid) => ({ value: tid, label: tecnicaLabel(tid) ?? '' }))
-												.filter((o) => o.label)}
-										/>
-									</div>
-								{/if}
-								{#if tecFallaron.length}
-									<div class="mt-1">
-										<ChipPicker
-											mode="readonly"
-											label="Técnicas que fallé"
-											items={tecFallaron
-												.map((tid) => ({ value: tid, label: tecnicaLabel(tid) ?? '' }))
-												.filter((o) => o.label)}
-										/>
+										<ChipPicker mode="readonly" label="Fue mal" items={itemsMal} />
 									</div>
 								{/if}
 							</button>

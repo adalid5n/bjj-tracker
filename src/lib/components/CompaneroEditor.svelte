@@ -4,9 +4,11 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import CinturonChips from '$lib/components/CinturonChips.svelte';
 	import { capitalizeFirst } from '$lib/utils';
+	import { settings } from '$lib/settings.svelte';
 	import type { Cinturon, Companero, PesoRelativo } from '$lib/types';
 
 	const PESOS: { value: PesoRelativo; label: string }[] = [
@@ -36,13 +38,21 @@
 	} = $props();
 
 	const mode = $derived<'wizard' | 'form'>(companero ? 'form' : 'wizard');
-	const totalSteps = 3;
+	// Pasos semánticos: 1=Nombre, 2=Cinturón, 3=Peso relativo, 4=Notas.
+	// El paso 4 (Notas) solo aparece en modo avanzado (T-3.it6). Hobbyist
+	// queda en 3 pasos.
+	const visibleSteps = $derived<number[]>(
+		settings.modoAvanzado ? [1, 2, 3, 4] : [1, 2, 3]
+	);
+	const totalSteps = $derived(visibleSteps.length);
 
 	let nombre = $state('');
 	let cinturon = $state<Cinturon | undefined>(undefined);
 	let pesoRelativo = $state<PesoRelativo | undefined>(undefined);
-	// `notas` ya no se edita desde la UI. La columna sigue en BD; guardamos
-	// el valor original cargado del `companero` para reenviarlo intacto.
+	// `notas` (T-3.it6): editable bajo `settings.modoAvanzado`. En hobbyist
+	// no se renderiza el paso pero `notasOriginal` se sigue cargando para
+	// preservar el dato existente al editar.
+	let notas = $state('');
 	let notasOriginal = $state<string | undefined>(undefined);
 
 	let currentStep = $state(1);
@@ -56,6 +66,7 @@
 			nombre = companero?.nombre ?? '';
 			cinturon = companero?.cinturon;
 			pesoRelativo = companero?.peso_relativo;
+			notas = companero?.notas ?? '';
 			notasOriginal = companero?.notas;
 			currentStep = 1;
 			visitedSteps = new Set([1]);
@@ -64,13 +75,15 @@
 	});
 
 	function goToStep(step: number) {
+		if (!visibleSteps.includes(step)) return;
 		if (step > currentStep && !visitedSteps.has(step)) return;
 		currentStep = step;
 	}
 
 	function advance() {
-		if (currentStep < totalSteps) {
-			currentStep += 1;
+		const idx = visibleSteps.indexOf(currentStep);
+		if (idx >= 0 && idx < visibleSteps.length - 1) {
+			currentStep = visibleSteps[idx + 1];
 			visitedSteps = new Set([...visitedSteps, currentStep]);
 		}
 	}
@@ -145,6 +158,7 @@
 	}
 
 	onMount(() => {
+		settings.init();
 		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
 	});
 
@@ -157,14 +171,18 @@
 		saving = true;
 		errorMsg = '';
 		try {
+			// T-3.it6: notas editable solo en modo avanzado. En hobbyist
+			// reenvía el valor original (undefined en creación) para no
+			// pisar el dato existente al editar.
+			const notasFinal = settings.modoAvanzado
+				? notas.trim() || undefined
+				: notasOriginal;
 			await onSave({
 				id: companero?.id ?? crypto.randomUUID(),
 				nombre: nombre.trim(),
 				cinturon,
 				peso_relativo: pesoRelativo,
-				// `notas`: en creación queda undefined → null. En edición se
-				// reenvía el valor original cargado para preservarlo.
-				notas: notasOriginal
+				notas: notasFinal
 			});
 			open = false;
 		} catch (err) {
@@ -186,8 +204,7 @@
 
 		{#if mode === 'wizard'}
 			<div class="flex items-center gap-1 pt-2">
-				{#each Array(totalSteps) as _, i (i)}
-					{@const step = i + 1}
+				{#each visibleSteps as step (step)}
 					{@const visited = visitedSteps.has(step)}
 					{@const isCurrent = step === currentStep}
 					<button
@@ -204,7 +221,7 @@
 				{/each}
 			</div>
 			<p class="text-center text-xs text-muted-foreground">
-				Paso {currentStep} de {totalSteps}
+				Paso {visibleSteps.indexOf(currentStep) + 1} de {totalSteps}
 			</p>
 
 			<!-- Body scrollable; footer fuera para que siempre quede visible. -->
@@ -245,6 +262,18 @@
 								value={pesoRelativo ?? null}
 								onChange={handlePesoChange}
 								ariaLabel="Peso relativo"
+							/>
+						</div>
+					{/if}
+
+					{#if settings.modoAvanzado && currentStep === 4}
+						<!-- Paso 4: Notas (solo modo avanzado, T-3.it6). -->
+						<div class="space-y-3">
+							<h3 class="text-sm font-semibold">Notas (opcional)</h3>
+							<Textarea
+								bind:value={notas}
+								placeholder="Estilo, gustos, manías…"
+								rows={4}
 							/>
 						</div>
 					{/if}
@@ -314,6 +343,18 @@
 							ariaLabel="Peso relativo"
 						/>
 					</div>
+
+					{#if settings.modoAvanzado}
+						<div class="space-y-1.5">
+							<Label for="companero-form-notas">Notas</Label>
+							<Textarea
+								id="companero-form-notas"
+								bind:value={notas}
+								placeholder="Estilo, gustos, manías…"
+								rows={4}
+							/>
+						</div>
+					{/if}
 
 					{#if errorMsg}
 						<p class="text-sm text-destructive">{errorMsg}</p>

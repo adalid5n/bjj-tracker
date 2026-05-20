@@ -13,6 +13,7 @@
 	import TecnicaWizardDialog from '$lib/components/TecnicaWizardDialog.svelte';
 	import { listCompaneros, createCompanero, updateCompanero } from '$lib/companeros';
 	import { capitalizeFirst } from '$lib/utils';
+	import { settings } from '$lib/settings.svelte';
 	import type {
 		CategoriaPosicion,
 		Cinturon,
@@ -95,16 +96,23 @@
 	} = $props();
 
 	const mode = $derived<'wizard' | 'form'>(roll ? 'form' : 'wizard');
-	// T-12 añadió un paso "posiciones problema" entre compañero y tamaño;
-	// luego se retiró el paso de duración. Pasos actuales (wizard, modo crear):
-	// 1=Compañero, 2=Posiciones, 3=Tamaño, 4=Resultado, 5=Técnicas.
-	const totalSteps = 5;
+	// Pasos actuales (wizard, modo crear):
+	// 1=Compañero, 2=Posiciones, 3=Técnicas, 4=Tamaño, 5=Resultado, 6=Duración.
+	// El paso 6 (Duración) solo aparece en modo avanzado (T-3.it6). En
+	// hobbyist el wizard tiene 5 pasos; en avanzado 6.
+	const visibleSteps = $derived<number[]>(
+		settings.modoAvanzado ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]
+	);
+	const totalSteps = $derived(visibleSteps.length);
 
 	let companeros = $state<Companero[]>([]);
 	let companeroId = $state<string | null>(null);
 	let tamanoRelativo = $state<PesoRelativo | undefined>(undefined);
-	// `duracion_min` ya no se edita desde la UI. La columna sigue en BD;
-	// guardamos el valor original cargado del `roll` para reenviarlo intacto.
+	// `duracion_min` (T-3.it6): editable bajo `settings.modoAvanzado`.
+	// `duracionStr` es el string del Input numérico (vacío = sin valor).
+	// `duracionMinOriginal` preserva el valor de BD para que en hobbyist el
+	// dato existente no se pise al guardar.
+	let duracionStr = $state('');
 	let duracionMinOriginal = $state<number | undefined>(undefined);
 	let resultado = $state<ResultadoRoll | undefined>(undefined);
 
@@ -174,6 +182,7 @@
 			lastCompaneroId = roll?.companero_id ?? null;
 			tamanoRelativo = roll?.tamano_relativo;
 			duracionMinOriginal = roll?.duracion_min;
+			duracionStr = roll?.duracion_min != null ? String(roll.duracion_min) : '';
 			resultado = roll?.resultado;
 			currentStep = 1;
 			visitedSteps = new Set([1]);
@@ -395,13 +404,15 @@
 	}
 
 	function goToStep(step: number) {
+		if (!visibleSteps.includes(step)) return;
 		if (step > currentStep && !visitedSteps.has(step)) return;
 		currentStep = step;
 	}
 
 	function advance() {
-		if (currentStep < totalSteps) {
-			currentStep += 1;
+		const idx = visibleSteps.indexOf(currentStep);
+		if (idx >= 0 && idx < visibleSteps.length - 1) {
+			currentStep = visibleSteps[idx + 1];
 			visitedSteps = new Set([...visitedSteps, currentStep]);
 		}
 	}
@@ -492,7 +503,10 @@
 
 	function handleResultadoChange(v: string | null) {
 		resultado = (v ?? undefined) as ResultadoRoll | undefined;
-		if (v && mode === 'wizard') advance();
+		// En modo avanzado el paso 5 (Resultado) NO es el último (queda
+		// Duración después), así que avanzamos al elegir. En hobbyist es
+		// el último y NO avanzamos — el usuario pulsa Guardar.
+		if (v && mode === 'wizard' && settings.modoAvanzado) advance();
 	}
 
 	const canAdvance = $derived(
@@ -551,8 +565,22 @@
 			advance();
 			return;
 		}
-		if (currentStep === totalSteps) {
-			// Paso Resultado (último). Solo guarda si hay resultado.
+		// Paso 5 (Resultado): en hobbyist es el último → Guardar. En
+		// avanzado no es el último (queda Duración) → avanzar si hay valor.
+		if (currentStep === 5) {
+			if (settings.modoAvanzado) {
+				if (resultado) {
+					intercept();
+					advance();
+				}
+			} else if (canSaveWizard) {
+				intercept();
+				handleSave();
+			}
+			return;
+		}
+		// Paso 6 (Duración, solo avanzado): es el último → Guardar.
+		if (currentStep === 6) {
 			if (canSaveWizard) {
 				intercept();
 				handleSave();
@@ -573,6 +601,7 @@
 	}
 
 	onMount(() => {
+		settings.init();
 		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
 	});
 
@@ -586,15 +615,22 @@
 		saving = true;
 		errorMsg = '';
 		try {
-			// `duracion_min` ya no se edita desde la UI. Se reenvía el valor
-			// original cargado (undefined en creación, el número guardado en
-			// edición) para no pisar valores existentes.
+			// T-3.it6: duracion_min editable solo en modo avanzado. En
+			// hobbyist reenviamos el valor original cargado para no pisar
+			// el dato existente al editar (en creación queda undefined).
+			let duracionFinal: number | undefined;
+			if (settings.modoAvanzado) {
+				const parsed = parseInt(duracionStr, 10);
+				duracionFinal = Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+			} else {
+				duracionFinal = duracionMinOriginal;
+			}
 			await onSave({
 				id: roll?.id ?? crypto.randomUUID(),
 				sesion_id: sesionId,
 				companero_id: companeroId ?? undefined,
 				tamano_relativo: tamanoRelativo,
-				duracion_min: duracionMinOriginal,
+				duracion_min: duracionFinal,
 				resultado,
 				// T-3.it2.b: la UI ya no escribe estos textos libres. Para
 				// preservar el histórico de rolls antiguos, reenviamos el
@@ -648,8 +684,7 @@
 
 		{#if mode === 'wizard'}
 			<div class="flex items-center gap-1 pt-2">
-				{#each Array(totalSteps) as _, i (i)}
-					{@const step = i + 1}
+				{#each visibleSteps as step (step)}
 					{@const visited = visitedSteps.has(step)}
 					{@const isCurrent = step === currentStep}
 					<button
@@ -666,7 +701,7 @@
 				{/each}
 			</div>
 			<p class="text-center text-xs text-muted-foreground">
-				Paso {currentStep} de {totalSteps}
+				Paso {visibleSteps.indexOf(currentStep) + 1} de {totalSteps}
 			</p>
 
 			<!--
@@ -930,6 +965,28 @@
 						/>
 					</div>
 				{/if}
+
+				{#if settings.modoAvanzado && currentStep === 6}
+					<!-- Paso 6: Duración (solo modo avanzado, T-3.it6). -->
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Duración (opcional)</h3>
+						<div class="flex items-center gap-2">
+							<Input
+								type="number"
+								inputmode="numeric"
+								min="0"
+								bind:value={duracionStr}
+								placeholder="0"
+								class="max-w-[8rem]"
+								aria-label="Duración en minutos"
+							/>
+							<span class="text-sm text-muted-foreground">min</span>
+						</div>
+						<p class="text-xs text-muted-foreground">
+							Cuánto duró el roll. Puedes saltarte este paso.
+						</p>
+					</div>
+				{/if}
 				</div>
 
 				{#if errorMsg}
@@ -1181,6 +1238,24 @@
 						<p class="text-xs text-muted-foreground italic">El resultado es obligatorio.</p>
 					{/if}
 				</div>
+
+				{#if settings.modoAvanzado}
+					<div class="space-y-1.5">
+						<Label for="duracion-form">Duración (min)</Label>
+						<div class="flex items-center gap-2">
+							<Input
+								id="duracion-form"
+								type="number"
+								inputmode="numeric"
+								min="0"
+								bind:value={duracionStr}
+								placeholder="0"
+								class="max-w-[8rem]"
+							/>
+							<span class="text-sm text-muted-foreground">min</span>
+						</div>
+					</div>
+				{/if}
 
 					{#if errorMsg}
 						<p class="text-sm text-destructive">{errorMsg}</p>

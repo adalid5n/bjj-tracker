@@ -26,6 +26,7 @@
 		TipoTecnica
 	} from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { settings } from '$lib/settings.svelte';
 
 	let { posicion, onChanged }: { posicion: Posicion; onChanged?: () => void } = $props();
 
@@ -87,6 +88,9 @@
 	let mostrarConfirmBorrar = $state(false);
 
 	onMount(async () => {
+		// Hidrata el state de settings para que `settings.modoAvanzado` sea
+		// leíble sincrónicamente en el render (bloques opcionales).
+		settings.init();
 		try {
 			const [
 				{ getTecnicasByPosicion },
@@ -291,6 +295,11 @@
 			{CATEGORIA_LABEL[posicion.categoria]}
 		</span>
 	</div>
+
+	<!-- Notas (T-3.it6): solo en modo avanzado y si hay contenido. -->
+	{#if settings.modoAvanzado && posicion.notas.trim().length > 0}
+		<p class="text-sm whitespace-pre-wrap text-muted-foreground">{posicion.notas}</p>
+	{/if}
 
 	{#if status === 'loading'}
 		<p class="text-sm text-muted-foreground">Cargando técnicas…</p>

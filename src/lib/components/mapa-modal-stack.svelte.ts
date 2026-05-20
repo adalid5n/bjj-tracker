@@ -233,6 +233,11 @@ export type TecnicaWizardDraftState = {
 	sumisionDestinoId: string | null;
 	tipo: 'ataque' | 'sweep' | 'escape' | 'transicion' | 'sumision' | undefined;
 	estado: 'probando' | 'funciona' | 'descartada' | undefined;
+	// T-3.it6: re-introducidos bajo modoAvanzado. En modoHobbyist se
+	// persisten como '' y los pasos no se renderizan. Mantener el campo en
+	// el draft permite que sobreviva el remount tras un sub-wizard inline.
+	detalles: string;
+	erroresComunes: string;
 	currentStep: number;
 	visitedSteps: number[];
 };
@@ -272,6 +277,10 @@ export type PosicionWizardDraftState = {
 	categoria: 'guardia' | 'control_superior' | 'espalda' | 'transicion' | 'otro' | undefined;
 	tipo: 'ofensiva' | 'defensiva' | 'neutral' | undefined;
 	complementariaId: string | null;
+	// T-3.it6: re-introducidas bajo modoAvanzado. En modoHobbyist se
+	// persisten como '' y el paso no se renderiza. Mantener el campo en
+	// el draft permite que sobreviva el remount tras un sub-wizard inline.
+	notas: string;
 	currentStep: number;
 	visitedSteps: number[];
 };

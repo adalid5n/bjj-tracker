@@ -31,8 +31,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import type { SumisionTerminal } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
 	let {
@@ -49,7 +51,10 @@
 		onRequestClose?: () => void;
 	} = $props();
 
-	const totalSteps = 1;
+	// T-3.it6: en modo avanzado el wizard incluye paso 2 (Notas opcional).
+	// En hobbyist queda como un único paso (Nombre) y el indicador de
+	// progreso se oculta (lógica genérica más abajo en el render).
+	const totalSteps = $derived(settings.modoAvanzado ? 2 : 1);
 
 	// T-2.it2: en modo `editar` el componente renderiza un form plano con
 	// todos los campos visibles a la vez (mismo patrón que `RollEditor`).
@@ -57,9 +62,10 @@
 	const viewMode = $derived<'wizard' | 'form'>(modo === 'editar' ? 'form' : 'wizard');
 
 	let nombre = $state('');
-	// `notas` ya no se edita desde la UI (campo retirado). La columna sigue
-	// en BD; guardamos el valor original cargado para reenviarlo intacto al
-	// actualizar.
+	// `notas` (T-3.it6): editable bajo `settings.modoAvanzado`. En hobbyist
+	// no se renderiza el paso, pero `notasOriginal` se sigue cargando para
+	// preservar el dato existente al editar.
+	let notas = $state('');
 	let notasOriginal = $state('');
 
 	let currentStep = $state(1);
@@ -81,9 +87,10 @@
 
 	// Snapshot para detectar dirty en modo editar; en modo crear se
 	// compara contra los defaults vacíos.
-	let snapshot = $state<{ nombre: string }>({ nombre: '' });
+	let snapshot = $state<{ nombre: string; notas: string }>({ nombre: '', notas: '' });
 
 	onMount(async () => {
+		settings.init();
 		// Registra el dirty handler en el stack para que el host lo
 		// consulte antes de cerrar / hacer pop a una entrada anterior.
 		mapaModalStack.setDirtyHandler(() => isDirty);
@@ -119,8 +126,9 @@
 				return;
 			}
 			nombre = s.nombre;
+			notas = s.notas;
 			notasOriginal = s.notas;
-			snapshot = { nombre: s.nombre };
+			snapshot = { nombre: s.nombre, notas: s.notas };
 			status = 'ready';
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : String(err);
@@ -134,8 +142,12 @@
 	});
 
 	// Hay cambios sin guardar si algún campo difiere del snapshot inicial.
-	// Trim para no marcar dirty por espacios incidentales.
-	const isDirty = $derived(nombre.trim() !== snapshot.nombre.trim());
+	// Trim para no marcar dirty por espacios incidentales. `notas` solo
+	// cuenta cuando el modo avanzado expone el paso.
+	const isDirty = $derived(
+		nombre.trim() !== snapshot.nombre.trim() ||
+			(settings.modoAvanzado && notas.trim() !== snapshot.notas.trim())
+	);
 
 	// Limpia el error inline cuando el usuario edita el nombre. Antes esto
 	// vivía en un `$effect` que leía `nombre` para "trackear" cambios, pero
@@ -173,10 +185,11 @@
 	}
 
 	function tryAdvanceFromStep1() {
-		// Con un solo paso (Nombre), "Continuar" se reemplaza por "Guardar":
+		// Hobbyist (totalSteps=1): "Continuar" se reemplaza por "Guardar":
 		// validamos duplicado inline y, si pasa, intentamos guardar
-		// directamente. `handleSave` también captura el UNIQUE de SQLite por
-		// si entra una carrera entre pestañas.
+		// directamente. Avanzado (totalSteps=2): avanzamos al paso de notas.
+		// `handleSave` captura el UNIQUE de SQLite como defensa frente a
+		// carreras entre pestañas.
 		const n = nombre.trim();
 		if (!n) return;
 		if (nombreYaExiste(n)) {
@@ -184,7 +197,11 @@
 			return;
 		}
 		nombreError = '';
-		void handleSave();
+		if (settings.modoAvanzado) {
+			advance();
+		} else {
+			void handleSave();
+		}
 	}
 
 	function handleNombreKeydown(e: KeyboardEvent) {
@@ -220,12 +237,22 @@
 			e.preventDefault();
 			e.stopImmediatePropagation();
 		};
-		// Único paso: pulsar Enter en el input dispara el guardado (vía
-		// tryAdvanceFromStep1, que valida duplicado y llama a handleSave).
+		// Paso 1 (Nombre): Enter dispara guardado en hobbyist, avance al
+		// paso 2 en avanzado (vía tryAdvanceFromStep1).
 		if (currentStep === 1) {
 			if (canAdvanceFromStep1 && !saving) {
 				intercept();
 				tryAdvanceFromStep1();
+			}
+			return;
+		}
+		// Paso 2 (Notas, solo avanzado): Enter dispara Guardar — pero como
+		// el target suele ser TEXTAREA, ya hemos retornado arriba. Si el foco
+		// está fuera (body, botón del progress…), guardamos.
+		if (currentStep === 2) {
+			if (canAdvanceFromStep1 && !saving) {
+				intercept();
+				void handleSave();
 			}
 			return;
 		}
@@ -268,11 +295,12 @@
 		try {
 			if (modo === 'crear') {
 				const { createSumision } = await import('$lib/sumisiones');
-				// La UI ya no edita Notas — persistimos cadena vacía. La
-				// columna sigue en BD por la migración inmutable.
+				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
+				// persistimos cadena vacía.
+				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
 				const nueva = await createSumision({
 					nombre: nombreFinal,
-					notas: ''
+					notas: notasFinal
 				});
 				onSaved?.(nueva.id, 'crear');
 				// Tras guardar ya no hay cambios pendientes: desactiva el
@@ -297,12 +325,13 @@
 					throw new Error('Falta sumisionId en modo editar.');
 				}
 				const { updateSumision } = await import('$lib/sumisiones');
-				// `notas` ya no se edita desde la UI — reenviamos el valor
-				// original cargado de BD para preservar lecturas existentes.
+				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
+				// reenvía el valor original cargado de BD.
+				const notasFinal = settings.modoAvanzado ? notas.trim() : notasOriginal;
 				const update: Omit<SumisionTerminal, 'created_at' | 'updated_at'> = {
 					id: sumisionId,
 					nombre: nombreFinal,
-					notas: notasOriginal
+					notas: notasFinal
 				};
 				await updateSumision(update);
 				onSaved?.(sumisionId, 'editar');
@@ -390,8 +419,24 @@
 				{#if nombreError}
 					<p id="sumision-nombre-error" class="text-sm text-destructive">{nombreError}</p>
 				{/if}
-				<p class="text-xs text-muted-foreground">Pulsa Enter o "Guardar" para crear la sumisión.</p>
+				<p class="text-xs text-muted-foreground">
+					{settings.modoAvanzado
+						? 'Pulsa Enter o "Continuar" para añadir notas.'
+						: 'Pulsa Enter o "Guardar" para crear la sumisión.'}
+				</p>
 			</div>
+
+			{#if settings.modoAvanzado}
+				<!-- Paso 2: Notas (solo modo avanzado, T-3.it6). -->
+				<div class="space-y-3" class:hidden={currentStep !== 2}>
+					<h3 class="text-sm font-semibold">Notas (opcional)</h3>
+					<Textarea
+						bind:value={notas}
+						placeholder="Detalles, escapes típicos, links…"
+						rows={4}
+					/>
+				</div>
+			{/if}
 
 			{#if errorMsg}
 				<p class="text-sm text-destructive">{errorMsg}</p>

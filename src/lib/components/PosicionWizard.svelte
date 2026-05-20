@@ -56,12 +56,14 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
 
 	type ComboboxItem = { id: string; label: string; sublabel?: string };
 	import type { CategoriaPosicion, Posicion, TipoRolPosicion } from '$lib/types';
 	import { mapaModalStack, posicionWizardDraft } from './mapa-modal-stack.svelte';
+	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
 	// Identificador del item "Sin complementaria" en el Combobox. Cuando el
@@ -123,12 +125,15 @@
 		{ value: 'neutral', label: 'Neutral' }
 	];
 
-	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria.
+	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria, 5=Notas.
+	// El paso 5 (Notas) solo aparece en modo avanzado (T-3.it6).
 	// Cuando el wizard es un sub-wizard de "+ Crear nueva complementaria" (T-1.it2
 	// fix), el paso 4 se salta — la complementaria es implícita (el padre).
 	// El último paso visible siempre es el que renderiza "Guardar".
 	const visibleSteps = $derived<number[]>(
-		parentForComplementaria !== undefined ? [1, 2, 3] : [1, 2, 3, 4]
+		parentForComplementaria !== undefined
+			? settings.modoAvanzado ? [1, 2, 3, 5] : [1, 2, 3]
+			: settings.modoAvanzado ? [1, 2, 3, 4, 5] : [1, 2, 3, 4]
 	);
 	const totalSteps = $derived(visibleSteps.length);
 
@@ -145,9 +150,12 @@
 	let categoria = $state<CategoriaPosicion | undefined>(undefined);
 	let tipo = $state<TipoRolPosicion | undefined>(undefined);
 	let complementariaId = $state<string | null>(null);
-	// `notas` ya no se edita desde la UI (campo retirado), pero la columna
-	// sigue en BD y debe preservarse en `updatePosicion`. Guardamos el
-	// valor original cargado de BD para reenviarlo intacto al actualizar.
+	// `notas` (T-3.it6): editable bajo `settings.modoAvanzado`. En hobbyist
+	// no se renderiza el paso, pero `notasOriginal` se sigue cargando de BD
+	// para preservar el dato existente al editar (clave: si un user creó la
+	// posición con notas en avanzado y luego cambia a hobbyist y la edita,
+	// las notas no se pisan con '' — se mantienen).
+	let notas = $state('');
 	let notasOriginal = $state('');
 
 	let currentStep = $state(1);
@@ -180,7 +188,8 @@
 		categoria: CategoriaPosicion | undefined;
 		tipo: TipoRolPosicion | undefined;
 		complementariaId: string | null;
-	}>({ nombre: '', categoria: undefined, tipo: undefined, complementariaId: null });
+		notas: string;
+	}>({ nombre: '', categoria: undefined, tipo: undefined, complementariaId: null, notas: '' });
 
 	/**
 	 * Listener global de Enter para cubrir el caso "foco perdido". Ver
@@ -201,6 +210,9 @@
 	}
 
 	onMount(async () => {
+		// Hidrata el state de settings (idempotente). Permite leer
+		// `settings.modoAvanzado` sincrónicamente desde el render.
+		settings.init();
 		// Registra el dirty handler en el stack (solo `stack`). En
 		// `standalone` el padre se entera vía `onDirtyChange` (efecto
 		// reactivo más abajo).
@@ -236,6 +248,7 @@
 			categoria = draft.categoria;
 			tipo = draft.tipo;
 			complementariaId = draft.complementariaId;
+			notas = draft.notas;
 			currentStep = draft.currentStep;
 			visitedSteps = new Set(draft.visitedSteps);
 		}
@@ -272,15 +285,19 @@
 				categoria = p.categoria;
 				tipo = p.tipo;
 				complementariaId = p.posicion_complementaria_id ?? null;
+				notas = p.notas;
 			}
-			// Preserva las notas ya existentes — la UI no las edita, pero
-			// no queremos pisarlas con '' al guardar.
+			// Preserva las notas existentes en BD. En hobbyist el paso no se
+			// renderiza, pero al guardar usamos `notasOriginal` para no pisar
+			// el dato. En avanzado, `notas` es editable y arranca con este
+			// valor.
 			notasOriginal = p.notas;
 			snapshot = {
 				nombre: p.nombre,
 				categoria: p.categoria,
 				tipo: p.tipo,
-				complementariaId: p.posicion_complementaria_id ?? null
+				complementariaId: p.posicion_complementaria_id ?? null,
+				notas: p.notas
 			};
 			status = 'ready';
 		} catch (err) {
@@ -323,18 +340,23 @@
 			categoria,
 			tipo,
 			complementariaId,
+			notas,
 			currentStep,
 			visitedSteps: Array.from(visitedSteps)
 		});
 	});
 
 	// Hay cambios sin guardar si algún campo difiere del snapshot inicial.
-	// Trim en nombre para no marcar dirty por espacios incidentales.
+	// Trim en nombre y notas para no marcar dirty por espacios incidentales.
+	// `notas` solo cuenta cuando el modo avanzado expone el paso — en
+	// hobbyist el usuario no la puede tocar, así que no debería disparar
+	// dirty.
 	const isDirty = $derived(
 		nombre.trim() !== snapshot.nombre.trim() ||
 			categoria !== snapshot.categoria ||
 			tipo !== snapshot.tipo ||
-			complementariaId !== snapshot.complementariaId
+			complementariaId !== snapshot.complementariaId ||
+			(settings.modoAvanzado && notas.trim() !== snapshot.notas.trim())
 	);
 
 	// Posiciones disponibles como complementaria: las que NO tengan otra
@@ -490,10 +512,17 @@
 			(tipo !== undefined ? handleContinueStep3 : handleSkipTipo)();
 			return;
 		}
-		// Paso final: paso 4 si hay complementaria visible, paso 3 si el
-		// wizard es sub-wizard "Crear nueva complementaria" (sub-wizard salta
-		// el paso 4). En ambos casos guardamos al pulsar Enter.
+		// Paso 4 (Complementaria) en modo avanzado no es el último (5 lo es).
+		// Permitimos avanzar al paso 5 al pulsar Enter.
 		const lastStep = visibleSteps[visibleSteps.length - 1];
+		if (currentStep === 4 && currentStep !== lastStep) {
+			intercept();
+			advance();
+			return;
+		}
+		// Paso final: paso 4 si hay complementaria visible (hobbyist), paso 3
+		// si el wizard es sub-wizard "Crear nueva complementaria", paso 5 si
+		// modo avanzado. En todos los casos guardamos al pulsar Enter.
 		if (currentStep === lastStep && nombre.trim().length > 0 && !saving) {
 			intercept();
 			handleSave();
@@ -578,15 +607,14 @@
 			const categoriaFinal: CategoriaPosicion = categoria ?? 'otro';
 			if (modo === 'crear') {
 				const { createPosicion } = await import('$lib/posiciones');
-				// La UI ya no expone Notas — persistimos cadena vacía. La
-				// columna `posiciones.notas` queda en BD por la migración
-				// inmutable; lecturas previas no se tocan al editar (ver el
-				// `update` de abajo).
+				// Notas (T-3.it6): editable solo en modo avanzado. En
+				// hobbyist persistimos cadena vacía.
+				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
 				const nueva = await createPosicion({
 					nombre: nombreFinal,
 					categoria: categoriaFinal,
 					tipo,
-					notas: '',
+					notas: notasFinal,
 					posicion_complementaria_id: complementariaId
 				});
 				if (mode === 'stack') {
@@ -630,13 +658,16 @@
 					throw new Error('Falta posicionId en modo editar.');
 				}
 				const { updatePosicion } = await import('$lib/posiciones');
-				// `notas`: reenvía el valor original (la UI ya no la edita).
+				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
+				// reenvía el valor original cargado de BD para no pisar el
+				// dato existente.
+				const notasFinal = settings.modoAvanzado ? notas.trim() : notasOriginal;
 				const update: Omit<Posicion, 'created_at' | 'updated_at'> = {
 					id: posicionId,
 					nombre: nombreFinal,
 					categoria: categoriaFinal,
 					tipo,
-					notas: notasOriginal,
+					notas: notasFinal,
 					posicion_complementaria_id: complementariaId
 				};
 				await updatePosicion(update);
@@ -782,6 +813,21 @@
 				</p>
 			</div>
 
+			{#if settings.modoAvanzado}
+				<!-- Paso 5: Notas (solo modo avanzado, T-3.it6). -->
+				<div class="space-y-3" class:hidden={currentStep !== 5}>
+					<h3 class="text-sm font-semibold">Notas (opcional)</h3>
+					<Textarea
+						bind:value={notas}
+						placeholder="Detalles, recordatorios, links…"
+						rows={4}
+					/>
+					<p class="text-xs text-muted-foreground">
+						Texto libre — útil para recordar setups, errores típicos, etc.
+					</p>
+				</div>
+			{/if}
+
 			{#if errorMsg}
 				<p class="text-sm text-destructive">{errorMsg}</p>
 			{/if}
@@ -832,6 +878,12 @@
 					onclick={tipo !== undefined ? handleContinueStep3 : handleSkipTipo}
 					disabled={saving}
 				>
+					Continuar
+				</Button>
+			{:else if currentStep !== visibleSteps[visibleSteps.length - 1] && currentStep === 4}
+				<!-- Modo avanzado (T-3.it6): paso 4 (Complementaria) no es el
+				     último cuando hay paso de Notas. Botón Continuar avanza al 5. -->
+				<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
 					Continuar
 				</Button>
 			{/if}
@@ -905,6 +957,13 @@
 						Otra vista de la misma situación (p. ej. "Mount top" ↔ "Mount bottom").
 					</p>
 				</div>
+
+				{#if settings.modoAvanzado}
+					<div class="space-y-1.5">
+						<Label for="posicion-form-notas">Notas</Label>
+						<Textarea id="posicion-form-notas" bind:value={notas} rows={4} />
+					</div>
+				{/if}
 
 				{#if errorMsg}
 					<p class="text-sm text-destructive">{errorMsg}</p>

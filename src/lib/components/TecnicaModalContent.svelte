@@ -40,6 +40,7 @@
 		consumePendingReturnHandlerWork,
 		setPendingReturnHandlerWork
 	} from './mapa-modal-stack.svelte';
+	import { settings } from '$lib/settings.svelte';
 
 	let { tecnica, onChanged }: { tecnica: Tecnica; onChanged?: () => void } = $props();
 
@@ -113,6 +114,9 @@
 	let contrasErrorMessage = $state('');
 
 	onMount(async () => {
+		// Hidrata el state de settings para que `settings.modoAvanzado` sea
+		// leíble sincrónicamente en el render (bloques opcionales T-3.it6).
+		settings.init();
 		try {
 			// T-11: si el modal se está remontando tras un wizard inline de
 			// "+ Crear nueva técnica" que insertó una contra, esperamos a
@@ -443,6 +447,20 @@
 				<span class="ml-1 text-muted-foreground">(posición eliminada)</span>
 			{/if}
 		</div>
+
+		<!-- Detalles + Errores comunes (T-3.it6): solo modo avanzado, si hay contenido. -->
+		{#if settings.modoAvanzado && tecnica.detalles?.trim().length > 0}
+			<div>
+				<h3 class="text-sm font-semibold">Detalles</h3>
+				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{tecnica.detalles}</p>
+			</div>
+		{/if}
+		{#if settings.modoAvanzado && tecnica.errores_comunes?.trim().length > 0}
+			<div>
+				<h3 class="text-sm font-semibold">Errores comunes</h3>
+				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{tecnica.errores_comunes}</p>
+			</div>
+		{/if}
 
 		<!-- Contras conocidas (T-6 read-only + T-11 editable: ✕ por item, + Añadir contra) -->
 		<div>
