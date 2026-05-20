@@ -1,8 +1,105 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-20 (sesión 36, pulido post-it.5 — recorte de 9 campos opcionales en wizards + reorden RollEditor)
-**Fase activa:** Pulido UX post-it.5. Sin iteración formal abierta. Criterio aplicado: solo lo que alimenta el grafo o lo conecta a rolls/sesiones se queda; el resto fuera.
-**Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): modo hobbyist vs avanzado (conectaría AnalisisHome ya construido), reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, tab Sumisiones en `/mapa`, sistematizar sombras en tokens.
+**Última actualización:** 2026-05-20 (sesión 37, cierre it.6 — modo hobbyist vs avanzado, tag `v0.6-it6`)
+**Fase activa:** Pausa entre iteraciones. it.6 cerrada con bump 0.5.0 → 0.6.0.
+**Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 37 (2026-05-20) — Iteración 6 cerrada (modo hobbyist vs avanzado) + tab Sumisiones en /mapa + cards a 2 filas
+
+**Hecho — it.6 completa con tag `v0.6-it6` y bump 0.5.0 → 0.6.0. Tres tareas formales (T-1/T-2/T-3) + una mejora paralela (tab Sumisiones en /mapa) + ajustes post-T-3 (ocultar AnalisisPanel en /rolls, reorganizar home avanzado, reducir cards de roll a 2 filas mezcladas).**
+
+**Idea raíz:** auditoría de campos opcionales hecha en s36 dejó la app más "hobbyist" de facto. it.6 expone esa decisión como toggle al user: un usuario que quiera la versión rica vuelve a tener todos los campos + análisis en home y en /rolls. Default hobbyist (app recién instalada arranca minimal).
+
+**T-1.it6 — Fontanería (commit `81031d5`):**
+- Migración `SCHEMA_V6_MIGRATION` con tabla `app_settings (key TEXT PK, value TEXT NOT NULL)` + seed `('modo_avanzado','false')`. V1..V5 intactos.
+- `src/lib/settings.ts` — DAO key/value (UPSERT con `ON CONFLICT(key) DO UPDATE`).
+- `src/lib/settings.svelte.ts` — `SettingsState` patrón canónico (class field + `$state` privado + getters + `init()` idempotente con promise cacheado). Singleton `settings`.
+- `src/lib/sync.ts` — `CURRENT_SCHEMA_VERSION = 6`, export/import incluyen `app_settings`. Strict mismatch (sin compat v5).
+- `/ajustes` — Switch de bits-ui directo (precedente del proyecto). Label "Vista avanzada" + texto de ayuda. `settings.init()` en `onMount`.
+- `+layout.svelte` NO se toca — el init es lazy desde cada consumidor.
+
+**T-2.it6 — Home (commit `1fd56d4`, parte 1):**
+- `AnalisisHome` montado bajo `{#if settings.modoAvanzado}` debajo del bloque de sesiones del día.
+- Lista de sesiones del día con `max-h-48 overflow-y-auto pr-1` en avanzado (~2 cards visibles, resto scrolleable interno). Hobbyist sin scroll.
+- Bloque `{#if settings.modoAvanzado && s.foco}` en cada card.
+
+**T-3.it6 — Wizards/editors/modales (commit `1fd56d4`, parte 2):**
+Re-introducidos bajo `{#if settings.modoAvanzado}` los 9 campos retirados en s36:
+| Componente | Campo |
+|---|---|
+| PosicionWizard | Notas |
+| SumisionWizard | Notas |
+| TecnicaWizard | Detalles + Errores comunes |
+| SesionEditor (wizard) + SesionForm (form) | Foco + Técnica clase + Obs profesor |
+| CompaneroEditor | Notas |
+| RollEditor | Duración (en `duracion_min`, al final como paso 6) |
+| PosicionModalContent + SumisionModalContent + TecnicaModalContent | Bloques read-only |
+| +page.svelte cards | `s.foco` |
+
+Patrón consistente en todos:
+- `visibleSteps` calculado dinámicamente con `$derived` y `settings.modoAvanzado`.
+- `*Original` preserva el dato de BD al editar en hobbyist (no se pisa).
+- `settings.init()` en `onMount` (idempotente).
+- `mapa-modal-stack.svelte.ts` extendido con campos en draft states (notas/detalles/erroresComunes).
+
+**Mejora paralela — tab Sumisiones en /mapa (commit `859598e`):**
+- Tercer botón en sub-toggle de Lista junto a Posiciones y Técnicas.
+- Lista plana orden alfabético, tap → `SumisionModalContent` (flujo ya existente).
+- Sin FAB local (el global ya tiene "Nueva sumisión").
+- Bonus: desacoplado bug latente en `filtroSinResultados` (OR posiciones+sumisiones que con tabs separadas dejaba estados sin mensaje).
+
+**Ajustes post-T-3 (commit `1fd56d4`, parte 3):**
+- `/rolls` — `AnalisisPanel` bajo `{#if settings.modoAvanzado}`.
+- `/rolls` y `/sesion/[id]` — cards de roll reducidas de 4 chip-pickers a 2 (Fue bien | Fue mal), mezcla plana posiciones + técnicas (sumisiones ya entran como técnicas con `tipo='sumision'`). Aplicado a ambos sitios por consistencia.
+
+**Decisiones técnicas relevantes:**
+- **Tabla key/value** en vez de columna por flag — futuras flags entran sin migración. Trade-off: pierdes tipado SQL, lo recuperas en `SettingsState`.
+- **`settings.init()` lazy con promise cacheada** — coordinación cero entre consumidores, primera llamada hace round-trip a BD, las demás devuelven el promise. Coherente con el patrón de `theme.svelte.ts`.
+- **`disabled` mientras `!initialized`** en el Switch — evita flicker on→off al hidratar.
+- **Cards de roll mezcla plana**: el owner pidió explícitamente plano (no icono ⌖/⚡ ni color de borde distinto). Pierdes distinción posición vs técnica; ganas densidad visual.
+
+**Validación:**
+- `pnpm check` → 0/0/0 (1058 archivos) tras cada subagente y al final.
+- `pnpm build` → 6-16s sin warnings nuevos.
+- Owner verificó `pnpm preview` con toggle ON y OFF, ambos modos funcionando.
+
+**Riesgo asumido y explicitado:** import estricto de JSON v5 viejo falla con "Versión incompatible…". El owner generó `bjj-tracker-export-20260520-v6.json` como referencia (no se commitea, JSONs gitignored).
+
+**Lección — auditoría previa pagó deuda futura:**
+La sesión 36 auditó campos sin intención de hacer toggle. Esa decisión hizo que it.6 fuera trivial en alcance (saber exactamente qué reabrir). Sin esa auditoría, it.6 hubiera empezado por debatir "qué es opcional" — semanas de discusión. Patrón aplicable: cuando una decisión de producto requiere clasificar el inventario, hacer la clasificación ANTES con criterio explícito (aquí: "alimenta el grafo o conecta rolls/sesiones") simplifica todas las decisiones derivadas.
+
+**Próximo paso concreto:**
+Decidir próxima iteración o pausar. Candidatos prioritarios: reducir copy en pantallas (con `/rolls` como ancla, parcialmente atacado al reducir cards), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`.
+
+**Archivos modificados (sesión completa):**
+- `src/lib/db/schema.ts`
+- `src/lib/settings.ts` (nuevo)
+- `src/lib/settings.svelte.ts` (nuevo)
+- `src/lib/sync.ts`
+- `src/routes/ajustes/+page.svelte`
+- `src/routes/+page.svelte`
+- `src/routes/rolls/+page.svelte`
+- `src/routes/sesion/[id]/+page.svelte`
+- `src/routes/mapa/+page.svelte`
+- `src/lib/components/PosicionWizard.svelte`
+- `src/lib/components/PosicionModalContent.svelte`
+- `src/lib/components/SumisionWizard.svelte`
+- `src/lib/components/SumisionModalContent.svelte`
+- `src/lib/components/TecnicaWizard.svelte`
+- `src/lib/components/TecnicaModalContent.svelte`
+- `src/lib/components/SesionEditor.svelte`
+- `src/lib/components/SesionForm.svelte`
+- `src/lib/components/CompaneroEditor.svelte`
+- `src/lib/components/RollEditor.svelte`
+- `src/lib/components/mapa-modal-stack.svelte.ts`
+- `package.json` (bump)
+- `.claude/ITERACION_6.md` (nuevo)
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
+- `.claude/MEJORAS_FUTURAS.md` (3 entradas marcadas hechas)
+
+**Reportes de subagentes:** `.claude/agent-reports/20260520-it6-t1/`, `.claude/agent-reports/20260520-it6-t3/`, `.claude/agent-reports/20260520-tab-sumisiones-mapa/`.
 
 ---
 

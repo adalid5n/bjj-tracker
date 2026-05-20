@@ -12,24 +12,22 @@ Cada entrada debería responder:
 
 ## UX
 
-### Modo "hobbyist" vs "avanzado" — perfiles de uso
+### ~~Modo "hobbyist" vs "avanzado" — perfiles de uso~~ — HECHO en it.6 (2026-05-20, tag `v0.6-it6`)
 
-- **Origen:** Adalid, 2026-05-19 (sesión 26)
-- **Idea:** ofrecer dos perfiles de uso configurables (probablemente en `/ajustes`):
-  - **Hobbyist:** captura mínima. Solo los campos imprescindibles para registrar una sesión y un roll. Modelo de datos intacto; lo que se oculta son campos de UI, no columnas de BD.
-  - **Avanzado:** todo lo que ya existe hoy (compañero detallado, posiciones problema, tipo/foco/observaciones, técnica clase, etc.).
-- **Sospecha del owner:** muchos de los campos actuales aportan poco o nada al grafo (la salida principal de la app). Reducirlos al mínimo en modo hobbyist hace la captura mucho más rápida sin perder la información que de verdad alimenta el análisis.
-- **Investigación pendiente (cuando toque, NO ahora):** auditar campo por campo qué datos contribuyen al grafo / análisis (consultas C1/C2, vista grafo) y cuáles son ornamentales / sin consumo downstream. Esa auditoría es prerequisito de diseñar el modo hobbyist con criterio — si no, es decisión arbitraria.
-- **Por qué:** la fricción en captura post-clase (CU-1) es el cuello de botella real. Un modo simplificado para el caso primario, con la opción de subir a "avanzado" si el uso real lo pide, encaja mejor con el flujo natural de usuario.
-- **Cuándo:** post-it.4. Probablemente iteración dedicada (el cambio toca múltiples editores: SesionEditor, RollEditor, CompaneroEditor). Empezar por la auditoría de datos antes de tocar UI.
-- **Activo construido para reusar:** `src/lib/components/AnalisisHome.svelte` (creado en T-4.it5, commit `b7cf755`) — versión compacta del análisis (solo C1, top 3 posiciones + top 3 técnicas, ventana fija de 5 sesiones). NO está montado en home. Cuando se implemente el toggle hobbyist/avanzado, conectarlo: visible solo en modo "avanzado". El componente ya tiene su propia reactividad y reload via `reloadKey` prop.
+Toggle "Vista avanzada" en `/ajustes`. Tabla `app_settings` (key/value)
++ `SettingsState` reactivo. En avanzado: home muestra `AnalisisHome`
+("Problemas recientes") y la lista de sesiones del día es scrolleable
+(~2 cards visibles); `/rolls` muestra `AnalisisPanel`; wizards y
+editores reabren los 9 campos opcionales recortados en s36 (notas,
+detalles, errores comunes, foco, técnica clase, obs profesor,
+duración, `s.foco` en cards de home). Default hobbyist.
 
 ### Reducir copy / texto inicial en cada pantalla
 
 - **Origen:** Adalid, 2026-05-19 (sesión 26)
 - **Estado actual:** muchas pantallas tienen títulos largos, descripciones explicativas, labels redundantes o textos de ayuda que pesan visualmente al entrar.
 - **Pantalla ancla — `/rolls`** (señalada por owner como "se muestra mucho de golpe"). Puntos concretos detectados:
-  - **Labels de chip-picker read-only en cada card** ("Posiciones que fueron bien", "Posiciones que fallé", "Técnicas que fueron bien", "Técnicas que fallé") — hasta 4 filas con label largo en cada roll. Candidatos: icono ✓/✗ + categoría corta, o quitar label si el color del chip ya indica resultado. Ya estaba anotado como pendiente en la entrada "Reducir read-only de chips".
+  - ~~**Labels de chip-picker read-only en cada card**~~ — HECHO en s37 (2026-05-20, commit `1fd56d4`). Cards reducidas de 4 filas a 2 ("Fue bien" | "Fue mal"), mezcla plana posiciones + técnicas. Aplicado tanto en `/rolls` como en `/sesion/[id]` (regla de consistencia).
   - **Filtro de Posición desplegado**: 5 sub-labels de categoría (`Guardia`, `Control superior`, `Espalda`, `Transición`, `Otro`) + chips de cada. Cuando se abre Filtros, el bloque se vuelve denso. Opción: categorías colapsables por defecto, o chips planos con prefijo de categoría.
   - **Contador `{rolls.length} roll(s)`** sobre la lista — texto pequeño pero awkward por el "(s)" plural. Eliminar o convertir en chip discreto al lado del título.
   - **Labels de filtros redundantes con su `Select` placeholder** ("Resultado" arriba + "Cualquiera" dentro del trigger). En filtros opcionales, el placeholder solo basta.
@@ -338,20 +336,12 @@ Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
   organización persistente estén en uso real durante un par de
   semanas y se note exactamente qué es lo que molesta.
 
-### Tab Sumisiones en el sub-toggle de Lista del /mapa
+### ~~Tab Sumisiones en el sub-toggle de Lista del /mapa~~ — HECHO en s37 (2026-05-20, commit `859598e`)
 
-- **Origen:** sesión 22 (2026-05-17), decisiones de producto de T-8.it3.
-- **Idea:** añadir un tercer estado al sub-toggle de Lista (`/mapa` →
-  vista Lista) para Sumisiones, junto a Posiciones y Técnicas. Hoy
-  las sumisiones solo se acceden desde el modal de una posición; el
-  owner quería separarlas como tab propio pero priorizó cerrar T-8
-  primero.
-- **Por qué:** acceso directo al catálogo de sumisiones sin pasar por
-  posición. Útil cuando it.3 lleve la vista grafo y el inventario
-  crezca lo suficiente para que la búsqueda dentro de modales sea
-  fricción real.
-- **Cuándo:** post-T-8.it3, valorar en cleanup de it.3 o como tarea
-  propia en it.4 si la fricción es palpable en uso real.
+Tercer botón "Sumisiones" en sub-toggle de Lista. Lista plana, orden
+alfabético, tap abre `SumisionModalContent` (flujo ya existente). Sin
+FAB local (el global ya tenía "Nueva sumisión"). Mejora paralela a
+it.6.
 
 ### Sistematizar sombras (`shadow-[rgba(...)]` inline → tokens semánticos)
 
