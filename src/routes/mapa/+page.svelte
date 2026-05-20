@@ -114,10 +114,11 @@
 
 	// Toggle de dos niveles para /mapa (T-8.it3):
 	//   - vistaPrincipal: chasis principal (Grafo vs Lista).
-	//   - subVistaLista: sub-toggle dentro de Lista (Posiciones vs Técnicas).
+	//   - subVistaLista: sub-toggle dentro de Lista
+	//     (Posiciones / Técnicas / Sumisiones).
 	// No persiste entre navegaciones por decisión de producto.
 	let vistaPrincipal = $state<'grafo' | 'lista'>('grafo');
-	let subVistaLista = $state<'posiciones' | 'tecnicas'>('posiciones');
+	let subVistaLista = $state<'posiciones' | 'tecnicas' | 'sumisiones'>('posiciones');
 	// Filtros del tab "Técnicas". Multi-select: vacío = todos.
 	let tiposSeleccionados = $state<string[]>([]);
 	// Filtros del tab "Grafo" (T-4.it3). Mismo patrón vacío = todos.
@@ -282,10 +283,10 @@
 	});
 
 	const catalogoVacio = $derived(posiciones.length === 0 && sumisiones.length === 0);
+	// "Sin resultados" del tab Posiciones depende SOLO de posiciones tras
+	// extraer Sumisiones a su propio tab. Cada tab gestiona sus vacíos.
 	const filtroSinResultados = $derived(
-		queryNormalized !== '' &&
-			posicionesFiltradas.length === 0 &&
-			sumisionesFiltradas.length === 0
+		queryNormalized !== '' && posicionesFiltradas.length === 0
 	);
 
 	// Mapas id → nombre para resolver origen/destino en la lista plana de
@@ -589,6 +590,18 @@
 						>
 							Técnicas
 						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={subVistaLista === 'sumisiones'}
+							class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {subVistaLista ===
+							'sumisiones'
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'}"
+							onclick={() => (subVistaLista = 'sumisiones')}
+						>
+							Sumisiones
+						</button>
 					</div>
 
 					<!--
@@ -758,29 +771,8 @@
 						</ul>
 					</section>
 				{/each}
-
-				{#if sumisionesFiltradas.length > 0}
-					<section class="space-y-2">
-						<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-							Sumisiones
-						</h2>
-						<ul class="space-y-2">
-							{#each sumisionesFiltradas as s (s.id)}
-								<li>
-									<button
-										type="button"
-										class="block w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-										onclick={() => openSumision(s)}
-									>
-										<div class="font-medium">{s.nombre}</div>
-									</button>
-								</li>
-							{/each}
-						</ul>
-					</section>
-				{/if}
 			{/if}
-		{:else}
+		{:else if subVistaLista === 'tecnicas'}
 			<!--
 			  Tab "Técnicas": el filtro multi-select por tipo vive en el
 			  sub-header sticky de arriba. Aquí solo la lista plana ordenada
@@ -832,6 +824,38 @@
 										{/if}
 									</div>
 								</div>
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{:else}
+			<!--
+			  Tab "Sumisiones": lista plana ordenada alfabéticamente (la DAO ya
+			  aplica `ORDER BY nombre`). Click en item → abre `SumisionModalContent`
+			  vía el stack del mapa (mismo flujo que desde el modal de posición).
+			  Creación NO se hace desde aquí: el FAB "+ Nuevo" global de la página
+			  ya expone "Nueva sumisión" en su DropdownMenu, así evitamos un
+			  segundo punto de entrada (decisión: escaso > ruido).
+			-->
+			{#if sumisiones.length === 0}
+				<p class="rounded border border-dashed border-border p-8 text-center text-muted-foreground">
+					Sin sumisiones en el catálogo. Pulsa "+ Nuevo → Nueva sumisión".
+				</p>
+			{:else if sumisionesFiltradas.length === 0}
+				<p class="rounded border border-dashed border-border p-8 text-center text-muted-foreground">
+					Sin resultados para "{query}".
+				</p>
+			{:else}
+				<ul class="space-y-2">
+					{#each sumisionesFiltradas as s (s.id)}
+						<li>
+							<button
+								type="button"
+								class="block w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+								onclick={() => openSumision(s)}
+							>
+								<div class="font-medium">{s.nombre}</div>
 							</button>
 						</li>
 					{/each}
