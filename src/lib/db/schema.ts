@@ -305,14 +305,48 @@ function migrate4To5(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v6:
- *   { from: 5, to: 6, run: (db) => { ... } }
+ * DDL incremental para subir de schema v5 a v6 (T-1.it6).
+ *
+ * Añade la tabla `app_settings` (key/value genérica) para alojar flags de
+ * preferencias del usuario que viven en BD y deben sobrevivir al
+ * export/import. El primer (y por ahora único) uso es `modo_avanzado`,
+ * que controla la "Vista avanzada" introducida en it.6.
+ *
+ * Decisiones de modelado:
+ * - Tabla key/value en vez de columnas tipadas: el set de flags es
+ *   pequeño y volátil; una columna por flag obligaría a migrar cada vez.
+ *   Trade-off: perdemos tipado SQL, lo recuperamos en la capa TS
+ *   (`SettingsState`).
+ * - Seed inicial con `modo_avanzado='false'` para que el getter de
+ *   `SettingsState` tenga un valor que leer sin null-check en el primer
+ *   arranque tras migración. Una BD nueva ejecuta V1 + esta migración y
+ *   queda con el seed.
+ */
+export const SCHEMA_V6_MIGRATION = `
+CREATE TABLE app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+INSERT INTO app_settings (key, value) VALUES ('modo_avanzado', 'false');
+
+UPDATE schema_meta SET value = '6' WHERE key = 'version';
+`;
+
+function migrate5To6(db: MigrationDb): void {
+	db.exec(SCHEMA_V6_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v7:
+ *   { from: 6, to: 7, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
 	{ from: 2, to: 3, run: migrate2To3 },
 	{ from: 3, to: 4, run: migrate3To4 },
-	{ from: 4, to: 5, run: migrate4To5 }
+	{ from: 4, to: 5, run: migrate4To5 },
+	{ from: 5, to: 6, run: migrate5To6 }
 ];
 
 /**

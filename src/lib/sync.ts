@@ -19,7 +19,7 @@ import type {
 	TecnicaContra
 } from '$lib/types';
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 // T-3.it2: filas de las tablas pivot `roll_tecnica` y `roll_posicion`.
 // `resultado` es 'fue_bien' | 'fallo' (CHECK en SQL). La PK compuesta
@@ -47,6 +47,14 @@ export type GrafoLayoutDbRow = {
 	y: number;
 };
 
+// T-1.it6: filas de la tabla key/value `app_settings`. El value es
+// siempre TEXT en SQL; la interpretación (bool, número, JSON…) vive en
+// la capa TS (`SettingsState`).
+export type AppSettingRow = {
+	key: string;
+	value: string;
+};
+
 export type ExportPayload = {
 	schema_version: number;
 	exported_at: string;
@@ -60,6 +68,7 @@ export type ExportPayload = {
 	roll_posicion: RollPosicionRow[];
 	roll_tecnica: RollTecnicaRow[];
 	grafo_layout: GrafoLayoutDbRow[];
+	app_settings: AppSettingRow[];
 };
 
 export async function exportAll(): Promise<ExportPayload> {
@@ -74,7 +83,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		tecnicaContras,
 		rollPosicion,
 		rollTecnica,
-		grafoLayout
+		grafoLayout,
+		appSettings
 	] = await Promise.all([
 		query<Companero>('SELECT * FROM companeros ORDER BY created_at'),
 		query<Sesion>('SELECT * FROM sesiones ORDER BY created_at'),
@@ -91,7 +101,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		),
 		query<GrafoLayoutDbRow>(
 			'SELECT entidad_id, kind, x, y FROM grafo_layout ORDER BY entidad_id, kind'
-		)
+		),
+		query<AppSettingRow>('SELECT key, value FROM app_settings ORDER BY key')
 	]);
 	return {
 		schema_version: CURRENT_SCHEMA_VERSION,
@@ -105,7 +116,8 @@ export async function exportAll(): Promise<ExportPayload> {
 		tecnica_contras: tecnicaContras,
 		roll_posicion: rollPosicion,
 		roll_tecnica: rollTecnica,
-		grafo_layout: grafoLayout
+		grafo_layout: grafoLayout,
+		app_settings: appSettings
 	};
 }
 
@@ -135,7 +147,8 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 		'tecnica_contras',
 		'roll_posicion',
 		'roll_tecnica',
-		'grafo_layout'
+		'grafo_layout',
+		'app_settings'
 	];
 	for (const key of requiredArrays) {
 		if (!Array.isArray(p[key])) {
@@ -160,6 +173,7 @@ export async function importAll(payload: unknown): Promise<{
 	roll_posicion: number;
 	roll_tecnica: number;
 	grafo_layout: number;
+	app_settings: number;
 }> {
 	assertExportShape(payload);
 
@@ -183,8 +197,9 @@ export async function importAll(payload: unknown): Promise<{
 		try {
 			// Wipe en orden FK (hijos antes que padres) — no estrictamente
 			// necesario con FK OFF, pero mantenemos el orden por claridad.
-			// `grafo_layout` no tiene FK; orden indiferente, lo borramos
-			// con los demás "hijos" del catálogo.
+			// `grafo_layout` y `app_settings` no tienen FK; orden
+			// indiferente, los borramos con los demás "hijos" del catálogo.
+			await run('DELETE FROM app_settings');
 			await run('DELETE FROM grafo_layout');
 			await run('DELETE FROM roll_tecnica');
 			await run('DELETE FROM roll_posicion');
@@ -229,7 +244,8 @@ export async function importAll(payload: unknown): Promise<{
 		tecnica_contras: payload.tecnica_contras.length,
 		roll_posicion: payload.roll_posicion.length,
 		roll_tecnica: payload.roll_tecnica.length,
-		grafo_layout: payload.grafo_layout.length
+		grafo_layout: payload.grafo_layout.length,
+		app_settings: payload.app_settings.length
 	};
 }
 
@@ -373,5 +389,9 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 			 VALUES (?, ?, ?, ?)`,
 			[gl.entidad_id, gl.kind, gl.x, gl.y]
 		);
+	}
+
+	for (const s of payload.app_settings) {
+		await run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [s.key, s.value]);
 	}
 }

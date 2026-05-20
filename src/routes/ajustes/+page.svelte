@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { Switch } from 'bits-ui';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { theme } from '$lib/theme.svelte';
+	import { settings } from '$lib/settings.svelte';
 
 	let schemaVersion = $state<number | null>(null);
 	let busy = $state<'export' | 'import' | null>(null);
@@ -16,7 +18,22 @@
 		} catch (err) {
 			console.error('[ajustes] no se pudo leer schema_version:', err);
 		}
+		// T-1.it6: hidrata el state reactivo de settings desde BD.
+		// Idempotente; si otro consumidor ya lo invocó, no hay nuevo round-trip.
+		try {
+			await settings.init();
+		} catch (err) {
+			console.error('[ajustes] no se pudo cargar settings:', err);
+		}
 	});
+
+	async function onToggleModoAvanzado(v: boolean) {
+		try {
+			await settings.setModoAvanzado(v);
+		} catch (err) {
+			console.error('[ajustes] no se pudo persistir modo_avanzado:', err);
+		}
+	}
 
 	function todayStamp(): string {
 		const d = new Date();
@@ -192,6 +209,40 @@
 			{message.text}
 		</div>
 	{/if}
+
+	<!--
+	  T-1.it6: toggle "Vista avanzada". Persiste el flag en BD (tabla
+	  `app_settings`) vía `settings.setModoAvanzado()`. En T-1 no hay
+	  consumidores aún; conectar wizards/home es T-2 y T-3.
+
+	  Switch de bits-ui directo (sin wrapper local en `components/ui/`):
+	  un solo sitio de uso, y bits-ui ya provee la primitive accesible.
+	  Si el Switch aparece en más sitios, se promueve a wrapper.
+	-->
+	<section class="space-y-3 rounded border border-border p-4">
+		<div class="flex items-start justify-between gap-3">
+			<div class="flex-1 space-y-1">
+				<label for="modo-avanzado-switch" class="text-sm font-semibold text-foreground">
+					Vista avanzada
+				</label>
+				<p class="text-sm text-muted-foreground">
+					Muestra estadísticas en el inicio y campos opcionales en formularios.
+				</p>
+			</div>
+			<Switch.Root
+				id="modo-avanzado-switch"
+				checked={settings.modoAvanzado}
+				onCheckedChange={onToggleModoAvanzado}
+				disabled={!settings.initialized}
+				aria-label="Vista avanzada"
+				class="peer relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
+			>
+				<Switch.Thumb
+					class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+				/>
+			</Switch.Root>
+		</div>
+	</section>
 
 	<!--
 	  M7: selector de tema. Auto sigue `prefers-color-scheme` del SO. Claro /
