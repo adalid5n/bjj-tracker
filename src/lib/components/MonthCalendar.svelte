@@ -33,11 +33,19 @@
 	let {
 		selectedDate,
 		onSelectDate,
-		markers = new Set<string>()
+		markers = new Set<string>(),
+		compact = $bindable(false)
 	}: {
 		selectedDate: string;
 		onSelectDate: (iso: string) => void;
 		markers?: Set<string>;
+		/**
+		 * Estado compact expuesto al padre (T-1.it5 fix desktop, sesión actual).
+		 * El propio MonthCalendar lo escribe scroll-driven; el padre lo lee
+		 * para compensar el flow (p. ej. margin-top en la lista de sesiones
+		 * para que no queden ocultas tras el calendar sticky).
+		 */
+		compact?: boolean;
 	} = $props();
 
 	// ── Helpers de fecha ──────────────────────────────────────────────
@@ -60,7 +68,7 @@
 	}
 
 	// ── Estado ────────────────────────────────────────────────────────
-	let compact = $state(false);
+	// `compact` se declara arriba como prop bindable.
 
 	// Mes visible: día 1 del mes en curso. Inicial = mes del día seleccionado.
 	let viewMonth = $state<CalendarDate>(

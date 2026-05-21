@@ -76,6 +76,9 @@
 		mode = 'stack',
 		posicionId,
 		parentForComplementaria,
+		isComplementariaSubWizard = false,
+		isSubWizard = false,
+		onCreateNewComplementaria,
 		onSaved,
 		onRequestClose,
 		onDirtyChange
@@ -85,15 +88,29 @@
 		// `mapaModalStack`; 'standalone' usa solo callbacks.
 		mode?: 'stack' | 'standalone';
 		posicionId?: string;
-		// Si el sub-wizard se abrió desde "+ Crear nueva" del paso de
-		// Complementaria de otro PosicionWizard: id del padre.
-		// Bajo este flag (T-1.it2 fix): (1) se salta el paso 4 del sub
-		// (la complementaria es implícita = padre), (2) la nueva posición
-		// se crea con `posicion_complementaria_id = padre` y la simetría
-		// la aplica `syncComplementaria`, (3) el sub NO usa
-		// `posicionWizardDraft` para no pisar el draft del padre — así
-		// el padre, al remontarse tras el pop, restaura su `currentStep`.
+		// Id del padre cuando el sub-wizard se abre desde "+ Crear nueva
+		// complementaria" Y el padre ya existe en BD (modo editar o ya
+		// guardado). Si existe: `posicion_complementaria_id = padre` al
+		// guardar el sub, `syncComplementaria` aplica simetría.
+		// Si el padre todavía no existe (modo crear sin id), queda undefined
+		// y el sub se guarda con complementaria=null; el padre sincroniza
+		// cuando él mismo se guarde.
 		parentForComplementaria?: string;
+		// True si vengo de "+ Crear nueva complementaria" (con o sin id del
+		// padre). Bajo este flag se salta el paso 4 (Complementaria) del sub
+		// porque la complementaria está implícita = el padre.
+		isComplementariaSubWizard?: boolean;
+		// True si soy un sub-wizard en el stack (stack.length > 1, lo decide
+		// el host). Bajo este flag NO leo ni escribo `posicionWizardDraft`
+		// para no pisar el del primer wizard-posicion del stack — así el
+		// padre, al remontarse tras el pop, restaura su `currentStep` y demás.
+		isSubWizard?: boolean;
+		// Solo en modo `standalone`: callback que el wizard invoca cuando el
+		// usuario pulsa "+ Crear nueva" en el paso Complementaria. El padre
+		// (PosicionWizardDialog) abre un sub-Dialog y, al guardarse, llama
+		// `onResult(newId)`. Si está undefined, el botón "+ Crear nueva" no
+		// aparece (igual que pasaba en stack antes de T-1.it2).
+		onCreateNewComplementaria?: (onResult: (newId: string) => void) => void;
 		// Hook para que el host invalide su cache tras guardar/crear.
 		// id = id de la posición creada/editada; mode permite distinguir.
 		// En `standalone`, además, el padre cierra el Dialog tras esto.
@@ -127,11 +144,12 @@
 
 	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria, 5=Notas.
 	// El paso 5 (Notas) solo aparece en modo avanzado (T-3.it6).
-	// Cuando el wizard es un sub-wizard de "+ Crear nueva complementaria" (T-1.it2
-	// fix), el paso 4 se salta — la complementaria es implícita (el padre).
-	// El último paso visible siempre es el que renderiza "Guardar".
+	// Cuando el wizard es un sub-wizard de "+ Crear nueva complementaria"
+	// (con o sin id del padre), el paso 4 se salta — la complementaria es
+	// implícita (el padre). El último paso visible siempre es el que renderiza
+	// "Guardar".
 	const visibleSteps = $derived<number[]>(
-		parentForComplementaria !== undefined
+		isComplementariaSubWizard
 			? settings.modoAvanzado ? [1, 2, 3, 5] : [1, 2, 3]
 			: settings.modoAvanzado ? [1, 2, 3, 4, 5] : [1, 2, 3, 4]
 	);
@@ -237,12 +255,12 @@
 		// nueva posición" en el paso de complementaria). Sin esto el
 		// usuario perdería todo lo que llevaba escrito.
 		//
-		// El sub-wizard (parentForComplementaria definido) NO lee draft
-		// para no acoplarse al draft del padre (escenarios cruzados).
+		// Los sub-wizards (isSubWizard=true) NO leen el draft: pertenece al
+		// primer wizard-posicion del stack y no debemos pisarlo. Cubre tanto
+		// "+ Crear nueva complementaria" anidada como sub-wizards de posición
+		// pusheados por el TecnicaWizard.
 		const draft =
-			mode === 'stack' && parentForComplementaria === undefined
-				? posicionWizardDraft.value
-				: null;
+			mode === 'stack' && !isSubWizard ? posicionWizardDraft.value : null;
 		if (draft && draft.key === draftKey) {
 			nombre = draft.nombre;
 			categoria = draft.categoria;
@@ -329,11 +347,10 @@
 	// así que el PosicionWizard padre se desmonta y luego se remonta al
 	// volver. Sin esto el usuario perdería todo lo escrito.
 	//
-	// El sub-wizard (parentForComplementaria definido) NO escribe el
-	// draft — pisaría el del padre y al remontarse el padre perdería
-	// `currentStep` y demás.
+	// Los sub-wizards (isSubWizard=true) NO escriben el draft — pisarían el
+	// del padre y al remontarse el padre perdería `currentStep` y demás.
 	$effect(() => {
-		if (mode !== 'stack' || status !== 'ready' || parentForComplementaria !== undefined) return;
+		if (mode !== 'stack' || status !== 'ready' || isSubWizard) return;
 		posicionWizardDraft.set({
 			key: draftKey,
 			nombre,
@@ -396,6 +413,17 @@
 		}
 	}
 
+	function handleStandaloneCreateNewComplementaria() {
+		// Patrón equivalente al stack pero sin `mapaModalStack`: el padre
+		// (PosicionWizardDialog) abre un sub-Dialog anidado y nos pasa el id
+		// del recién creado por callback. Igual que el stack, escribimos al
+		// state local (la instancia no se desmonta en standalone, así que la
+		// asignación es lo único que necesitamos).
+		onCreateNewComplementaria?.((newId) => {
+			complementariaId = newId;
+		});
+	}
+
 	function handleCreateNewComplementaria() {
 		// Patrón "+ Crear nueva inline" (T-10): registramos un returnHandler
 		// que recibirá el id de la nueva posición cuando el sub-wizard
@@ -412,16 +440,18 @@
 				posicionWizardDraft.set({ ...current, complementariaId: newId });
 			}
 		});
-		// Si el padre ya está creado (modo editar → tiene posicionId), se
-		// pasa al sub-wizard como `parentForComplementaria`: el sub salta
-		// el paso de complementaria y la vincula automáticamente. Si el
-		// padre todavía no tiene id (modo crear), el sub abre con su flujo
-		// completo de 5 pasos.
+		// `isComplementariaSubWizard: true` siempre — el sub salta el paso 4
+		// (Complementaria) porque su complementaria implícita es el padre.
+		// `parentForComplementaria`: id del padre si ya existe (modo editar
+		// o ya guardado). Si el padre todavía no tiene id (modo crear), va
+		// undefined: el sub guarda con complementaria=null y la simetría se
+		// aplica cuando el padre se guarde (`syncComplementaria`).
 		mapaModalStack.push({
 			kind: 'wizard-posicion',
 			modo: 'crear',
 			nombre: 'Nueva posición',
-			parentForComplementaria: posicionId
+			parentForComplementaria: posicionId,
+			isComplementariaSubWizard: true
 		});
 	}
 
@@ -621,12 +651,11 @@
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.
 					mapaModalStack.setDirtyHandler(null);
-					// Limpia el draft solo si NO somos un sub-wizard inline
-					// — el sub no escribió al draft (para no pisar el del
-					// padre), así que tampoco debe limpiarlo. El draft del
-					// padre tiene que sobrevivir hasta que el padre se
-					// remonte y lo lea.
-					if (parentForComplementaria === undefined) {
+					// Limpia el draft solo si NO somos sub-wizard — el sub no
+					// escribió al draft (para no pisar el del padre), así que
+					// tampoco debe limpiarlo. El draft del padre tiene que
+					// sobrevivir hasta que el padre se remonte y lo lea.
+					if (!isSubWizard) {
 						posicionWizardDraft.clear();
 					}
 					// El callback `onSaved` puede leerse en el host para invalidar
@@ -803,7 +832,11 @@
 					searchPlaceholder="Buscar posición…"
 					emptyMessage="No hay posiciones disponibles."
 					ariaLabel="Posición complementaria"
-					onCreateNew={mode === 'stack' ? handleCreateNewComplementaria : undefined}
+					onCreateNew={mode === 'stack'
+						? handleCreateNewComplementaria
+						: onCreateNewComplementaria
+							? handleStandaloneCreateNewComplementaria
+							: undefined}
 					createNewLabel="Crear nueva posición"
 				/>
 				<p class="text-xs text-muted-foreground">
@@ -950,7 +983,11 @@
 						searchPlaceholder="Buscar posición…"
 						emptyMessage="No hay posiciones disponibles."
 						ariaLabel="Posición complementaria"
-						onCreateNew={mode === 'stack' ? handleCreateNewComplementaria : undefined}
+						onCreateNew={mode === 'stack'
+						? handleCreateNewComplementaria
+						: onCreateNewComplementaria
+							? handleStandaloneCreateNewComplementaria
+							: undefined}
 						createNewLabel="Crear nueva posición"
 					/>
 					<p class="text-xs text-muted-foreground">

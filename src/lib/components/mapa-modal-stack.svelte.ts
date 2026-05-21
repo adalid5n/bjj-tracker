@@ -24,13 +24,24 @@ export type MapaModalEntry =
 			nombre: string;
 			/**
 			 * Si el sub-wizard se abre desde "+ Crear nueva" del paso
-			 * Complementaria de otro PosicionWizard, este id es el del padre.
-			 * Bajo este flag: (1) se salta el paso de Complementaria del sub
-			 * (es implícita = padre), (2) se vincula bidireccionalmente al
-			 * guardar, (3) el sub no toca `posicionWizardDraft` para no pisar
-			 * el draft del padre. Ver T-1.it2 fix.
+			 * Complementaria de otro PosicionWizard YA EXISTENTE (modo editar
+			 * o ya guardado), este id es el del padre. La simetría
+			 * bidireccional la aplica `syncComplementaria` al guardar el sub.
+			 *
+			 * Si el padre todavía no existe (está en modo crear, sin id), este
+			 * campo queda `undefined`. El sub se guarda con
+			 * `posicion_complementaria_id = null` y la simetría se aplica
+			 * cuando el padre se guarda (también vía `syncComplementaria`).
 			 */
 			parentForComplementaria?: string;
+			/**
+			 * Indica que este sub-wizard vino de "+ Crear nueva complementaria"
+			 * (con o sin id del padre). Bajo este flag se salta el paso 4
+			 * (Complementaria) del sub porque la complementaria está implícita
+			 * (el padre). Distinto de `isSubWizard` (que solo dice "soy sub
+			 * por estar en stack.length > 1, no toques draft del padre").
+			 */
+			isComplementariaSubWizard?: boolean;
 	  }
 	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string }
 	| { kind: 'wizard-sumision'; modo: 'crear'; nombre: string }

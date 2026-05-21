@@ -39,16 +39,24 @@
 
 	let {
 		modo,
+		mode = 'stack',
 		sumisionId,
 		onSaved,
-		onRequestClose
+		onRequestClose,
+		onDirtyChange
 	}: {
 		modo: 'crear' | 'editar';
+		// Modo de integración con el padre. 'stack' usa `mapaModalStack`;
+		// 'standalone' usa solo callbacks (mismo patrón que PosicionWizard).
+		mode?: 'stack' | 'standalone';
 		sumisionId?: string;
 		// Hook para que el host invalide su cache tras guardar/crear.
 		onSaved?: (id: string, modo: 'crear' | 'editar') => void;
 		// Hook para que el host pida cerrar el stack desde aquí (Cancelar).
 		onRequestClose?: () => void;
+		// Solo `standalone`: informa al padre del estado dirty para que
+		// pueda mostrar el confirm de descartar al cerrar el Dialog.
+		onDirtyChange?: (isDirty: boolean) => void;
 	} = $props();
 
 	// T-3.it6: en modo avanzado el wizard incluye paso 2 (Notas opcional).
@@ -91,9 +99,11 @@
 
 	onMount(async () => {
 		settings.init();
-		// Registra el dirty handler en el stack para que el host lo
-		// consulte antes de cerrar / hacer pop a una entrada anterior.
-		mapaModalStack.setDirtyHandler(() => isDirty);
+		// Registra el dirty handler en el stack (solo `stack`). En
+		// `standalone` el padre se entera vía `onDirtyChange`.
+		if (mode === 'stack') {
+			mapaModalStack.setDirtyHandler(() => isDirty);
+		}
 		if (typeof document !== 'undefined') document.addEventListener('keydown', handleDocumentEnter, true);
 
 		// Carga el catálogo en paralelo con la posible carga de la sumisión
@@ -137,7 +147,9 @@
 	});
 
 	onDestroy(() => {
-		mapaModalStack.setDirtyHandler(null);
+		if (mode === 'stack') {
+			mapaModalStack.setDirtyHandler(null);
+		}
 		if (typeof document !== 'undefined') document.removeEventListener('keydown', handleDocumentEnter, true);
 	});
 
@@ -148,6 +160,13 @@
 		nombre.trim() !== snapshot.nombre.trim() ||
 			(settings.modoAvanzado && notas.trim() !== snapshot.notas.trim())
 	);
+
+	// En `standalone`, propaga dirty al padre cada vez que cambia.
+	$effect(() => {
+		if (mode === 'standalone') {
+			onDirtyChange?.(isDirty);
+		}
+	});
 
 	// Limpia el error inline cuando el usuario edita el nombre. Antes esto
 	// vivía en un `$effect` que leía `nombre` para "trackear" cambios, pero
@@ -269,7 +288,7 @@
 		// El host se encarga de preguntar "¿descartar cambios?" si procede.
 		if (onRequestClose) {
 			onRequestClose();
-		} else {
+		} else if (mode === 'stack') {
 			mapaModalStack.pop();
 		}
 	}
@@ -302,23 +321,28 @@
 					nombre: nombreFinal,
 					notas: notasFinal
 				});
-				onSaved?.(nueva.id, 'crear');
-				// Tras guardar ya no hay cambios pendientes: desactiva el
-				// dirty handler antes de cerrar para no disparar el prompt.
-				mapaModalStack.setDirtyHandler(null);
-				// T-10: si hay un return handler registrado (caso típico:
-				// el wizard de técnica abrió este sub-wizard desde "+ Crear
-				// nueva sumisión" en el paso de destino), salimos del wizard
-				// con `pop` y le pasamos el nuevo id al handler — en lugar
-				// de hacer el `closeAll + push modal` habitual, que rompería
-				// el flujo dejando al usuario en el modal de la nueva sumisión.
-				if (mapaModalStack.hasReturnHandler()) {
-					mapaModalStack.pop();
-					mapaModalStack.invokeReturnHandler(nueva.id, 'sumision');
+				if (mode === 'stack') {
+					onSaved?.(nueva.id, 'crear');
+					mapaModalStack.setDirtyHandler(null);
+					// T-10: si hay un return handler registrado (caso típico:
+					// el wizard de técnica abrió este sub-wizard desde "+ Crear
+					// nueva sumisión" en el paso de destino), salimos del wizard
+					// con `pop` y le pasamos el nuevo id al handler — en lugar
+					// de hacer el `closeAll + push modal` habitual, que rompería
+					// el flujo dejando al usuario en el modal de la nueva sumisión.
+					if (mapaModalStack.hasReturnHandler()) {
+						mapaModalStack.pop();
+						mapaModalStack.invokeReturnHandler(nueva.id, 'sumision');
+					} else {
+						// Cierra el wizard y abre el modal de la sumisión creada.
+						mapaModalStack.closeAll();
+						mapaModalStack.push({ kind: 'sumision', id: nueva.id, nombre: nueva.nombre });
+					}
 				} else {
-					// Cierra el wizard y abre el modal de la sumisión creada.
-					mapaModalStack.closeAll();
-					mapaModalStack.push({ kind: 'sumision', id: nueva.id, nombre: nueva.nombre });
+					// `standalone`: el padre decide qué hacer (típicamente cerrar
+					// su Dialog). Reportamos no-dirty para suprimir el confirm.
+					onDirtyChange?.(false);
+					onSaved?.(nueva.id, 'crear');
 				}
 			} else {
 				if (!sumisionId) {
@@ -334,10 +358,14 @@
 					notas: notasFinal
 				};
 				await updateSumision(update);
-				onSaved?.(sumisionId, 'editar');
-				mapaModalStack.setDirtyHandler(null);
-				// Vuelve al modal anterior (la sumisión que se estaba viendo).
-				mapaModalStack.pop();
+				if (mode === 'stack') {
+					onSaved?.(sumisionId, 'editar');
+					mapaModalStack.setDirtyHandler(null);
+					mapaModalStack.pop();
+				} else {
+					onDirtyChange?.(false);
+					onSaved?.(sumisionId, 'editar');
+				}
 			}
 		} catch (err) {
 			if (isUniqueError(err)) {

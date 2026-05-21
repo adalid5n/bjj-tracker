@@ -97,7 +97,7 @@
 
 	const mode = $derived<'wizard' | 'form'>(roll ? 'form' : 'wizard');
 	// Pasos actuales (wizard, modo crear):
-	// 1=Compañero, 2=Posiciones, 3=Técnicas, 4=Tamaño, 5=Resultado, 6=Duración.
+	// 1=Compañero, 2=Tamaño, 3=Posiciones, 4=Técnicas, 5=Resultado, 6=Duración.
 	// El paso 6 (Duración) solo aparece en modo avanzado (T-3.it6). En
 	// hobbyist el wizard tiene 5 pasos; en avanzado 6.
 	const visibleSteps = $derived<number[]>(
@@ -153,13 +153,6 @@
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
 
-	// Bandera consumida al salir del paso 2 (posiciones problema) para
-	// saltarse el paso 3 (tamaño) si el compañero ya tenía peso
-	// preconfigurado. Antes de T-12 el "skip tamaño" se aplicaba directamente
-	// al hacer `advance()` desde el paso 1 (tamaño era el paso 2). Ahora
-	// posiciones se intercala entre los dos, así que diferimos el skip.
-	let pendingSkipTamano = $state(false);
-
 	let showExtraData = $state(false);
 	let extraDataCompaneroId = $state<string | null>(null);
 	let extraCinturon = $state<Cinturon | null>(null);
@@ -196,7 +189,6 @@
 			crearTecnicaOpen = false;
 			cualResultadoCrear = 'fue_bien';
 			cualResultadoCrearPosicion = 'fue_bien';
-			pendingSkipTamano = false;
 			// Reset de tabs/buscadores para que al abrir el editor siempre
 			// arranquemos en "Fue bien" sin texto residual de una sesión
 			// anterior del Dialog.
@@ -214,7 +206,7 @@
 		const c = companeros.find((c) => c.id === companeroId);
 		// Pisar el chip de tamaño con el peso del compañero al cambiarlo,
 		// aunque ya hubiera un valor (típicamente del compañero anterior).
-		// El usuario puede cambiarlo manualmente en el paso 3 si quiere.
+		// El usuario puede cambiarlo manualmente en el paso 2 si quiere.
 		if (c?.peso_relativo) {
 			tamanoRelativo = c.peso_relativo;
 		}
@@ -442,7 +434,6 @@
 
 	async function handleExtraDataContinue() {
 		const id = extraDataCompaneroId;
-		const skipTamano = !!extraPeso;
 		if (id) {
 			const created = companeros.find((c) => c.id === id);
 			const hasExtras = extraCinturon || extraPeso || extraNotas.trim();
@@ -476,29 +467,16 @@
 		}
 		showExtraData = false;
 		extraDataCompaneroId = null;
+		// Compañero recién creado: saltamos el paso Tamaño (paso 2). Si
+		// rellenó peso en extras, ya quedó asignado a `tamanoRelativo`
+		// arriba; si no, lo añadirá editando el compañero más tarde.
 		advance();
-		// Antes de T-12 aquí hacíamos un `advance()` extra para saltar
-		// tamaño cuando ya teníamos peso preconfigurado. Ahora entre
-		// compañero (1) y tamaño (3) está posiciones (2), así que no
-		// saltamos en línea: dejamos la bandera y la consumimos al salir
-		// del paso 2.
-		if (skipTamano) pendingSkipTamano = true;
+		advance();
 	}
 
 	function handleTamanoChange(v: string | null) {
 		tamanoRelativo = (v ?? undefined) as PesoRelativo | undefined;
 		if (v && mode === 'wizard') advance();
-	}
-
-	function handleAdvanceFromPosiciones() {
-		// Sale del paso 2 (posiciones-problema) hacia el siguiente. Si el
-		// compañero traía peso preconfigurado, consumimos la bandera y
-		// saltamos el paso 3 (tamaño).
-		advance();
-		if (pendingSkipTamano) {
-			pendingSkipTamano = false;
-			advance();
-		}
 	}
 
 	function handleResultadoChange(v: string | null) {
@@ -549,18 +527,19 @@
 			return;
 		}
 		if (currentStep === 2) {
+			// Paso Tamaño relativo (skippable).
 			intercept();
-			handleAdvanceFromPosiciones();
+			advance();
 			return;
 		}
 		if (currentStep === 3) {
-			// Paso Técnicas (movido tras Posiciones).
+			// Paso Posiciones (skippable).
 			intercept();
 			advance();
 			return;
 		}
 		if (currentStep === 4) {
-			// Paso Tamaño relativo.
+			// Paso Técnicas (skippable).
 			intercept();
 			advance();
 			return;
@@ -753,15 +732,24 @@
 										}}
 									/>
 								</div>
-								<Button class="w-full" onclick={handleExtraDataContinue} disabled={saving}>
-									Continuar
-								</Button>
 							</div>
 						{/if}
 					</div>
 				{/if}
 
 				{#if currentStep === 2}
+					<div class="space-y-3">
+						<h3 class="text-sm font-semibold">Tamaño relativo</h3>
+						<Chips
+							options={PESOS}
+							value={tamanoRelativo ?? null}
+							onChange={handleTamanoChange}
+							ariaLabel="Tamaño relativo"
+						/>
+					</div>
+				{/if}
+
+				{#if currentStep === 3}
 					<!-- T-3.it2.c: paso de posiciones unificado en un solo
 					     buscador + tabs "Fue bien" / "Fue mal". Skippable.
 					     El chip "+ Crear nueva" interno del ChipPicker añade
@@ -855,7 +843,7 @@
 					</div>
 				{/if}
 
-				{#if currentStep === 3}
+				{#if currentStep === 4}
 					<!-- T-3.it2.c: técnicas unificadas en un solo buscador +
 					     tabs "Fue bien" / "Fue mal". El chip "+ Crear nueva"
 					     interno añade al set del tab activo. -->
@@ -942,18 +930,6 @@
 					</div>
 				{/if}
 
-				{#if currentStep === 4}
-					<div class="space-y-3">
-						<h3 class="text-sm font-semibold">Tamaño relativo</h3>
-						<Chips
-							options={PESOS}
-							value={tamanoRelativo ?? null}
-							onChange={handleTamanoChange}
-							ariaLabel="Tamaño relativo"
-						/>
-					</div>
-				{/if}
-
 				{#if currentStep === 5}
 					<div class="space-y-3">
 						<h3 class="text-sm font-semibold">Resultado *</h3>
@@ -1019,13 +995,15 @@
 					<Button size="sm" onclick={handleSave} disabled={!canSaveWizard}>
 						{saving ? 'Guardando…' : 'Guardar'}
 					</Button>
-				{:else if currentStep === 2}
-					<Button size="sm" onclick={handleAdvanceFromPosiciones} disabled={!canAdvance}>
-						Continuar
-					</Button>
+				{:else if currentStep === 1 && showExtraData}
+					<!-- Sub-form de extras del compañero recién creado: el
+					     Continuar del footer procesa los extras (peso, cinturón,
+					     notas), preselecciona el tamaño relativo si hay peso y
+					     salta el paso Tamaño. -->
+					<Button size="sm" onclick={handleExtraDataContinue} disabled={saving}>Continuar</Button>
 				{:else}
-					<!-- Resto de pasos (incluido el 1): botón Continuar uniforme,
-					     disabled si !canAdvance (paso 1 = sin compañero seleccionado). -->
+					<!-- Resto de pasos: botón Continuar uniforme. Disabled si
+					     !canAdvance (paso 1 = sin compañero seleccionado). -->
 					<Button size="sm" onclick={advance} disabled={!canAdvance}>Continuar</Button>
 				{/if}
 			</Dialog.Footer>
@@ -1043,8 +1021,18 @@
 						/>
 					</div>
 
+				<div class="space-y-1.5">
+					<Label>Tamaño relativo</Label>
+					<Chips
+						options={PESOS}
+						value={tamanoRelativo ?? null}
+						onChange={(v) => (tamanoRelativo = (v ?? undefined) as PesoRelativo | undefined)}
+						ariaLabel="Tamaño relativo"
+					/>
+				</div>
+
 				<!-- T-3.it2.c: posiciones unificadas (modo editar). Mismo
-				     patrón que el paso 2 del wizard: un buscador + tabs +
+				     patrón que el paso 3 del wizard: un buscador + tabs +
 				     un único ChipPicker. -->
 				<div class="space-y-4">
 					<h3 class="text-sm font-semibold">Posiciones</h3>
@@ -1131,7 +1119,7 @@
 				</div>
 
 				<!-- T-3.it2.c: técnicas unificadas (modo editar). Mismo
-				     patrón que el paso 3 del wizard. El Input legacy de
+				     patrón que el paso 4 del wizard. El Input legacy de
 				     "Posiciones donde tuve problema" se eliminó — la columna
 				     BD se preserva intacta. -->
 				<div class="space-y-4">
@@ -1214,16 +1202,6 @@
 							accent="warning"
 						/>
 					{/if}
-				</div>
-
-				<div class="space-y-1.5">
-					<Label>Tamaño relativo</Label>
-					<Chips
-						options={PESOS}
-						value={tamanoRelativo ?? null}
-						onChange={(v) => (tamanoRelativo = (v ?? undefined) as PesoRelativo | undefined)}
-						ariaLabel="Tamaño relativo"
-					/>
 				</div>
 
 				<div class="space-y-1.5">

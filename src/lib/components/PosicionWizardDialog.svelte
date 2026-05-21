@@ -22,12 +22,15 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import PosicionWizard from './PosicionWizard.svelte';
+	import PosicionWizardDialogSelf from './PosicionWizardDialog.svelte';
 	import type { Posicion } from '$lib/types';
 
 	let {
 		open = $bindable(false),
 		onSaved,
-		onCancel
+		onCancel,
+		isComplementariaSubWizard = false,
+		allowCreateNewComplementaria = true
 	}: {
 		open?: boolean;
 		// Se invoca cuando el wizard guarda con éxito. El padre puede usar
@@ -37,10 +40,40 @@
 		// Opcional: se invoca cuando el usuario cierra sin guardar (ya
 		// confirmó el descarte si había cambios).
 		onCancel?: () => void;
+		// Se pasa al PosicionWizard interno: bajo este flag se salta el paso
+		// 4 (Complementaria). Lo usa el propio Dialog al renderizar un
+		// sub-Dialog anidado para "+ Crear nueva complementaria".
+		isComplementariaSubWizard?: boolean;
+		// Si true, el wizard interno expone "+ Crear nueva" en el paso
+		// Complementaria → abre un sub-Dialog anidado. Lo apagamos para el
+		// sub-Dialog para limitar la profundidad a 1 nivel (sin recursión).
+		allowCreateNewComplementaria?: boolean;
 	} = $props();
 
 	let isDirty = $state(false);
 	let mostrarConfirmDescartar = $state(false);
+
+	// Sub-Dialog anidado para "+ Crear nueva complementaria" en standalone.
+	// El wizard interno invoca `requestCreateComplementaria(onResult)`. Aquí
+	// guardamos `onResult` y abrimos el sub. Cuando el sub guarda, llamamos
+	// al callback con el id y cerramos el sub.
+	let subWizardOpen = $state(false);
+	let onComplementariaResult: ((id: string) => void) | null = null;
+
+	function requestCreateComplementaria(onResult: (id: string) => void) {
+		onComplementariaResult = onResult;
+		subWizardOpen = true;
+	}
+
+	async function handleSubWizardSaved(p: Posicion) {
+		subWizardOpen = false;
+		onComplementariaResult?.(p.id);
+		onComplementariaResult = null;
+	}
+
+	function handleSubWizardCancel() {
+		onComplementariaResult = null;
+	}
 
 	function handleOpenChange(value: boolean) {
 		// Fallback: bits-ui llama aquí desde el botón ✕ (que no pasa por
@@ -140,6 +173,10 @@
 			<PosicionWizard
 				modo="crear"
 				mode="standalone"
+				{isComplementariaSubWizard}
+				onCreateNewComplementaria={allowCreateNewComplementaria
+					? requestCreateComplementaria
+					: undefined}
 				onSaved={handleWizardSaved}
 				onRequestClose={handleWizardRequestClose}
 				onDirtyChange={handleDirtyChange}
@@ -147,6 +184,26 @@
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<!--
+  Sub-Dialog anidado para "+ Crear nueva complementaria" en standalone.
+  Pasamos:
+    - isComplementariaSubWizard: el wizard interno salta el paso 4
+      (Complementaria implícita = la posición padre que se está creando).
+    - allowCreateNewComplementaria=false: limita la profundidad a 1 nivel;
+      el sub no expone "+ Crear nueva" para evitar recursión infinita.
+  El padre standalone (PosicionWizardDialog principal) NO se desmonta cuando
+  el sub está abierto, así que su state sobrevive sin necesidad de draft.
+-->
+{#if subWizardOpen}
+	<PosicionWizardDialogSelf
+		bind:open={subWizardOpen}
+		onSaved={handleSubWizardSaved}
+		onCancel={handleSubWizardCancel}
+		isComplementariaSubWizard={true}
+		allowCreateNewComplementaria={false}
+	/>
+{/if}
 
 <AlertDialog.Root open={mostrarConfirmDescartar} onOpenChange={handleAlertOpenChange}>
 	<AlertDialog.Content>

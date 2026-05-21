@@ -64,7 +64,10 @@
 		posicionOrigenId: posicionOrigenIdProp,
 		onSaved,
 		onRequestClose,
-		onDirtyChange
+		onDirtyChange,
+		onCreateNewPosicionOrigen,
+		onCreateNewPosicionDestino,
+		onCreateNewSumisionDestino
 	}: {
 		modo: 'crear' | 'editar';
 		// T-3.it2: modo de integración con el padre.
@@ -88,6 +91,14 @@
 		// Solo `standalone`: propaga `isDirty` al padre para que muestre
 		// el confirm de descartar cambios al intentar cerrar el Dialog.
 		onDirtyChange?: (isDirty: boolean) => void;
+		// Solo `standalone`: callbacks para "+ Crear nueva" en los tres
+		// pasos donde aparece. El padre (`TecnicaWizardDialog`) abre un
+		// sub-Dialog y llama `onResult(newId)` cuando el sub guarda; nosotros
+		// asignamos el id al state correspondiente. Si están undefined, los
+		// botones "+ Crear nueva" no aparecen en standalone.
+		onCreateNewPosicionOrigen?: (onResult: (newId: string) => void) => void;
+		onCreateNewPosicionDestino?: (onResult: (newId: string) => void) => void;
+		onCreateNewSumisionDestino?: (onResult: (newId: string) => void) => void;
 	} = $props();
 
 	const TIPOS: { value: TipoTecnica; label: string }[] = [
@@ -610,6 +621,37 @@
 		});
 	}
 
+	// Equivalentes standalone: el padre (`TecnicaWizardDialog`) gestiona un
+	// sub-Dialog y nos pasa el id por callback. La instancia del wizard NO
+	// se desmonta (no hay stack), así que no hace falta tocar el draft —
+	// solo actualizar catálogo + asignar al state local.
+	function handleStandaloneCreateNuevaPosicionOrigen() {
+		onCreateNewPosicionOrigen?.((newId) => {
+			void import('$lib/posiciones').then(async ({ listPosiciones }) => {
+				posiciones = await listPosiciones();
+			});
+			posicionOrigenId = newId;
+		});
+	}
+
+	function handleStandaloneCreateNuevaPosicion() {
+		onCreateNewPosicionDestino?.((newId) => {
+			void import('$lib/posiciones').then(async ({ listPosiciones }) => {
+				posiciones = await listPosiciones();
+			});
+			posicionDestinoId = newId;
+		});
+	}
+
+	function handleStandaloneCreateNuevaSumision() {
+		onCreateNewSumisionDestino?.((newId) => {
+			void import('$lib/sumisiones').then(async ({ listSumisiones }) => {
+				sumisiones = await listSumisiones();
+			});
+			sumisionDestinoId = newId;
+		});
+	}
+
 	// Idem para sumisión (rama tipo=sumision).
 	function handleCreateNuevaSumision() {
 		mapaModalStack.setReturnHandler((newId, kind) => {
@@ -962,7 +1004,11 @@
 				placeholder="Selecciona una posición…"
 				searchPlaceholder="Buscar posición…"
 				emptyMessage="Sin posiciones en el catálogo."
-				onCreateNew={mode === 'stack' ? handleCreateNuevaPosicionOrigen : undefined}
+				onCreateNew={mode === 'stack'
+						? handleCreateNuevaPosicionOrigen
+						: onCreateNewPosicionOrigen
+							? handleStandaloneCreateNuevaPosicionOrigen
+							: undefined}
 				createNewLabel="Crear nueva posición"
 				ariaLabel="Posición de origen"
 			/>
@@ -998,7 +1044,11 @@
 					placeholder="Selecciona una sumisión…"
 					searchPlaceholder="Buscar sumisión…"
 					emptyMessage="Sin sumisiones todavía."
-					onCreateNew={mode === 'stack' ? handleCreateNuevaSumision : undefined}
+					onCreateNew={mode === 'stack'
+						? handleCreateNuevaSumision
+						: onCreateNewSumisionDestino
+							? handleStandaloneCreateNuevaSumision
+							: undefined}
 					createNewLabel="Crear nueva sumisión"
 					ariaLabel="Sumisión de destino"
 				/>
@@ -1013,7 +1063,11 @@
 					placeholder="Selecciona una posición…"
 					searchPlaceholder="Buscar posición…"
 					emptyMessage="Sin posiciones en el catálogo."
-					onCreateNew={mode === 'stack' ? handleCreateNuevaPosicion : undefined}
+					onCreateNew={mode === 'stack'
+						? handleCreateNuevaPosicion
+						: onCreateNewPosicionDestino
+							? handleStandaloneCreateNuevaPosicion
+							: undefined}
 					createNewLabel="Crear nueva posición"
 					ariaLabel="Posición de destino"
 				/>
@@ -1176,7 +1230,11 @@
 						placeholder="Selecciona una posición…"
 						searchPlaceholder="Buscar posición…"
 						emptyMessage="Sin posiciones en el catálogo."
-						onCreateNew={mode === 'stack' ? handleCreateNuevaPosicionOrigen : undefined}
+						onCreateNew={mode === 'stack'
+						? handleCreateNuevaPosicionOrigen
+						: onCreateNewPosicionOrigen
+							? handleStandaloneCreateNuevaPosicionOrigen
+							: undefined}
 						createNewLabel="Crear nueva posición"
 						ariaLabel="Posición de origen"
 					/>
@@ -1202,7 +1260,11 @@
 							placeholder="Selecciona una sumisión…"
 							searchPlaceholder="Buscar sumisión…"
 							emptyMessage="Sin sumisiones todavía."
-							onCreateNew={mode === 'stack' ? handleCreateNuevaSumision : undefined}
+							onCreateNew={mode === 'stack'
+						? handleCreateNuevaSumision
+						: onCreateNewSumisionDestino
+							? handleStandaloneCreateNuevaSumision
+							: undefined}
 							createNewLabel="Crear nueva sumisión"
 							ariaLabel="Sumisión de destino"
 						/>
@@ -1214,7 +1276,11 @@
 							placeholder="Selecciona una posición…"
 							searchPlaceholder="Buscar posición…"
 							emptyMessage="Sin posiciones en el catálogo."
-							onCreateNew={mode === 'stack' ? handleCreateNuevaPosicion : undefined}
+							onCreateNew={mode === 'stack'
+						? handleCreateNuevaPosicion
+						: onCreateNewPosicionDestino
+							? handleStandaloneCreateNuevaPosicion
+							: undefined}
 							createNewLabel="Crear nueva posición"
 							ariaLabel="Posición de destino"
 						/>

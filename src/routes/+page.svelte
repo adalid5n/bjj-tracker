@@ -26,6 +26,11 @@
 	let editorOpen = $state(false);
 	let diaSeleccionado = $state(todayIso());
 	let initialized = $state(false);
+	// Estado compact del MonthCalendar (bind:compact). Se usa para empujar
+	// el bloque de sesiones hacia abajo cuando el calendar se queda sticky
+	// arriba con altura compactada — sin esto, las primeras sesiones quedan
+	// tapadas por el calendar opaco (sesión actual).
+	let calendarCompact = $state(false);
 
 	const DIA_STORAGE_KEY = 'home:diaSeleccionado';
 
@@ -151,9 +156,13 @@
 			selectedDate={diaSeleccionado}
 			onSelectDate={(iso) => (diaSeleccionado = iso)}
 			markers={diasConSesion}
+			bind:compact={calendarCompact}
 		/>
 
-		<section class="space-y-2">
+		<section
+			class="space-y-2"
+			style:margin-top={calendarCompact ? '13rem' : undefined}
+		>
 			<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
 				{dayHeaderLabel(diaSeleccionado)}
 			</h2>

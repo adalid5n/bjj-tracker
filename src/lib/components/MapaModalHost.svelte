@@ -483,19 +483,23 @@
 					<!--
 					  {#key} fuerza remount cuando se empuja un wizard-posicion
 					  encima de otro (caso "+ Crear nueva posición" inline desde
-					  el paso de complementaria). Sin esto, Svelte mantiene la
-					  misma instancia y solo actualiza props — el wizard sigue
-					  mostrando los datos del padre con el título cambiado a
-					  "Nueva posición". El `{#if}` de arriba no cambia de rama
-					  porque ambos tops son del mismo `kind`.
+					  el paso de complementaria, o desde el wizard de técnica).
+					  La clave incluye `stack.length` porque entre padre y sub
+					  ambos son `modo='crear'` con id undefined, así que sin el
+					  nivel del stack la expresión evaluaría constante y Svelte
+					  reusaría la instancia (manteniendo el state del padre).
 					-->
-					{#key top.modo === 'editar' ? `editar:${top.id}` : 'crear'}
+					{#key `${stack.length}:${top.modo === 'editar' ? `editar:${top.id}` : 'crear'}`}
 						<PosicionWizard
 							modo={top.modo}
 							posicionId={top.modo === 'editar' ? top.id : undefined}
 							parentForComplementaria={top.modo === 'crear'
 								? top.parentForComplementaria
 								: undefined}
+							isComplementariaSubWizard={top.modo === 'crear'
+								? top.isComplementariaSubWizard
+								: false}
+							isSubWizard={stack.length > 1}
 							onSaved={handlePosicionWizardSaved}
 							onRequestClose={handleWizardRequestClose}
 						/>

@@ -679,16 +679,18 @@
 							<MoveIcon class="size-4" />
 							<span class="hidden sm:inline">{grafoEditing ? 'Salir' : 'Mover nodos'}</span>
 						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onclick={handleReorganizar}
-							aria-label="Reorganizar grafo"
-							title="Reorganizar grafo"
-						>
-							<RefreshCwIcon class="size-4" />
-							<span class="hidden sm:inline">Reorganizar</span>
-						</Button>
+						{#if grafoEditing}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={handleReorganizar}
+								aria-label="Reorganizar grafo"
+								title="Reorganizar grafo"
+							>
+								<RefreshCwIcon class="size-4" />
+								<span class="hidden sm:inline">Reorganizar</span>
+							</Button>
+						{/if}
 						{#if grafoDirty}
 							<Button
 								variant="default"

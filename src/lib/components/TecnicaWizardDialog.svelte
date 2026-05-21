@@ -19,17 +19,20 @@
 	 * Restringido a modo `crear`: es el único caso de uso de T-3.it2. La
 	 * edición de técnicas se hace en `/mapa`.
 	 *
-	 * En `standalone` el TecnicaWizard NO expone los botones "+ Crear
-	 * nueva posición / + Crear nueva sumisión" en los pasos de origen y
-	 * destino (no queremos anidar Dialogs sobre Dialogs sin necesidad).
-	 * Si al usuario le falta una posición/sumisión, cancela, las crea en
-	 * `/mapa` y vuelve.
+	 * "+ Crear nueva posición / + Crear nueva sumisión" en los pasos de
+	 * origen y destino: el TecnicaWizard standalone invoca los callbacks
+	 * `onCreateNewPosicionOrigen / Destino / SumisionDestino`. Aquí abrimos
+	 * un sub-Dialog (PosicionWizardDialog / SumisionWizardDialog) y, al
+	 * guardarse, pasamos el id por el callback `onResult`. Los sub-Dialogs
+	 * NO permiten más recursión (limit de profundidad).
 	 */
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import TecnicaWizard from './TecnicaWizard.svelte';
-	import type { Tecnica } from '$lib/types';
+	import PosicionWizardDialog from './PosicionWizardDialog.svelte';
+	import SumisionWizardDialog from './SumisionWizardDialog.svelte';
+	import type { Tecnica, Posicion, SumisionTerminal } from '$lib/types';
 
 	let {
 		open = $bindable(false),
@@ -123,6 +126,61 @@
 	function handleDirtyChange(value: boolean) {
 		isDirty = value;
 	}
+
+	// Sub-Dialogs anidados para los tres "+ Crear nueva" del wizard. El
+	// wizard interno invoca el callback correspondiente, aquí guardamos el
+	// `onResult` y abrimos el sub. Al guardar, llamamos al callback con el id
+	// y cerramos. La instancia del TecnicaWizard no se desmonta — el state
+	// del usuario sobrevive sin necesidad de draft.
+	let subPosicionOrigenOpen = $state(false);
+	let subPosicionDestinoOpen = $state(false);
+	let subSumisionDestinoOpen = $state(false);
+	let onPosicionOrigenResult: ((id: string) => void) | null = null;
+	let onPosicionDestinoResult: ((id: string) => void) | null = null;
+	let onSumisionDestinoResult: ((id: string) => void) | null = null;
+
+	function requestCreatePosicionOrigen(onResult: (id: string) => void) {
+		onPosicionOrigenResult = onResult;
+		subPosicionOrigenOpen = true;
+	}
+
+	function requestCreatePosicionDestino(onResult: (id: string) => void) {
+		onPosicionDestinoResult = onResult;
+		subPosicionDestinoOpen = true;
+	}
+
+	function requestCreateSumisionDestino(onResult: (id: string) => void) {
+		onSumisionDestinoResult = onResult;
+		subSumisionDestinoOpen = true;
+	}
+
+	function handleSubPosicionOrigenSaved(p: Posicion) {
+		subPosicionOrigenOpen = false;
+		onPosicionOrigenResult?.(p.id);
+		onPosicionOrigenResult = null;
+	}
+
+	function handleSubPosicionDestinoSaved(p: Posicion) {
+		subPosicionDestinoOpen = false;
+		onPosicionDestinoResult?.(p.id);
+		onPosicionDestinoResult = null;
+	}
+
+	function handleSubSumisionDestinoSaved(s: SumisionTerminal) {
+		subSumisionDestinoOpen = false;
+		onSumisionDestinoResult?.(s.id);
+		onSumisionDestinoResult = null;
+	}
+
+	function handleSubPosicionOrigenCancel() {
+		onPosicionOrigenResult = null;
+	}
+	function handleSubPosicionDestinoCancel() {
+		onPosicionDestinoResult = null;
+	}
+	function handleSubSumisionDestinoCancel() {
+		onSumisionDestinoResult = null;
+	}
 </script>
 
 <Dialog.Root {open} onOpenChange={handleOpenChange}>
@@ -149,10 +207,47 @@
 				onSaved={handleWizardSaved}
 				onRequestClose={handleWizardRequestClose}
 				onDirtyChange={handleDirtyChange}
+				onCreateNewPosicionOrigen={requestCreatePosicionOrigen}
+				onCreateNewPosicionDestino={requestCreatePosicionDestino}
+				onCreateNewSumisionDestino={requestCreateSumisionDestino}
 			/>
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<!--
+  Sub-Dialogs anidados para "+ Crear nueva" en los pasos de origen/destino.
+  Cada uno se monta solo cuando se abre (`{#if}`) para no precargar wizards
+  innecesariamente. Los PosicionWizardDialog reciben
+  `allowCreateNewComplementaria={false}` para limitar la profundidad — sin
+  esto un usuario podría anidar 3 niveles de Dialog y volverse difícil de
+  cerrar.
+-->
+{#if subPosicionOrigenOpen}
+	<PosicionWizardDialog
+		bind:open={subPosicionOrigenOpen}
+		onSaved={handleSubPosicionOrigenSaved}
+		onCancel={handleSubPosicionOrigenCancel}
+		allowCreateNewComplementaria={false}
+	/>
+{/if}
+
+{#if subPosicionDestinoOpen}
+	<PosicionWizardDialog
+		bind:open={subPosicionDestinoOpen}
+		onSaved={handleSubPosicionDestinoSaved}
+		onCancel={handleSubPosicionDestinoCancel}
+		allowCreateNewComplementaria={false}
+	/>
+{/if}
+
+{#if subSumisionDestinoOpen}
+	<SumisionWizardDialog
+		bind:open={subSumisionDestinoOpen}
+		onSaved={handleSubSumisionDestinoSaved}
+		onCancel={handleSubSumisionDestinoCancel}
+	/>
+{/if}
 
 <AlertDialog.Root open={mostrarConfirmDescartar} onOpenChange={handleAlertOpenChange}>
 	<AlertDialog.Content>
