@@ -1,8 +1,87 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-21 (sesión 40, fix toast PWA — feedback visual + fallback de reload al pulsar Recargar)
+**Última actualización:** 2026-05-21 (sesión 41, reorganización spec-driven de la documentación del proyecto)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
-**Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+**Próxima iteración:** sin decidir. Candidato destacado en backlog: **Visualización de contras en el grafo — 2 fases** (mini-grafo en modal de técnica + zoom semántico en grafo principal, ver [`MEJORAS_FUTURAS.md`](MEJORAS_FUTURAS.md) y [`ROADMAP.md`](../ROADMAP.md)). Otros candidatos: reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 41 (2026-05-21) — Reorganización spec-driven de la documentación
+
+**Hecho — movido el corpus de docs internos (`.claude/`) a una estructura pública y navegable bajo `docs/` + ficheros canónicos en la raíz.** Disparado por una conversación de organización en la que el owner planteó si valía la pena pasar a un tracker (Jira/Linear/GitHub Issues) con MCP. Tras hacer push-back sobre el coste vs dolor real, acordamos que el 80% del valor de "best practices" venía de la parte spec-driven (docs-as-code) y que el pilot de tracker queda aplazado.
+
+### Movimientos (todos con `git mv`, preservan histórico)
+
+- `.claude/REQUISITOS.md` → `docs/spec/REQUISITOS.md`
+- 6 `.claude/ITERACION_*.md` → `docs/iterations/`
+- 8 `.claude/decisiones/*.md` → `docs/adr/`
+- 3 `.claude/T2_*.md` legacy → `docs/iterations/archive/`
+- `.claude/CONTEXTO_AGENTE.md` → `CLAUDE.md` (root, convención Claude Code)
+
+### Nuevos ficheros
+
+- **`CLAUDE.md`** (root) — antes `CONTEXTO_AGENTE.md`. Links internos actualizados a las nuevas rutas; sección "Estado del proyecto" reescrita para reflejar iteraciones 0-6 cerradas y pausa actual.
+- **`CHANGELOG.md`** (root) — formato [Keep a Changelog](https://keepachangelog.com/). 7 releases tageados (v0.1 a v0.6) + `Unreleased`. Derivado de `git log` entre tags y de los objetivos de cada `ITERACION_X.md`.
+- **`ROADMAP.md`** (root) — vista pública filtrada del backlog. Destaca "Visualización de contras en el grafo — 2 fases" como próximo en cola. Las entradas tachadas / hechas viven solo en `MEJORAS_FUTURAS.md`.
+- **`docs/adr/README.md`** — índice de los 8 ADRs con tabla, estado y formato. Referencia al patrón Michael Nygard.
+- **`docs/iterations/README.md`** — índice de iteraciones (0 a 6) con estado, tag y fecha de cierre. Nota explícita sobre `it.2` e `it.3` que cerraron sin doc propio.
+
+### Edits puntuales
+
+- **`CLAUDE.md`** — sección "Estado del proyecto" reescrita (iteraciones 0 a 6 cerradas + pausa actual). Sección "Reglas que viven en otros sitios" actualizada con paths nuevos a `docs/spec/`, `docs/iterations/`, `docs/adr/`. Referencias a ADR-001 reformateadas como links markdown.
+- **`README.md`** (root) — actualizada la ref `.claude/REQUISITOS.md §10` a `docs/spec/REQUISITOS.md §10` + añadidos links a `docs/iterations/`, `CHANGELOG.md` y `docs/adr/`.
+- **`tests/e2e/README.md`** — ref `CONTEXTO_AGENTE.md` → `../../CLAUDE.md`.
+- **`.claude/MEJORAS_FUTURAS.md`** — sed pragmático para actualizar refs internas: `decisiones/00N-...` → `../docs/adr/00N-...`, `CONTEXTO_AGENTE.md` → `../CLAUDE.md`, `ITERACION_N.md` → `../docs/iterations/ITERACION_N.md`. 9 sustituciones en total.
+
+### Ficheros NO tocados
+
+- **ADRs en `docs/adr/`** y **iteraciones en `docs/iterations/`** — referencias inline (`CONTEXTO_AGENTE.md`, `decisiones/00N-...`) se quedan como están. Son históricos: las menciones son prosa narrativa contextual, no links activos de navegación. La convención de ADRs inmutables manda. Si en el futuro hace falta navegabilidad perfecta desde ahí, se hace en un commit aparte de "fix refs históricas".
+- **`.claude/ESTADO_ACTUAL.md`** — diario interno detallado, sigue donde está.
+- **`.claude/agent-reports/`** — sigue gitignored.
+
+### Estructura final del repo (parte de docs)
+
+```
+bjj-tracker/
+├── README.md
+├── CHANGELOG.md         ← nuevo
+├── CLAUDE.md            ← nuevo (movido desde .claude/CONTEXTO_AGENTE.md)
+├── ROADMAP.md           ← nuevo
+├── docs/
+│   ├── spec/REQUISITOS.md
+│   ├── adr/             ← 8 ADRs + README índice
+│   └── iterations/      ← 6 ITERACION_* + README + archive/
+└── .claude/             ← solo working docs internos
+    ├── ESTADO_ACTUAL.md
+    ├── MEJORAS_FUTURAS.md
+    └── agent-reports/   (gitignored)
+```
+
+### Estrategia de commits
+
+2 commits separados (decisión del owner para limpieza de historia):
+
+1. **`docs(backlog): añadir entrada "Visualización de contras en el grafo — 2 fases"`** — solo la nueva entrada en `MEJORAS_FUTURAS.md` (63 líneas) que el owner tenía pending sin commitear desde la sesión de brainstorm. Con paths originales (`decisiones/...`) consistentes con el estado del repo en ese commit.
+2. **`docs: reorganize project documentation following spec-driven structure`** (este commit) — toda la reorganización: renames, ficheros nuevos, edits, update de links. Incluye el sed en `MEJORAS_FUTURAS.md` que actualiza los paths viejos a los nuevos.
+
+### Validación
+
+- `pnpm check` → 1060 files, 0 errors, 0 warnings ✅
+- `git status` → 19 renames (R), 4 untracked nuevos, 4 modified (.claude/MEJORAS_FUTURAS.md, README.md, tests/e2e/README.md, CLAUDE.md content + rename).
+- Build no afectado: solo movimientos de docs.
+
+### Decisiones / aprendizajes
+
+- **No retirar docs del repo.** El push-back fue clave. La "best practice" del mundo real no es "todo a tracker", sino "split deliberado por naturaleza del artefacto": specs/ADRs/CHANGELOG en repo (docs-as-code), backlog activo y tickets en tracker. La trazabilidad la ganas con la disciplina del repo, no añadiendo SaaS encima.
+- **Pilot de tracker aplazado.** Decisión consciente: el dolor real actual es organización, no tracking. El pilot se podrá retomar más adelante (mejor candidato: cuando arranque el grafo de contras o una iteración nueva) si el owner reporta dolor concreto.
+- **Una memoria nueva** guardada en `~/.claude/projects/-home-adalid-projects/memory/user_portfolio_motivation.md`: el owner usa sus proyectos personales también como portfolio QA→dev; separar "dolor real" vs "valor portfolio" al evaluar best practices.
+
+### Próximo paso concreto
+
+1. **Push de los 2 commits** (con OK del owner). Acto seguido GH Actions dispara deploy automático.
+2. Tras el push, dos caminos según prioridad:
+   - **(a)** Arrancar **plan técnico de "Visualización de contras en el grafo — Fase 1"** (mini-grafo en modal de técnica) en rama `feature/contras-visuales`. Plan formal a redactar con `doc-coauthoring` antes de tocar código.
+   - **(b)** Iteración 7 explícita (decidir alcance entre los candidatos del ROADMAP) y enmarcar la feature del grafo dentro.
 
 ---
 

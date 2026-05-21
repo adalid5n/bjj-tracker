@@ -41,7 +41,7 @@ Variables de entorno:
 ## Convenciones
 
 - **Consentimiento previo**: estos scripts NO se ejecutan ni se crean
-  por subagentes sin OK explícito del owner. Ver `CONTEXTO_AGENTE.md`.
+  por subagentes sin OK explícito del owner. Ver [`../../CLAUDE.md`](../../CLAUDE.md).
 - **Sin tocar `pnpm-lock.yaml`** ni añadir deps: Playwright ya está
   instalado.
 - Los screenshots viven en `output/` (gitignored). Para revisarlos

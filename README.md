@@ -27,7 +27,9 @@ Aplicación personal para registrar entrenamientos de Brazilian Jiu-Jitsu y estr
 - **PWA:** vite-plugin-pwa (manifest + service worker)
 - **Lenguaje:** español
 
-Detalle de decisiones técnicas en `.claude/REQUISITOS.md` §10.
+Detalle de decisiones técnicas en [`docs/spec/REQUISITOS.md`](docs/spec/REQUISITOS.md) §10.
+Histórico de iteraciones en [`docs/iterations/`](docs/iterations/) y releases en [CHANGELOG.md](CHANGELOG.md).
+Decisiones arquitectónicas (ADRs) en [`docs/adr/`](docs/adr/).
 
 ## Privacidad
 

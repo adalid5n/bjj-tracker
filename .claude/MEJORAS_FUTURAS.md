@@ -43,7 +43,7 @@ duración, `s.foco` en cards de home). Default hobbyist.
 Estado: el agrupamiento por día con headers se entregó en T-5.it4 (commit
 `0d50b00`). El calendario y la visión general de "qué información merece la
 primera pantalla" entran en **Iteración 5 — Rediseño de home (calendario +
-dashboard)**, plan formal en `ITERACION_5.md`. Esta entrada queda como
+dashboard)**, plan formal en `../docs/iterations/ITERACION_5.md`. Esta entrada queda como
 referencia histórica; el seguimiento activo vive en el plan de it.5.
 
 Entrada original (preservada para contexto histórico):
@@ -53,7 +53,7 @@ Entrada original (preservada para contexto histórico):
 - **Origen:** Adalid, 2026-05-19 (sesión 26)
 - **Estado actual:** home es una lista plana de sesiones (sin agrupamiento por proximidad temporal, sin vista de calendario).
 - **Idea:**
-  - **Calendario en home:** vista mensual (o semanal) que marque los días con sesiones; tap en un día abre la sesión / las sesiones de ese día. Reusar el `Calendar` de bits-ui (ya disponible según `CONTEXTO_AGENTE.md`) para no construir desde cero.
+  - **Calendario en home:** vista mensual (o semanal) que marque los días con sesiones; tap en un día abre la sesión / las sesiones de ese día. Reusar el `Calendar` de bits-ui (ya disponible según `../CLAUDE.md`) para no construir desde cero.
   - **Agrupar sesiones con headers por día (patrón `/rolls`):** "Hoy" y "Ayer" como labels reservados; el resto de días con su fecha formateada como header (`lun, 12 may 2026`). Decisión owner 2026-05-19: usar el mismo patrón que ya existe en `/rolls` (no collapse agresivo de "Antiguos").
   - **Visión general "mejor home":** paraguas para revisar qué información merece estar en la primera pantalla (¿stats rápidas? ¿próxima clase? ¿últimos rolls?). A concretar.
 - **Por qué:** home es la primera pantalla en cada apertura de la PWA. Hoy es funcional pero pobre (lista plana). Calendario + agrupamiento dan navegación temporal y reducen scroll para ir a sesiones recientes.
@@ -146,7 +146,7 @@ Implementado en sesión 11 (2026-05-14). `ThemeState` singleton en
 `src/lib/theme.svelte.ts`, toggle 3 botones (Auto/Claro/Oscuro) en
 `/ajustes`, persistencia `localStorage['theme']`, suscripción a
 `matchMedia('(prefers-color-scheme: dark)')`. Decisión documentada en
-`decisiones/003-theme-manager.md`.
+`../docs/adr/003-theme-manager.md`.
 
 ### Sistema de diseño coherente — usar design tokens en lugar de Tailwind raw
 
@@ -172,7 +172,7 @@ Implementado en sesión 11 (2026-05-14). `ThemeState` singleton en
 
 Decidido 2026-05-13 (s9) — primera tarea de **it.2** (T-1.it2). Ver
 `ESTADO_ACTUAL.md` sección "Iteración 2 — entrada confirmada".
-Mini-ADR `decisiones/002-vinculo-top-bottom.md` a escribir cuando arranque.
+Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 
 ### Una técnica con múltiples destinos posibles
 
@@ -419,11 +419,11 @@ it.6.
   - Modelo de datos: tabla `tecnica_contras` (N:N auto-referencial
     sobre `tecnicas`).
   - Decisión arquitectónica sobre el grafo:
-    `decisiones/004-fcose-layout-algorithm.md`,
-    `decisiones/006-grafo-siempre-visible-sheet-drawer.md`,
-    `decisiones/008-persistencia-layout-grafo.md`.
+    `../docs/adr/004-fcose-layout-algorithm.md`,
+    `../docs/adr/006-grafo-siempre-visible-sheet-drawer.md`,
+    `../docs/adr/008-persistencia-layout-grafo.md`.
   - Vínculo top/bottom relacionado:
-    `decisiones/002-vinculo-top-bottom.md`.
+    `../docs/adr/002-vinculo-top-bottom.md`.
 
 ## Performance / build
 
@@ -497,7 +497,7 @@ Resuelto añadiendo `/// <reference types="vite-plugin-pwa/vanillajs" />` en `sr
 - **Idea:** actualizar cada action a la versión que ya soporta Node 24 nativamente (revisar releases de cada repo). Alternativa puente: añadir `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` como env var del workflow para opt-in antes del cutover.
 - **Por qué:** ahora el deploy funciona pero está en cuenta atrás. Si no se actualiza antes de septiembre, el workflow se rompe y bloquea releases.
 - **Cuándo:** antes del 2 de junio de 2026 idealmente (para validar con margen); como tarde, antes del 16 de septiembre de 2026.
-- **Restricción del proyecto:** `.github/workflows/deploy.yml` está en la lista de ficheros que no se tocan sin pedirlo explícitamente (ver `CONTEXTO_AGENTE.md`). Esta tarea requiere que el owner lo abra.
+- **Restricción del proyecto:** `.github/workflows/deploy.yml` está en la lista de ficheros que no se tocan sin pedirlo explícitamente (ver `../CLAUDE.md`). Esta tarea requiere que el owner lo abra.
 
 ---
 

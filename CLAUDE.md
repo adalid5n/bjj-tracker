@@ -20,11 +20,14 @@
 
 ## Estado del proyecto
 
-- Iteración 0 ✅ cerrada (tag `v0.1-it0`, 2026-05-10). Captura mínima
-  funcional desplegada en GitHub Pages.
-- Fase de pulido pre-iteración 1 en preparación. Plan detallado en
-  `ITERACION_0_5.md` (pendiente de crear).
-- Para el estado de detalle día a día, ver `ESTADO_ACTUAL.md`.
+- Iteraciones 0 a 6 cerradas. Última: `v0.6-it6` (2026-05-20, modo
+  hobbyist vs avanzado). App PWA desplegada en GitHub Pages.
+- Histórico completo de iteraciones en
+  [`docs/iterations/`](docs/iterations/); resúmenes públicos por
+  release en [CHANGELOG.md](CHANGELOG.md).
+- Pausa entre iteraciones — siguiente iteración por decidir entre
+  candidatos del [ROADMAP.md](ROADMAP.md).
+- Para el estado de detalle día a día, ver [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md).
 
 ## Entorno y herramientas
 
@@ -125,7 +128,7 @@
   a versiones patch recientes de svelte/sveltekit/vite.** Bugs del
   framework en patches específicas son frecuentes y un patch upgrade
   los resuelve. Histórico: bug de refresh resuelto con kit 2.57→2.59.1
-  + vite 8.0.7→8.0.12 (commit `8c7c62c`, ADR `decisiones/001-...`).
+  + vite 8.0.7→8.0.12 (commit `8c7c62c`, [ADR-001](docs/adr/001-bump-deps-fix-refresh.md)).
 
 ## Preferencias del owner (transversales a la app)
 
@@ -149,14 +152,18 @@ cualquier máquina) las herede.
 - **Reglas que viven en otros sitios** (no aquí):
   - Convenciones de código del proyecto y restricciones de stack →
     secciones superiores de este mismo fichero.
-  - Backlog de ideas descartadas → `MEJORAS_FUTURAS.md`.
-  - Plan de iteración actual → `ITERACION_X.md`.
-  - Estado vivo entre sesiones → `ESTADO_ACTUAL.md`.
+  - Backlog interno detallado → [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md).
+    Vista pública filtrada → [ROADMAP.md](ROADMAP.md).
+  - Planes de iteración → [`docs/iterations/`](docs/iterations/);
+    resúmenes públicos por release → [CHANGELOG.md](CHANGELOG.md).
+  - Estado vivo entre sesiones → [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md).
+  - Spec del producto → [`docs/spec/REQUISITOS.md`](docs/spec/REQUISITOS.md).
+  - ADRs (decisiones con peso) → [`docs/adr/`](docs/adr/).
 
 ## Continuidad entre sesiones
 
-- Existe `ESTADO_ACTUAL.md` con el estado vivo del proyecto.
-- **Actualizar `ESTADO_ACTUAL.md` SIEMPRE que se haga `git push`.** No
+- Existe [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md) con el estado vivo del proyecto.
+- **Actualizar `.claude/ESTADO_ACTUAL.md` SIEMPRE que se haga `git push`.** No
   es opcional ni "al cierre de sesión": va con el push, sea el primero
   o el quinto de la sesión. El update se acompaña en el mismo commit
   del cambio o en un commit `docs(...)` inmediatamente posterior, antes
@@ -166,8 +173,8 @@ cualquier máquina) las herede.
   en qué punto exacto quedamos, cuál es el siguiente paso concreto. Si
   un push corrige/reescribe trabajo de un subagente o sesión anterior,
   corregir también la sección histórica que ya no aplica.
-- Las decisiones técnicas con peso van a `.claude/decisiones/NNN-tema.md`
-  (ADR cortos), para referencia futura.
+- Las decisiones técnicas con peso van a [`docs/adr/NNN-tema.md`](docs/adr/)
+  (ADR cortos siguiendo el patrón Michael Nygard), para referencia futura.
 - Las reglas permanentes del proyecto se reflejan aquí, en este fichero.
 
 ## Cómo explicar cosas
