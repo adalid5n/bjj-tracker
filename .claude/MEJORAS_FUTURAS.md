@@ -362,6 +362,69 @@ it.6.
   expansión de scope, no la auditoría original.
 - **Cuándo:** cualquier sesión de pulido posterior. Sin urgencia.
 
+### Visualización de contras en el grafo — 2 fases (mini-grafo en modal + zoom semántico)
+
+- **Origen:** Adalid, 2026-05-21 (sesión de brainstorming sobre cómo
+  mejorar la representación de técnicas y hacer visibles los contras).
+- **Problema:** los contras son hoy una relación N:N invisible en el
+  grafo principal. Decisión vigente (sigue válida): no dibujar
+  aristas-de-aristas para no romper la legibilidad del catálogo. Por
+  ese motivo los contras sólo aparecen como hipervínculos planos
+  dentro del modal de técnica. Adalid quiere hacerlos más visuales
+  **sin romper esa decisión**.
+- **Idea (dos fases, mismo objetivo, en orden):**
+  - **Fase 1 — Mini-grafo de contras en el modal de técnica.**
+    Sustituir/complementar la lista de hipervínculos por un sub-grafo
+    Cytoscape: técnica al centro, contras alrededor como hub-spoke,
+    con color del tipo de cada contra (cyan/verde/naranja/gris
+    punteado/rojo) y badge si existen. Componente aislado, no toca el
+    canvas principal.
+  - **Fase 2 — Zoom semántico en el grafo principal ("edge
+    promotion").** Al seleccionar un nodo posición, las técnicas que
+    salen se **promueven a nodos satélite** (nombre, color de tipo,
+    badge de contras). Desde cada técnica-promovida nacen flechas
+    hacia sus posiciones destino Y sus contras. El resto del grafo se
+    difumina (patrón focus + context). Al deseleccionar, animación
+    inversa colapsa los satélites de vuelta a aristas. Es la versión
+    "ambiciosa" del mismo concepto.
+- **Por qué en este orden:**
+  - Fase 1 es barata, aislada y valida la hipótesis "ver contras como
+    grafo aporta más que como lista". Si tras probarla Adalid prefiere
+    la lista plana, la fase 2 se descarta.
+  - El componente de sub-grafo de la fase 1 se **reutiliza como pieza
+    interna** del zoom semántico de fase 2: no es trabajo desechable.
+- **Por qué (objetivo):** los contras son información rica del modelo
+  (sabes qué te van a hacer, sabes cómo defender) pero hoy son
+  invisibles hasta abrir una técnica y hacer click en su lista.
+  Hacerlos visibles como grafo materializa el conocimiento táctico de
+  un golpe de vista.
+- **Tradeoffs / riesgos a vigilar:**
+  - Fase 2 requiere animar la transición arista→nodo (Cytoscape lo
+    soporta vía `cy.add` + `position`) y respetar `fixedNodeConstraint`
+    para que el resto del grafo no se zarandee al expandir.
+  - Si la fase 2 funciona bien, podría volver redundante al mini-grafo
+    del modal en el largo plazo. Aceptable: la fase 1 cumple su papel
+    de prueba de concepto barata.
+- **Cuándo:**
+  - Fase 1: candidata a entrada en iteración de pulido o it.1, según
+    prioridad. Barata.
+  - Fase 2: iteración propia (o tarea grande dentro de una). Material
+    para it.7+, o cuando una iteración tenga foco en
+    exploración/análisis del grafo.
+- **Modo de trabajo acordado (2026-05-21):** ambas fases se
+  desarrollarán en una **rama aparte** (p.ej. `feature/contras-visuales`)
+  y se mergean a `main` cuando estén validadas. Plan de implementación
+  a redactar **antes** de arrancar.
+- **Referencias:**
+  - Modelo de datos: tabla `tecnica_contras` (N:N auto-referencial
+    sobre `tecnicas`).
+  - Decisión arquitectónica sobre el grafo:
+    `decisiones/004-fcose-layout-algorithm.md`,
+    `decisiones/006-grafo-siempre-visible-sheet-drawer.md`,
+    `decisiones/008-persistencia-layout-grafo.md`.
+  - Vínculo top/bottom relacionado:
+    `decisiones/002-vinculo-top-bottom.md`.
+
 ## Performance / build
 
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`
