@@ -1,8 +1,72 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-21 (sesión 38, pulido post-it.6: roll wizard + calendar sticky + bug complementaria + "+ Crear nueva" en wizards standalone)
-**Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido + un feature menor; sin tag de iteración.
+**Última actualización:** 2026-05-21 (sesión 39, pulido post-it.6 — segundo round: selected state en grafo + bug z-index AlertDialog móvil + reorden chips TipoTecnica + Origen/Destino navegables en drawer técnica)
+**Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
 **Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 39 (2026-05-21) — Selected state grafo + z-index AlertDialog + reorden chips TipoTecnica + Origen/Destino navegables
+
+**Hecho — cuatro mejoras en la misma sesión, todas en el contexto de `/mapa`. Sin nueva iteración, sin tag.** Una feature (selected visual en el grafo), un bug (z-index AlertDialog detrás del drawer en móvil), un cambio de orden de chips, y un rediseño visual del drawer de técnica para hacer Origen/Destino claramente navegables.
+
+### Selected state en el grafo (`GrafoMapa` + `mapa/+page.svelte`)
+
+Petición del owner: "necesito que el grafo tenga un estado selected que indique en qué punto estoy". Decisiones de producto: el destacado refleja **el top del `mapaModalStack`** (no un tap toggle independiente); estilo visual = **borde más grueso + color de acento (`--primary`)**.
+
+- `GrafoMapa.svelte`: nueva prop `selectedGraphId?: string | null` (id con prefijo del grafo: `pos:<id>`, `sum:<id>`, o id de arista para técnicas). Dos selectores nuevos al final del stylesheet de Cytoscape: `node.selected` y `edge.selected`, ambos con `border-color/line-color = primary` y ancho mayor (`border-width: 4`, `width: 4`). `$effect` que sincroniza la clase `.selected` con la prop (`removeClass` global + `addClass` al match). Va al final del stylesheet para ganar en la cascada de Cytoscape.
+- `mapa/+page.svelte`: `selectedGraphId` derivado del `mapaModalStack.top`. Posición → `pos:${id}`, sumisión → `sum:${id}`, técnica → `id` (las aristas no llevan prefijo). Wizards y stack vacío → `null` (nada destacado). Pasado al `<GrafoMapa>` como prop. Sincroniza automáticamente con la navegación entre modales del breadcrumb.
+
+### Bug z-index AlertDialog (móvil)
+
+Owner reportó: "cuando estoy usando el grafo y luego me quiero mover por el nav, el wizard de descartar queda atrás del drawer". Reconstruido: usuario con un modal de posición/técnica abierto en Sheet bottom móvil, mueve un nodo del grafo (mitad superior visible), tap nav (`BottomNav`). `beforeNavigate` dispara el `AlertDialog` del descartar grafo, pero queda al mismo plano que el Sheet (ambos `z-50` en shadcn).
+
+Fix en los componentes shadcn locales: `alert-dialog-content.svelte` y `alert-dialog-overlay.svelte` pasan de `z-50` a `z-[60]`. Efecto: todos los `AlertDialog` de la app (descartar del grafo, descartar de wizards, descartar de complementaria, etc.) quedan siempre encima de cualquier `Dialog`/`Sheet`. No rompe nada — la jerarquía es la esperada (el confirm de descartar debe estar siempre encima del modal padre).
+
+### Orden de chips de TipoTecnica
+
+Owner: "Sumisiones se debería ver antes que sweeps, transiciones después de sweeps". Orden previo `['ataque', 'sweep', 'escape', 'transicion', 'sumision']`. Nuevo orden: **`['ataque', 'sumision', 'sweep', 'transicion', 'escape']`** (manteniendo ataque primero y escape último como anclas semánticas: ofensiva → defensiva).
+
+Cambiado en los tres sitios donde se define el orden:
+- `TecnicaWizard.svelte:104` — `TIPOS` array para chips del paso 4 (Tipo) del wizard.
+- `PosicionModalContent.svelte:64` — `TIPOS_ORDEN` para tabs de tipo en el drawer de posición.
+- `mapa/+page.svelte:100` — `TIPOS_TECNICA_ORDEN` para opciones del filtro multi-select.
+
+### Origen y Destino como bloques navegables (`TecnicaModalContent`)
+
+Owner: "desde técnica no queda claro dónde tienes que tocar para ir al paso siguiente, por cómo indicas 'Destino: nombre'". Comparado con el drawer de posición (tap claro en bloques completos), el drawer de técnica tenía Origen/Destino como texto inline + `<button class="hover:underline">` — affordance débil, especialmente en móvil donde no hay hover.
+
+Rediseño: **bloques card con header pequeño en mayúsculas + nombre en `font-medium` + flecha direccional**.
+- Origen: flecha `←` al inicio (vienes de aquí, tap para ir atrás en la cadena).
+- Destino: flecha `→` al final (vas hacia aquí).
+- Estilo: `flex w-full items-center gap-2 rounded border border-border p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent` — mismo lenguaje visual que la lista de técnicas del `PosicionModalContent`.
+- Entidad eliminada: bloque con `border-dashed` + italic muted, sin botón (mantiene la maquetación pero comunica "ya no está").
+
+### Validación
+
+- `pnpm check` → 1059/0/0 (sin archivos nuevos).
+- `pnpm build` → 6-7s sin warnings nuevos.
+- Owner verificó visualmente: selected state OK, z-index OK (AlertDialog ahora encima del drawer en móvil), orden chips OK, Origen/Destino OK tras un retoque (Origen pidió flecha al lado izquierdo apuntando hacia atrás, no al derecho como había puesto inicialmente).
+
+### Lecciones
+
+- **Subir z-index en shadcn local es legítimo cuando un caso de uso lo requiere.** El `z-50` por defecto de shadcn asume que solo hay un Dialog/Sheet/AlertDialog a la vez. Cuando coexisten (drawer del modal + AlertDialog del descartar grafo, p. ej.), el último en montarse debería ganar por orden DOM — pero el `transform` del Sheet crea un stacking context propio y el orden DOM no basta. Subir el AlertDialog a `z-[60]` es la solución pragmática y no rompe nada porque jerárquicamente el AlertDialog SIEMPRE debe estar sobre el modal padre.
+- **Flecha direccional vs flecha de affordance.** Mi primera implementación de Origen/Destino tenía ambos con flecha `→` al final (intención: "tap aquí, navegable"). El owner pidió que Origen tuviera `←` (intención: "vienes de aquí"). Lección: cuando hay un eje semántico claro (origen ↔ destino), la flecha debe codificar dirección, no solo affordance. La affordance la da el bloque entero (borde + hover); la flecha agrega significado.
+
+### Próximo paso concreto
+
+Decidir próxima iteración o pausar. Sin candidatos nuevos añadidos al backlog en esta sesión.
+
+### Archivos modificados (7) — todos modificados
+
+- `src/lib/components/GrafoMapa.svelte`
+- `src/routes/mapa/+page.svelte`
+- `src/lib/components/ui/alert-dialog/alert-dialog-content.svelte`
+- `src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte`
+- `src/lib/components/TecnicaWizard.svelte`
+- `src/lib/components/PosicionModalContent.svelte`
+- `src/lib/components/TecnicaModalContent.svelte`
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
 
 ---
 
