@@ -103,10 +103,10 @@
 
 	const TIPOS: { value: TipoTecnica; label: string }[] = [
 		{ value: 'ataque', label: 'Ataque' },
+		{ value: 'sumision', label: 'Sumisión' },
 		{ value: 'sweep', label: 'Sweep' },
-		{ value: 'escape', label: 'Escape' },
 		{ value: 'transicion', label: 'Transición' },
-		{ value: 'sumision', label: 'Sumisión' }
+		{ value: 'escape', label: 'Escape' }
 	];
 
 	const ESTADOS: { value: EstadoTecnica; label: string }[] = [

@@ -404,47 +404,67 @@
 			<pre class="mt-1 text-xs whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else}
-		<!-- Origen -->
-		<div class="text-sm">
-			<span class="text-muted-foreground">Origen:</span>
+		<!-- Origen: bloque card navegable. Flecha ← al inicio (lado izquierdo)
+		     para indicar "vienes de aquí — tap para ir hacia atrás en la
+		     cadena". Mismo lenguaje visual que la lista de técnicas del
+		     PosicionModalContent (botón `block w-full` con hover:bg-accent). -->
+		<div class="space-y-1">
+			<p class="text-xs text-muted-foreground uppercase tracking-wide">Origen</p>
 			{#if origen}
 				<button
 					type="button"
-					class="ml-1 rounded font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+					class="flex w-full items-center gap-2 rounded border border-border p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 					onclick={() => pushPosicion(origen!)}
 				>
-					{origen.nombre}
+					<span class="text-muted-foreground" aria-hidden="true">←</span>
+					<span class="font-medium">{origen.nombre}</span>
 				</button>
 			{:else}
-				<span class="ml-1 text-muted-foreground">(posición eliminada)</span>
+				<div
+					class="rounded border border-dashed border-border p-3 text-sm text-muted-foreground italic"
+				>
+					(posición eliminada)
+				</div>
 			{/if}
 		</div>
 
-		<!-- Destino -->
-		<div class="text-sm">
-			<span class="text-muted-foreground">Destino:</span>
+		<!-- Destino: mismo patrón que Origen. -->
+		<div class="space-y-1">
+			<p class="text-xs text-muted-foreground uppercase tracking-wide">Destino</p>
 			{#if tecnica.tipo === 'sumision'}
 				{#if destinoSumision}
 					<button
 						type="button"
-						class="ml-1 rounded font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+						class="flex w-full items-center justify-between gap-2 rounded border border-border p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 						onclick={() => pushSumision(destinoSumision!)}
 					>
-						{destinoSumision.nombre}<span class="text-muted-foreground"> (sumisión)</span>
+						<span class="font-medium">
+							{destinoSumision.nombre}<span class="text-muted-foreground"> (sumisión)</span>
+						</span>
+						<span class="text-muted-foreground" aria-hidden="true">→</span>
 					</button>
 				{:else}
-					<span class="ml-1 text-muted-foreground">(sumisión eliminada)</span>
+					<div
+						class="rounded border border-dashed border-border p-3 text-sm text-muted-foreground italic"
+					>
+						(sumisión eliminada)
+					</div>
 				{/if}
 			{:else if destinoPosicion}
 				<button
 					type="button"
-					class="ml-1 rounded font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+					class="flex w-full items-center justify-between gap-2 rounded border border-border p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 					onclick={() => pushPosicion(destinoPosicion!)}
 				>
-					{destinoPosicion.nombre}
+					<span class="font-medium">{destinoPosicion.nombre}</span>
+					<span class="text-muted-foreground" aria-hidden="true">→</span>
 				</button>
 			{:else}
-				<span class="ml-1 text-muted-foreground">(posición eliminada)</span>
+				<div
+					class="rounded border border-dashed border-border p-3 text-sm text-muted-foreground italic"
+				>
+					(posición eliminada)
+				</div>
 			{/if}
 		</div>
 

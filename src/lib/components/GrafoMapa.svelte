@@ -57,6 +57,12 @@
 		// mueve el nodo, tap se ignora (sin modal) para no chocar con
 		// el flujo de movimiento.
 		editing?: boolean;
+		// Id del elemento del grafo (con prefijo) que está actualmente
+		// abierto en el modal/Sheet del mapa, o null si no hay nada
+		// abierto. Cuando coincida con un nodo/arista del grafo, este se
+		// destaca con la clase Cytoscape `.selected` (borde más grueso +
+		// color de acento). El padre lo deriva del top del `mapaModalStack`.
+		selectedGraphId?: string | null;
 	};
 
 	let {
@@ -67,7 +73,8 @@
 		categorias = [],
 		onAttemptPush,
 		dirty = $bindable(false),
-		editing = $bindable(false)
+		editing = $bindable(false),
+		selectedGraphId = null
 	}: Props = $props();
 
 	let container: HTMLDivElement;
@@ -262,6 +269,27 @@
 			{
 				selector: 'edge[estado = "descartada"]',
 				style: { width: 1, opacity: 0.4, 'line-style': 'dotted' }
+			},
+			// Estado "selected" (sesión 39): indica el nodo o arista que
+			// corresponde a la entidad abierta en el modal/Sheet. Borde
+			// más grueso + color de acento (`--primary`). Va AL FINAL del
+			// stylesheet para ganar en la cascada de Cytoscape (la última
+			// regla que matchea pisa propiedades anteriores).
+			{
+				selector: 'node.selected',
+				style: {
+					'border-width': 4,
+					'border-color': t.primary
+				}
+			},
+			{
+				selector: 'edge.selected',
+				style: {
+					width: 4,
+					'line-color': t.primary,
+					'target-arrow-color': t.primary,
+					opacity: 1
+				}
 			}
 		] as unknown as StylesheetJson;
 	}
@@ -328,6 +356,19 @@
 		estados;
 		categorias;
 		if (cy) applyFilters(cy);
+	});
+
+	// Sincroniza la prop `selectedGraphId` con la clase Cytoscape `.selected`.
+	// Quita la clase a todos los elementos y la aplica solo al match (si lo
+	// hay). Cytoscape `getElementById` devuelve una collection vacía si no
+	// existe — `addClass` sobre vacía es no-op, seguro.
+	$effect(() => {
+		const id = selectedGraphId;
+		if (!cy) return;
+		cy.elements('.selected').removeClass('selected');
+		if (id) {
+			cy.getElementById(id).addClass('selected');
+		}
 	});
 
 	// Sincroniza la prop `editing` con el estado de los nodos.

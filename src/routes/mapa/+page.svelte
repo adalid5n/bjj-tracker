@@ -99,10 +99,10 @@
 	// proyecto: ofensivo → defensivo → transversal → sumisión).
 	const TIPOS_TECNICA_ORDEN: TipoTecnica[] = [
 		'ataque',
+		'sumision',
 		'sweep',
-		'escape',
 		'transicion',
-		'sumision'
+		'escape'
 	];
 
 	let posiciones = $state<Posicion[]>([]);
@@ -217,6 +217,19 @@
 		)
 			return;
 		grafoComponent.panToEntity({ kind: top.kind, id: top.id }, presentation);
+	});
+
+	// Id del elemento del grafo (con prefijo) correspondiente al top del
+	// stack. Lo pasamos a GrafoMapa para destacar visualmente el nodo o
+	// arista de la entidad abierta. Cuando el top es un wizard (crear/
+	// editar) o no hay stack abierto, queda `null` y nada se destaca.
+	const selectedGraphId = $derived.by<string | null>(() => {
+		const top = mapaModalStack.top;
+		if (!top) return null;
+		if (top.kind === 'posicion') return `pos:${top.id}`;
+		if (top.kind === 'sumision') return `sum:${top.id}`;
+		if (top.kind === 'tecnica') return top.id;
+		return null;
 	});
 
 	// T-9.b.it3: si el usuario intenta navegar a otra ruta (BottomNav,
@@ -733,6 +746,7 @@
 					estados={estadosGrafo}
 					categorias={categoriasGrafo}
 					onAttemptPush={attemptPushModal}
+					{selectedGraphId}
 				/>
 			</div>
 		{:else if subVistaLista === 'posiciones'}

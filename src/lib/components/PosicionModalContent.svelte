@@ -61,7 +61,7 @@
 
 	// Orden de tabs en el modal (decide cuál se selecciona por defecto
 	// cuando hay varios tipos con contenido).
-	const TIPOS_ORDEN: TipoTecnica[] = ['ataque', 'sweep', 'escape', 'transicion', 'sumision'];
+	const TIPOS_ORDEN: TipoTecnica[] = ['ataque', 'sumision', 'sweep', 'transicion', 'escape'];
 
 	let tecnicas = $state<Tecnica[]>([]);
 	// Cache de nombres para destinos: lookup id → nombre.
