@@ -1,8 +1,87 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-20 (sesión 37, cierre it.6 — modo hobbyist vs avanzado, tag `v0.6-it6`)
-**Fase activa:** Pausa entre iteraciones. it.6 cerrada con bump 0.5.0 → 0.6.0.
+**Última actualización:** 2026-05-21 (sesión 38, pulido post-it.6: roll wizard + calendar sticky + bug complementaria + "+ Crear nueva" en wizards standalone)
+**Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido + un feature menor; sin tag de iteración.
 **Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 38 (2026-05-21) — Pulido UX: reorden roll wizard + bug `/mapa` complementaria + "+ Crear nueva" en wizards standalone
+
+**Hecho — cinco entregables en una sola sesión (sin nueva iteración, sin tag).** Tres pulidos UX (reorden del wizard de roll + skip Tamaño tras crear compañero nuevo + gap dinámico bajo el calendar sticky en desktop), un bugfix arquitectónico (`/mapa` "+ Crear nueva complementaria" desde padre en creación), y un feature menor (habilitar "+ Crear nueva" en wizards standalone, dentro de `RollEditor`). Cuatro tareas formalizadas (T-1 a T-3, más un primer round de ajustes UX previo).
+
+### Round 1 — Reorden roll wizard + sub-form compañero + gap calendar sticky
+
+Tres ajustes UX detectados durante uso normal:
+
+- **Reorden del wizard de roll (`RollEditor.svelte`):** orden previo `1=Compañero, 2=Posiciones, 3=Técnicas, 4=Tamaño, 5=Resultado, 6=Duración(avanzado)`. Nuevo: **`1=Compañero, 2=Tamaño, 3=Posiciones, 4=Técnicas, 5=Resultado, 6=Duración`**. Tamaño queda inmediatamente tras Compañero (decisión: el tamaño es relativo al compañero, conceptualmente ligado). Aplicado tanto al wizard de crear como al form de edición, por consistencia (mismo patrón que reorden de s36).
+- **Skip Tamaño tras crear nuevo compañero:** cuando el usuario crea un nuevo compañero inline en el paso 1 del wizard de roll, al pulsar Continuar (con o sin peso rellenado en el sub-form de extras) el wizard salta directamente al paso 3 (Posiciones), saltando Tamaño. Si rellenó peso, este queda asignado a `tamano_relativo`; si no, queda vacío en el roll. Antes el skip solo ocurría cuando rellenaba peso, y dependía de una bandera `pendingSkipTamano` diferida hasta salir del paso de Posiciones — toda esa maquinaria simplificada a dos `advance()` consecutivos.
+- **Bug del peso al crear nuevo compañero:** había DOS botones Continuar cuando el sub-form de extras del compañero estaba visible (uno dentro del sub-form, otro en el footer del wizard). El interno llamaba a `handleExtraDataContinue` (correcto). El externo llamaba a `advance()` (incorrecto: no procesaba peso, no saltaba Tamaño). Detectado por el owner. Fix: **eliminado el botón interno**; el del footer del wizard se ramifica con `{:else if currentStep===1 && showExtraData}` y llama a `handleExtraDataContinue`.
+- **Gap dinámico bajo el calendar sticky en desktop (`MonthCalendar` + `+page.svelte`):** en desktop al scrollear y compactarse el calendar (sticky `top-14`), las primeras sesiones de la lista quedaban tapadas por debajo del calendar opaco. Causa: el flow del documento se reajusta al cambiar la altura del calendar (~620px → ~200px), las sesiones suben en flow, pero el sticky compact se mantiene visualmente pegado arriba. Es comportamiento natural de `position: sticky` (no empuja al flow siguiente). Fix: `compact` ahora es prop bindable de `MonthCalendar`; home recibe el estado vía `bind:compact={calendarCompact}` y aplica `style:margin-top={calendarCompact ? '13rem' : undefined}` a la `<section>` de sesiones. **Caveat documentado:** mejora el caso "scrollY justo > 100" (que es lo que el owner veía); para `scrollY` mucho mayor las sesiones acaban pasando por detrás del calendar — natural del sticky, no eliminable sin cambiar el patrón.
+
+### T-1 — Botón "Reorganizar" visible solo en modo edición del grafo
+
+`mapa/+page.svelte:692-702`. Antes el botón "Reorganizar" estaba siempre visible en el sub-header de la vista grafo, junto a "Mover nodos" y (cuando `grafoDirty`) "Guardar organización". El owner pidió que solo aparezca cuando estás en modo edición. Cambio trivial: envuelto en `{#if grafoEditing}`. "Mover nodos" sigue siempre visible (es el toggle). "Guardar organización" sigue gobernado por `grafoDirty`.
+
+### T-2 — Bug `/mapa` "+ Crear nueva complementaria" desde padre en creación
+
+Bug reportado por el owner: "no se puede añadir una nueva posición desde posición complementaria, mientras estamos creando una nueva posición. Tras guardar, o se cierra el wizard lateral. Y si le doy a guardar, se crean varias de la misma posición". Tres sub-defectos encadenados, los tres arreglados:
+
+- **`MapaModalHost.svelte:492` — `{#key}` rota:** la expresión evaluaba a la cadena `'crear'` tanto para el wizard padre como para el sub-wizard ambos en modo crear. Svelte reusaba la instancia con el state del padre en lugar de remontarla. Fix: incluir `stack.length` en la clave (`${stack.length}:${...}`).
+- **`PosicionWizard.svelte` — draft compartido entre padre y sub:** la señal "soy sub-wizard" era `parentForComplementaria !== undefined`, lo que excluía el caso "padre en modo crear sin id". En ese caso, el sub leía y escribía el mismo `posicionWizardDraft` con clave `'crear'` que el padre, pisando los datos del padre. Fix: dos props nuevas en `PosicionWizard`:
+  - `isSubWizard` (calculado por el host: `stack.length > 1`) — gobierna lectura/escritura del `posicionWizardDraft`. Cubre también el caso latente del sub-wizard de posición pusheado desde `TecnicaWizard` (que antes leía el draft de posición sin ser su dueño).
+  - `isComplementariaSubWizard` (true si vine de "+ Crear nueva complementaria") — gobierna el salto del paso 4 (Complementaria) independientemente de si el padre tiene id.
+- **Simetría diferida cuando el padre está en modo crear:** verificado que `syncComplementaria` (`src/lib/posiciones.ts:98`) ya se invoca desde `createPosicion` y `updatePosicion`. Cuando el padre se guarda apuntando al sub recién creado, la simetría bidireccional se aplica automáticamente. No hacía falta código nuevo para T-2c — solo aprovechar el flujo existente.
+
+`mapa-modal-stack.svelte.ts`: la entrada `wizard-posicion` modo `crear` de `MapaModalEntry` ahora acepta `isComplementariaSubWizard?: boolean` además de `parentForComplementaria?: string`. La documentación explica los dos casos (padre con id vs padre sin id).
+
+### T-3 — Habilitar "+ Crear nueva" en wizards standalone (RollEditor)
+
+Feature menor propuesto y aprobado tras detectar el caso colateral: en el `RollEditor`, los wizards `PosicionWizardDialog` y `TecnicaWizardDialog` (que envuelven `PosicionWizard` y `TecnicaWizard` en `mode='standalone'`) tenían los botones "+ Crear nueva" deshabilitados por diseño (`onCreateNew={mode === 'stack' ? handler : undefined}`). Razón histórica: el `mapaModalStack` solo se renderiza en `/mapa` vía `MapaModalHost`, así que cualquier `push` desde standalone era invisible. Habilitarlos requería arquitectura nueva.
+
+Solución elegida: **sub-Dialogs anidados** (no global `mapaModalStack` en standalone). Cada Dialog wrapper gestiona sus propios sub-Dialogs vía callbacks `onResult` y estado interno. Profundidad limitada a 1 nivel (`allowCreateNewComplementaria=false` en el sub).
+
+**Phase 1 — Posición:**
+- `PosicionWizard`: nueva prop `onCreateNewComplementaria?: (onResult: (id: string) => void) => void` (solo standalone). Handler `handleStandaloneCreateNewComplementaria` invoca el callback; el padre llama `onResult(newId)` al guardar el sub; el wizard asigna `complementariaId = newId`.
+- `PosicionWizardDialog`: dos props nuevas: `isComplementariaSubWizard` (se pasa al wizard interno para que salte el paso 4) y `allowCreateNewComplementaria` (controla si el wizard interno expone "+ Crear nueva"; se desactiva en el sub para limitar profundidad). Self-import del propio Dialog para anidar (Svelte 5 deprecó `<svelte:self>`).
+
+**Phase 2 — Técnica + Sumisión:**
+- `TecnicaWizard`: tres props nuevas `onCreateNewPosicionOrigen`, `onCreateNewPosicionDestino`, `onCreateNewSumisionDestino` con el mismo patrón. Tres handlers standalone (`handleStandaloneCreateNuevaPosicionOrigen`, etc.) que refrescan el catálogo local y asignan al state. No tocan draft (la instancia no se desmonta en standalone).
+- `SumisionWizard`: se le añadió modo standalone (antes solo soportaba stack), con el patrón canónico (`mode`, `onDirtyChange`, `mode === 'stack'` guards en `onMount`/`onDestroy`/`cancel`/`handleSave`).
+- **`SumisionWizardDialog.svelte` (nuevo):** wrapper análogo a `PosicionWizardDialog` pero sin sub-Dialog anidado (la sumisión no tiene complementaria).
+- `TecnicaWizardDialog`: estado interno para tres sub-Dialogs (`subPosicionOrigenOpen`, `subPosicionDestinoOpen`, `subSumisionDestinoOpen`) + refs a callbacks. Tres `requestCreateXxx` handlers + tres `handleSubXxxSaved` handlers. Renderiza condicionalmente `PosicionWizardDialog` (×2 contextos) y `SumisionWizardDialog` cuando el flag correspondiente está activo. Los sub-`PosicionWizardDialog` van con `allowCreateNewComplementaria={false}` para evitar Dialogs de 3 niveles.
+
+### Validación
+
+- `pnpm check` → 1059/0/0 (un archivo nuevo: `SumisionWizardDialog.svelte`).
+- `pnpm build` → 6-7s sin warnings nuevos.
+- Owner verificó visualmente `pnpm preview`: los tres "perfect" del round 1 + OK explícito de T-1, T-2 (con instrucciones de verificación detalladas), T-3 Phase 1 y T-3 Phase 2.
+
+### Lecciones — diagnóstico vs scope
+
+- **El usuario diagnosticó él mismo el bug del peso** ("creo que hay 2 botones de continuar, uno dentro de la creación de compañero, y otro del wizard, el del wizard es el que no funciona"). Mi análisis previo no había llegado ahí. Lección: cuando el owner ofrece hipótesis específica, considerar como prioritaria — el contexto que tiene él (de uso real) puede ser superior al mío (de leer código).
+- **Sticky compact + flow: trade-off insoluble sin cambiar patrón.** Documentado en el código y en la entrada de sesión. Mejor honestidad explícita ("este fix mejora el caso inicial, no elimina el problema en cualquier scrollY") que vender una solución completa que no lo es.
+- **T-3 fue scope expandido y aceptado por el owner.** Originalmente el bug era "+ Crear nueva complementaria" no funcionaba en /mapa (T-2). El owner mencionó al pasar "desde rolleditor no deja crear complementaria, pero debería". Lo formalicé como T-3, propuse alcance "ambos posición y técnica", aprobó. El usuario más tarde preguntó "de dónde viene esto" — señal de que el scope se había desviado del bug. Aclaración explícita resolvió: el alcance era el aprobado, no hay confusión, sigue. Patrón aplicable: cuando un fix arrastra un feature derivado, hacer la separación explícita ("el bug es X; esto otro lo añadimos por coherencia, dime si lo quitamos").
+
+### Próximo paso concreto
+
+Decidir próxima iteración o pausar más. Sin candidatos nuevos añadidos al backlog en esta sesión (los pendientes siguen igual: reducir copy, sugerencia compañero, "Forzar actualización", Node 24, sombras en tokens).
+
+### Archivos modificados (12) — 11 modificados + 1 nuevo
+
+- `src/lib/components/RollEditor.svelte`
+- `src/lib/components/MonthCalendar.svelte`
+- `src/routes/+page.svelte`
+- `src/routes/mapa/+page.svelte`
+- `src/lib/components/MapaModalHost.svelte`
+- `src/lib/components/mapa-modal-stack.svelte.ts`
+- `src/lib/components/PosicionWizard.svelte`
+- `src/lib/components/PosicionWizardDialog.svelte`
+- `src/lib/components/TecnicaWizard.svelte`
+- `src/lib/components/TecnicaWizardDialog.svelte`
+- `src/lib/components/SumisionWizard.svelte`
+- `src/lib/components/SumisionWizardDialog.svelte` (nuevo)
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
 
 ---
 
