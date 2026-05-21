@@ -1,8 +1,46 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-21 (sesión 41, reorganización spec-driven de la documentación del proyecto)
+**Última actualización:** 2026-05-22 (sesión 42, plan técnico cerrado de Fase 1 de contras visuales)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
-**Próxima iteración:** sin decidir. Candidato destacado en backlog: **Visualización de contras en el grafo — 2 fases** (mini-grafo en modal de técnica + zoom semántico en grafo principal, ver [`MEJORAS_FUTURAS.md`](MEJORAS_FUTURAS.md) y [`ROADMAP.md`](../ROADMAP.md)). Otros candidatos: reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+**Próxima iteración:** sin decidir como iteración formal. Trabajo en cola con plan técnico cerrado: **Fase 1 de Visualización de contras en el grafo** (mini-grafo en modal de técnica) en [`T7_PLAN_contras_fase1.md`](T7_PLAN_contras_fase1.md), rama `feature/contras-visuales` a crear al arrancar Paso 1. Otros candidatos del backlog: reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 42 (2026-05-22) — Plan técnico de Fase 1 (contras visuales)
+
+**Hecho — plan técnico formal de la Fase 1 de "Visualización de contras en el grafo" redactado y guardado en [`T7_PLAN_contras_fase1.md`](T7_PLAN_contras_fase1.md).** Sin tocar código todavía; es checkpoint de planificación antes de arrancar la implementación. La rama `feature/contras-visuales` se crea al iniciar el Paso 1.
+
+### Flujo
+
+1. Owner decidió, entre los candidatos del backlog, arrancar plan técnico de Fase 1 (mini-grafo de contras en modal de técnica), descartando para hoy una iteración 7 explícita.
+2. Recon técnico delegado a Plan agent (informe en `.claude/agent-reports/20260521-contras-fase1-plan/plan.md`, gitignored). Lee `GrafoMapa.svelte`, `TecnicaModalContent.svelte`, `contras.ts`, `mapa-modal-stack.svelte.ts`, `layout.css`, ADRs 004/006/008. Devuelve análisis con 9 decisiones técnicas (A-I), 7 decisiones pendientes para owner, y 5 pasos de implementación.
+3. Push-back del owner contra la idea original del backlog de "color por tipo": el grafo principal hoy es deliberadamente monocromático (`GrafoMapa.svelte:219-258`), introducir color solo en el mini rompería la decisión global. Confirmada paleta monocromática consistente.
+4. Confirmadas las 7 decisiones del agente con un cambio: altura del canvas subida de 240 a 320 px (los 240 quedaban apretados con N>7 contras).
+5. Plan formal redactado con `doc-coauthoring`: 6 secciones, 13 decisiones cerradas agrupadas por tema (visual, topología y datos, componente/API, documentación), pasos de implementación con dependencias y verificación de cada uno, riesgos a vigilar.
+
+### Decisiones clave
+
+- **Paleta monocromática**, idéntica al grafo grande. La entrada `MEJORAS_FUTURAS.md:379` debe actualizarse al cerrar Fase 1 para no contradecir esto.
+- **Layout `preset` radial trigonométrico**, sin fcose. Determinista, barato, evita añadir 122 KB al chunk del modal.
+- **Aristas dirigidas hub → contra** (flecha). El modelo `tecnica_contras` es asimétrico (`src/lib/contras.ts:1-13`).
+- **API del componente sobredimensionada para Fase 2**: props `selectedId` y `height` declaradas pero no usadas — Fase 2 las consume sin retrabajo.
+- **Mini-grafo read-only** en Fase 1. La edición (Combobox + AlertDialog) se queda donde está hoy.
+- **ADR-009 corto** al cerrar Fase 1 para registrar las dos decisiones con peso (monocromático vence al backlog + preset sobre fcose).
+
+### Próximo paso concreto
+
+Implementación de Fase 1 según el plan `T7_PLAN_contras_fase1.md`:
+
+1. `git checkout -b feature/contras-visuales` desde `main`.
+2. Paso 1+2: esqueleto del componente `MiniGrafoContras.svelte` + readTokens/stylesheet.
+3. Paso 3+4: layout radial + tap handlers + reactividad de tema (paralelizables).
+4. Paso 5: sustitución del bloque de hipervínculos en `TecnicaModalContent.svelte`.
+5. Verificación `pnpm check` + `pnpm build` + `pnpm preview` con reload duro.
+
+### Archivos modificados (2)
+
+- `.claude/T7_PLAN_contras_fase1.md` (nuevo)
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
 
 ---
 
