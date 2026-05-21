@@ -1,8 +1,49 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-21 (sesión 39, pulido post-it.6 — segundo round: selected state en grafo + bug z-index AlertDialog móvil + reorden chips TipoTecnica + Origen/Destino navegables en drawer técnica)
+**Última actualización:** 2026-05-21 (sesión 40, fix toast PWA — feedback visual + fallback de reload al pulsar Recargar)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
 **Próxima iteración:** sin decidir. Candidatos en backlog (`MEJORAS_FUTURAS.md`): reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 40 (2026-05-21) — Fix toast PWA: feedback visual al pulsar Recargar + fallback de reload
+
+**Hecho — un bugfix UX en el toast de actualización PWA.** Reportado por el owner: "cuando hay una nueva versión, si le doy a recargar, no pasa nada, al menos visualmente. Ni siquiera se va ese popup". Dos defectos en uno: el botón "Recargar" no daba ninguna señal visible al pulsarlo, y si el flow de `SKIP_WAITING` + `controllerchange` no completaba, el popup se quedaba pegado.
+
+### Diagnóstico
+
+- `UpdateToast.svelte` llamaba a `pwa.update()` que ejecutaba `updateSW(true)` de `virtual:pwa-register` y nada más. Sin estado intermedio, sin feedback.
+- El flujo correcto requiere: postMessage `SKIP_WAITING` al SW en `waiting` → activación → evento `controllerchange` en el cliente → `window.location.reload()`. Si cualquier eslabón fallaba (waiting null, controllerchange no llega, SW sin handler), el botón parecía muerto.
+- Además, en pruebas el reload sucede en <50ms cuando todo va bien: el spinner ni se llegaba a pintar.
+
+### Cambios
+
+- **`src/lib/pwa.svelte.ts`** — añadidos:
+  - `#updating = $state(false)` y getter `updating` para que la UI sepa si está en mitad del flujo.
+  - Guard `if (this.#updating) return;` en `update()` para evitar clicks repetidos.
+  - **Fallback hard reload** a los 3000ms (`setTimeout(() => window.location.reload(), 3000)`) que garantiza que el botón siempre acaba recargando, aunque el flow de SW falle silenciosamente.
+  - **Espera de 400ms** (`await new Promise(r => setTimeout(r, 400))`) antes de llamar a `updateFn?.(true)`, para que el spinner tenga tiempo de pintarse antes de que `controllerchange` dispare el reload.
+- **`src/lib/components/UpdateToast.svelte`** — el botón Recargar ahora cambia a "⟳ Actualizando…" con `LoaderCircleIcon` de lucide + `animate-spin` y `disabled={pwa.updating}`. La X de cerrar sigue activa siempre — el usuario puede dismissar el toast aunque haya pulsado Recargar.
+
+### Validación
+
+- `pnpm check` → 1060/0/0 (un fichero más por el icono nuevo).
+- Owner verificó en preview real con SW: el spinner aparece visualmente al pulsar Recargar y luego refresh, como esperaba.
+
+### Lecciones
+
+- **Las acciones que disparan reload necesitan delay artificial para feedback visual.** Un cambio de `$state` no garantiza que el DOM pinte antes del siguiente evento; si el reload sucede en <50ms, el spinner es invisible. 400ms es un compromiso: imperceptible como latencia, perceptible como feedback.
+- **Toda integración con APIs externas asíncronas (SW, postMessage, controllerchange) debe tener fallback temporal.** El flow vite-pwa de `SKIP_WAITING + controllerchange + reload` depende de varios eslabones; un `setTimeout(reload, 3000)` como red de seguridad convierte el botón en "siempre hace algo".
+
+### Próximo paso concreto
+
+Decidir próxima iteración o pausar. Sin candidatos nuevos añadidos al backlog en esta sesión.
+
+### Archivos modificados (3) — todos modificados
+
+- `src/lib/pwa.svelte.ts`
+- `src/lib/components/UpdateToast.svelte`
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
 
 ---
 
