@@ -362,68 +362,80 @@ it.6.
   expansión de scope, no la auditoría original.
 - **Cuándo:** cualquier sesión de pulido posterior. Sin urgencia.
 
-### Visualización de contras en el grafo — 2 fases (mini-grafo en modal + zoom semántico)
+### Visualización de contras en el grafo — F3 sub-grafo filtrado (F1 y F2 rechazadas)
 
-- **Origen:** Adalid, 2026-05-21 (sesión de brainstorming sobre cómo
-  mejorar la representación de técnicas y hacer visibles los contras).
+- **Origen:** Adalid, 2026-05-21 (brainstorming inicial). Iterado en
+  sesiones 42-45 (2026-05-21/22) con dos intentos rechazados.
 - **Problema:** los contras son hoy una relación N:N invisible en el
-  grafo principal. Decisión vigente (sigue válida): no dibujar
-  aristas-de-aristas para no romper la legibilidad del catálogo. Por
-  ese motivo los contras sólo aparecen como hipervínculos planos
-  dentro del modal de técnica. Adalid quiere hacerlos más visuales
-  **sin romper esa decisión**.
-- **Idea (dos fases, mismo objetivo, en orden):**
-  - **Fase 1 — Mini-grafo de contras en el modal de técnica.**
-    Sustituir/complementar la lista de hipervínculos por un sub-grafo
-    Cytoscape: técnica al centro, contras alrededor como hub-spoke,
-    con color del tipo de cada contra (cyan/verde/naranja/gris
-    punteado/rojo) y badge si existen. Componente aislado, no toca el
-    canvas principal.
-  - **Fase 2 — Zoom semántico en el grafo principal ("edge
-    promotion").** Al seleccionar un nodo posición, las técnicas que
-    salen se **promueven a nodos satélite** (nombre, color de tipo,
-    badge de contras). Desde cada técnica-promovida nacen flechas
-    hacia sus posiciones destino Y sus contras. El resto del grafo se
-    difumina (patrón focus + context). Al deseleccionar, animación
-    inversa colapsa los satélites de vuelta a aristas. Es la versión
-    "ambiciosa" del mismo concepto.
-- **Por qué en este orden:**
-  - Fase 1 es barata, aislada y valida la hipótesis "ver contras como
-    grafo aporta más que como lista". Si tras probarla Adalid prefiere
-    la lista plana, la fase 2 se descarta.
-  - El componente de sub-grafo de la fase 1 se **reutiliza como pieza
-    interna** del zoom semántico de fase 2: no es trabajo desechable.
+  grafo principal. Decisión vigente: no dibujar aristas-de-aristas para
+  no romper la legibilidad del catálogo. Por ese motivo los contras
+  sólo aparecen como hipervínculos planos dentro del modal de técnica.
+  Adalid quiere hacerlos más visuales **sin romper esa decisión**.
+- **Histórico de approaches probados y rechazados:**
+  - **F1 — Mini-grafo Cytoscape dentro del modal** (sesión 43, rama
+    `feature/contras-visuales` parqueada). Hub-spoke con la técnica al
+    centro y contras alrededor. Rechazada por el owner en preview: "no
+    me gusta el grafo dentro del sheet, esperaba una transición animada
+    desde el grafo inicial". El grafo principal no participaba.
+  - **F2 — Mutación in-place del grafo principal** (sesión 44 plan,
+    sesión 45 implementación; rama `feature/contras-mapa-inplace`
+    parqueada, commit `dabfa88`). Modo contras que ocultaba el resto del
+    grafo y dibujaba la técnica X + sus contras como **nodos satélite
+    radiales**. Rechazada en preview por dos razones: (a) bug visual
+    real (display:'none' no restauraba al salir), (b) **incoherencia de
+    modelo**: las técnicas son aristas en el grafo principal pero se
+    convertían en nodos satélite. Misma entidad cambia de tipo según
+    contexto, rompe el lenguaje del grafo.
+- **Approach actual cerrado para próxima sesión (F3 — sub-grafo
+  filtrado del grafo principal):**
+  - Tap en una arista X (técnica) entra al modo: el grafo se **filtra
+    al sub-grafo** compuesto por los 2 nodos extremos de X (origen +
+    destino) + la arista X + cada contra Y dibujada como **arista** en
+    su forma natural (con sus posiciones origen/destino reales como
+    nodos). Las técnicas siguen siendo aristas, las posiciones siguen
+    siendo nodos — lenguaje del grafo intacto.
+  - El resto del grafo se atenúa (dim u oculto, a decidir en plan).
+  - **Solo las contras directamente relacionadas con la arista
+    seleccionada** se dibujan. Anidamiento recursivo: tap en una contra
+    Y → re-filtrar al sub-grafo de Y.
+  - **Las contras se distinguen visualmente con un color "amenazante"
+    (rojo apagado)** — token nuevo a definir, semánticamente "esto es
+    lo que el contrincante puede hacerte".
+  - **Layout: posiciones fcose actuales preservadas** (sin layout
+    shift). Solo cambia visibilidad y resaltado.
+- **Aprovechable de F2 (commit `dabfa88` en rama parqueada):** botón
+  "Ver contras en el mapa" en `TecnicaModalContent`, cableado completo
+  de `mapa/+page.svelte` (`$effect` async de sincronización stack↔grafo,
+  AlertDialog dirty, breadcrumb integrado al stack, ESC interceptado,
+  tap-canvas-vacío), las dos props nuevas del `MapaModalHost`. Se tira
+  de F2: `injectContrasElements`, `computeRadialPositions`, los
+  selectores `node[temp][kind="contra"]`, el "hub-as-node" central.
 - **Por qué (objetivo):** los contras son información rica del modelo
   (sabes qué te van a hacer, sabes cómo defender) pero hoy son
-  invisibles hasta abrir una técnica y hacer click en su lista.
-  Hacerlos visibles como grafo materializa el conocimiento táctico de
-  un golpe de vista.
-- **Tradeoffs / riesgos a vigilar:**
-  - Fase 2 requiere animar la transición arista→nodo (Cytoscape lo
-    soporta vía `cy.add` + `position`) y respetar `fixedNodeConstraint`
-    para que el resto del grafo no se zarandee al expandir.
-  - Si la fase 2 funciona bien, podría volver redundante al mini-grafo
-    del modal en el largo plazo. Aceptable: la fase 1 cumple su papel
-    de prueba de concepto barata.
-- **Cuándo:**
-  - Fase 1: candidata a entrada en iteración de pulido o it.1, según
-    prioridad. Barata.
-  - Fase 2: iteración propia (o tarea grande dentro de una). Material
-    para it.7+, o cuando una iteración tenga foco en
-    exploración/análisis del grafo.
-- **Modo de trabajo acordado (2026-05-21):** ambas fases se
-  desarrollarán en una **rama aparte** (p.ej. `feature/contras-visuales`)
-  y se mergean a `main` cuando estén validadas. Plan de implementación
-  a redactar **antes** de arrancar.
+  invisibles hasta abrir una técnica. Hacerlos visibles como sub-grafo
+  con el lenguaje correcto (técnica = arista) materializa el
+  conocimiento táctico de un golpe de vista, sin romper la coherencia
+  del grafo principal.
+- **Cuándo:** próxima sesión (T9 a redactar). Estimación ~2-3h de
+  implementación + planning previo con `doc-coauthoring`.
+- **Modo de trabajo acordado:** rama nueva `feature/contras-subgrafo`
+  desde `main`. Plan formal a redactar **antes** de arrancar. Las ramas
+  parqueadas `feature/contras-visuales` (F1) y `feature/contras-mapa-inplace`
+  (F2) quedan navegables en remoto como spikes documentados; no se
+  mergean.
 - **Referencias:**
   - Modelo de datos: tabla `tecnica_contras` (N:N auto-referencial
     sobre `tecnicas`).
-  - Decisión arquitectónica sobre el grafo:
+  - Decisiones arquitectónicas sobre el grafo:
     `../docs/adr/004-fcose-layout-algorithm.md`,
     `../docs/adr/006-grafo-siempre-visible-sheet-drawer.md`,
+    `../docs/adr/007-sincronizacion-modal-grafo.md`,
     `../docs/adr/008-persistencia-layout-grafo.md`.
   - Vínculo top/bottom relacionado:
     `../docs/adr/002-vinculo-top-bottom.md`.
+  - Historia: planes [`T7_PLAN_contras_fase1.md`](T7_PLAN_contras_fase1.md)
+    (F1) y [`T8_PLAN_contras_mapa_inplace.md`](T8_PLAN_contras_mapa_inplace.md)
+    (F2), ambos como referencia histórica de qué se descartó y por qué.
 
 ## Performance / build
 

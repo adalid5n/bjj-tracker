@@ -1,8 +1,73 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-22 (sesión 44, plan técnico de F2 cerrado y comiteado a main)
+**Última actualización:** 2026-05-22 (sesión 45, F2 implementada y rechazada en preview; pivot a F3 cerrado)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
-**Próxima iteración:** **Fase 2 de visualización de contras** — mutación in-place del grafo principal de `/mapa`. Rama F1 (`feature/contras-visuales`) parqueada como spike documentado tras review en sesión 44; el código no se mergea a main. Rama nueva `feature/contras-mapa-inplace` creada desde main. Plan formal redactado en [`T8_PLAN_contras_mapa_inplace.md`](T8_PLAN_contras_mapa_inplace.md) con 6 decisiones UX cerradas, 18 decisiones técnicas (D-1 a D-18), Reader Test aplicado y correcciones incorporadas. Implementación arranca en próxima sesión con Paso 1 del plan. Otros candidatos del backlog que siguen vivos para después de F2: reducir copy en pantallas, sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+**Próxima iteración:** **F3 de visualización de contras** — sub-grafo filtrado del grafo principal, contras como aristas (no nodos), color "amenazante" rojo apagado, posiciones fcose preservadas. Pendiente plan formal (T9 a redactar) y rama nueva `feature/contras-subgrafo` desde main. Aprovecha ~60% del cableado de F2 (botón, $effect async, AlertDialog dirty, breadcrumb integrado). Ramas F1 (`feature/contras-visuales`, commit `f936282`) y F2 (`feature/contras-mapa-inplace`, commit `dabfa88`) parqueadas en remoto como spikes documentados. Otros candidatos del backlog que siguen vivos: reducir copy en pantallas, sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 45 (2026-05-22) — F2 implementada y rechazada en preview, pivot a F3 cerrado
+
+**Hecho — implementación completa de Pasos 1-5 del T8 (F2 mutación in-place) en rama `feature/contras-mapa-inplace` + rechazo en preview por el owner + decisión de pivot al approach F3 (sub-grafo filtrado, contras como aristas).** La rama F2 queda parqueada sin merge en commit `dabfa88`, igual que pasó con F1 (`f936282`). Esta entrada actualiza main con el aprendizaje; el código F2 no se mergea.
+
+### Flujo
+
+1. **Paso 1 inline en main chat** (orquestador): `computeRadialPositions` copiado desde rama parqueada F1 al final del `<script>` de `GrafoMapa.svelte`, + 3 selectores nuevos (`node[temp][kind="contra"]`, `edge[temp]`, `edge[temp][tipo="transicion"]`) al final del array de `buildStylesheet`. `pnpm check` 0/0/0.
+2. **Pasos 2+3 y Paso 5 en paralelo vía 2 subagentes** (decisión del orquestador: pasos 2 y 3 tocan el mismo archivo, no se pueden paralelizar entre sí; sí con Paso 5 que es archivo distinto):
+   - Agente A — `GrafoMapa.svelte`: 3 métodos imperativos (`enterContrasMode`, `transitionContrasMode`, `exitContrasMode`) expuestos vía `export function`; helpers privados `injectContrasElements` + `hideAllExceptHubEdge`; snapshot interno del viewport y display; handlers tap sobre `node[temp]` (satélites) y sobre canvas vacío. Decisión del agente: filtrar `kind === 'contra'` en el tap para que el hub-as-node central no dispare push redundante. Reusó la prop existente `onAttemptPush` para los satélites.
+   - Agente B — `TecnicaModalContent.svelte`: prop nueva `onShowInGraph?: (tecnicaId: string) => void` + botón `Button variant="outline" size="sm"` al inicio del bloque `status === 'ready'` visible solo si `onShowInGraph !== undefined && contras.length > 0`.
+3. **Paso 4 sequential** (Agente C tras los anteriores): orquestación en `mapa/+page.svelte` + 2 props nuevas en `MapaModalHost.svelte` (`onShowInGraph` y `onContrasModeEscape`). Incluye `$effect` async de sincronización stack↔grafo con flag `cancelled` (patrón verbatim del T8 §3.5), AlertDialog dirty reusado (`mostrarConfirmDescartarGrafo` + `accionPostDescarteGrafo`, no duplicado), botón "Volver al mapa" en sub-header, wrapper `{#if contrasMode === null}` sobre botones de edición, `onEscapeKeydown` interceptado en los 3 wrappers del Host (Dialog, sheet-side, sheet-bottom — el agente apreció que el plan solo mencionaba uno y lo extendió por consistencia con la regla "aplica fixes a todos los equivalentes").
+4. `pnpm check` 1060/0/0 sobre el estado combinado. `pnpm build` OK.
+5. **Dataset de testing generado para esta sesión** (fuera del scope, ayuda del orquestador): `bjj-tracker-export-20260522-test-contras.json` en el root del proyecto (no comiteado). Toma el último export v6 del 2026-05-20 y añade 10 contras nuevas para tener 12 totales distribuidas en 4 hubs (5+3+2+2), con anidamiento de 3 niveles posible (Armbar mount → Upa → Kimura → Upa) y 4 técnicas sin contras (para verificar botón ausente). Importable vía `/ajustes`.
+6. **Hallazgo del owner en preview** (reload duro tras build):
+   - **Bug visual real**: al entrar al modo contras los nodos del resto del grafo se sobreponen en lugar de ocultarse, y al salir el grafo nunca se restaura. Causa probable: el snapshot del display captura valores vacíos/`undefined` (los nodos no tenían `display` explícito antes), y al restaurar los seteos no se aplican; los nodos podrían además colapsar al `(0,0)` por defecto al perder layout.
+   - **Rechazo de approach**: incoherencia de modelo visual. "Me cuesta entender cómo antes las técnicas eran flechas y ahora en el nuevo grafo las técnicas se vuelven nodos." La misma entidad cambia de tipo según contexto, rompe el lenguaje del grafo.
+7. Owner contra-propuso un re-encuadre completo (que el T8 plan no consideró): el grafo en modo contras se debe **filtrar a un sub-grafo** donde **las contras siguen siendo aristas** (su forma natural), con sus posiciones origen/destino reales como nodos del sub-grafo. Las técnicas SIEMPRE son aristas, en todo contexto.
+8. **3 decisiones UX cerradas del nuevo approach F3** sobre el re-encuadre:
+   - Contras se dibujan como aristas (no nodos satélite).
+   - Color distinto para contras: "amenazante", **rojo apagado**. Token nuevo a definir.
+   - Solo se muestran las contras directamente relacionadas con la arista seleccionada. Anidamiento recursivo: tap en contra Y → re-filtrar al sub-grafo de Y.
+   - Layout: posiciones fcose actuales preservadas (sin layout shift). Sin recalcular.
+
+### Decisiones clave
+
+- **F2 rechazada y parqueada como spike documentado.** El commit `dabfa88` queda en remoto navegable. NO se mergea a main. Patrón idéntico al que se hizo con F1 (`f936282`).
+- **Lección sensible para el orquestador y para futuros planes**: el T8 fue planeado con un Reader Test que no detectó la incoherencia "técnica como arista en el grafo principal vs técnica como nodo en el modo contras". El Reader Test cubrió correctitud técnica (race conditions, lifecycle, async patterns, IDs) pero no validó la **coherencia del modelo visual** con el resto de la app. Para próximos planes con impacto visual fuerte: incluir explícitamente "¿la representación visual de cada entidad cambia entre contextos?" como check del Reader Test o como parte del review previo al `doc-coauthoring`.
+- **Aprovechable de F2 para F3 (~60%)**: el botón en `TecnicaModalContent`, todo el cableado de `mapa/+page.svelte` (`$effect` async con `cancelled` flag, AlertDialog dirty, breadcrumb integrado al `mapaModalStack`, ESC interceptado, tap-canvas), las 2 props nuevas del `MapaModalHost`. Se tira de F2: `injectContrasElements`, `computeRadialPositions`, los selectores `node[temp][kind="contra"]`, el "hub-as-node" central. Los 3 métodos imperativos `enter/transition/exitContrasMode` siguen siendo el patrón válido, solo cambia su implementación interna.
+- **F3 a planificar como T9** en próxima sesión con su propio plan formal vía `doc-coauthoring`. Estimación ~2-3h de implementación.
+
+### Próximo paso concreto
+
+Al retomar:
+1. Redactar `T9_PLAN_contras_subgrafo.md` (o nombre análogo) con las 3 decisiones UX ya cerradas + diseño técnico:
+   - Cómo identificar el sub-grafo: posiciones extremos de X + posiciones extremos de cada contra Y.
+   - Cómo aplicar la atenuación del resto: `opacity: 0.15` vs `display:'none'`. La opción `display:'none'` está demostrada como problemática (esta sesión). `opacity` mantiene posiciones intactas y permite restauración trivial.
+   - Color "amenazante" rojo apagado: definir token en `src/routes/layout.css` (variante de `--destructive`? o token nuevo `--threat` / `--contra` con saturación más baja).
+   - Cómo interactúa con el estado `selected` actual del grafo (`.selected` se aplica hoy a la arista del top del stack).
+   - Animación: la transición sigue siendo `cy.layout({animate:true})` o basta con `cy.animate` por elemento al cambiar opacity/color? Sin layout shift, lo segundo basta.
+2. Crear rama `feature/contras-subgrafo` desde main.
+3. Implementar — aprovechando lo aprovechable de F2 vía cherry-pick selectivo o reimplementación (decidir al planear).
+
+### Archivos modificados en esta sesión
+
+- En rama `feature/contras-mapa-inplace` (commit `dabfa88`, push hecho):
+  - `src/lib/components/GrafoMapa.svelte`
+  - `src/lib/components/MapaModalHost.svelte`
+  - `src/lib/components/TecnicaModalContent.svelte`
+  - `src/routes/mapa/+page.svelte`
+- En `main` (este commit):
+  - `.claude/ESTADO_ACTUAL.md` (esta entrada).
+  - `.claude/MEJORAS_FUTURAS.md` (entrada "Visualización de contras" reescrita con historial de F1+F2 rechazadas y decisiones de F3).
+
+### Reportes de subagentes (gitignored, viven solo en feature)
+
+- `.claude/agent-reports/20260522-T8-pasos-2-3/implementation.md`
+- `.claude/agent-reports/20260522-T8-paso-5/implementation.md`
+- `.claude/agent-reports/20260522-T8-paso-4/implementation.md`
+
+### Dataset de testing generado en esta sesión (no comiteado)
+
+- `bjj-tracker-export-20260522-test-contras.json` (root del proyecto): 12 contras distribuidas en 4 hubs. Sirve para futuros pivots o vuelta a este approach. Importable vía `/ajustes` (schema v6 estricto).
 
 ---
 
