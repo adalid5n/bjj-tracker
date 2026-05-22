@@ -1,8 +1,58 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-22 (sesión 43, Fase 1 implementada en rama, approach en revisión pre-merge)
+**Última actualización:** 2026-05-22 (sesión 44, plan técnico de F2 cerrado y comiteado a main)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
-**Próxima iteración:** **decisión pendiente** sobre approach de visualización de contras. Fase 1 (mini-grafo dentro del modal de técnica) implementada en rama `feature/contras-visuales` y pusheada como spike, pero el owner cuestiona el approach tras verlo en preview — prefiere mutación in-place del grafo principal (`/mapa`), esencialmente Fase 2 del backlog. Sin decidir todavía: mergear F1 como entrega intermedia, parquear la rama, o descartarla y arrancar plan formal de F2. Otros candidatos del backlog que siguen vivos: reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+**Próxima iteración:** **Fase 2 de visualización de contras** — mutación in-place del grafo principal de `/mapa`. Rama F1 (`feature/contras-visuales`) parqueada como spike documentado tras review en sesión 44; el código no se mergea a main. Rama nueva `feature/contras-mapa-inplace` creada desde main. Plan formal redactado en [`T8_PLAN_contras_mapa_inplace.md`](T8_PLAN_contras_mapa_inplace.md) con 6 decisiones UX cerradas, 18 decisiones técnicas (D-1 a D-18), Reader Test aplicado y correcciones incorporadas. Implementación arranca en próxima sesión con Paso 1 del plan. Otros candidatos del backlog que siguen vivos para después de F2: reducir copy en pantallas, sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 44 (2026-05-22) — Plan técnico de Fase 2 cerrado, rama F1 parqueada, T8 a main
+
+**Hecho — review de la rama F1 + replanteo del approach + plan formal de Fase 2 (mutación in-place del grafo principal de `/mapa`) redactado en [`T8_PLAN_contras_mapa_inplace.md`](T8_PLAN_contras_mapa_inplace.md), revisado con Reader Test y comiteado a main.** Sin tocar código de implementación todavía; es checkpoint de planificación. La rama `feature/contras-mapa-inplace` se creó al inicio de sesión desde main; queda lista para arrancar implementación en próxima sesión.
+
+### Flujo
+
+1. Arranque tras `git pull`: nuevo commit `971e8e0` (doc sesión 43) bajado, rama `feature/contras-visuales` también presente. Owner pide revisar lo que hay en F1 antes de decidir qué hacer con la rama, y replantear el approach.
+2. Review del código de la rama F1 (commit `f936282`): `MiniGrafoContras.svelte` (505 líneas) + integración en `TecnicaModalContent.svelte`. Conclusión técnica: implementación cumple T7 al pie de la letra, código sólido y reutilizable como **piezas**, pero **no como entrega** — F2 (mutación in-place) no instancia un Cytoscape separado, así que el componente entero no se reutiliza; sí ~80 líneas (helpers radiales, label multi-línea, cap N=20).
+3. Decisión sobre rama F1: **parquear sin merge**. Razón: descartar la rama no descarta el conocimiento (decisiones del T7, aprendizaje sobre `Tecnica.tipo` para dashed). Lo que se pierde es el archivo físico, que no encaja arquitectónicamente en F2. Mergear sería entregar UX que el owner mismo rechaza → churn puro.
+4. Decisión sobre rama F2: **rama nueva `feature/contras-mapa-inplace` desde main**, no seguir desde la rama F1. Razón: histórico limpio. El commit de F1 cuenta una historia ("añadí mini-grafo"); F2 cuenta otra incompatible ("mutación in-place"). Mezclar ambos en la misma rama produce un git log confuso.
+5. **Plan agent** lanzado con brief completo (factibilidad mutación in-place, animación entre layouts, compatibilidad con ADRs 004/006/007/008, 6 preguntas técnicas + 4 UX abiertas). Informe largo entregado en mensaje (modo read-only del agent) y persistido en `.claude/agent-reports/20260522-contras-mapa-inplace-plan/plan.md`. Conclusión: factible, sin nuevas deps, sin tocar archivos prohibidos, animación nativa via `cy.layout({animate:true})`.
+6. **6 decisiones UX cerradas** con el owner: (1) modal sigue abierto sobre el grafo modo contras, (2) entrada por botón "Ver contras en el mapa" en el modal, (3) tap en contra Y promueve Y con breadcrumb integrado al `mapaModalStack`, (4) F2.0 sin URL (F2.1 opcional diferida), (5) dirty → AlertDialog, (6) cap N=20 confirmado.
+7. **T8 redactado** con `doc-coauthoring` (skill, sin Stage 1 de Context Gathering — el contexto ya estaba cerrado por el informe del agente + decisiones). Estructura paralela a T7: resumen, decisiones cerradas, modelo técnico, 6 pasos de implementación, F2.1 diferido, verificación y riesgos, referencias.
+8. **Reader Test** del T8 con sub-agente sin contexto previo. Devolvió 11 problemas, 2 bloqueantes (`getContras` es async pero llamado sync en el `$effect` propuesto; `popAll()` no existe en `mapaModalStack`, la API real es `closeAll()`), 4 altos (firma incorrecta de `computeRadialPositions`, handler tap sobre satélites no descrito, D-3 promete 3 vías de salida pero solo 1 implementada en pasos, owner del snapshot ambiguo), 5 medios/bajos.
+9. **2 decisiones técnicas bloqueantes** cerradas con el owner: (a) las contras se resuelven en el padre con `await getContras(...)` antes de invocar el método del grafo (D-18 nuevo en T8), patrón `$effect` async con flag de cancelación; (b) "Volver al mapa" hace `mapaModalStack.closeAll()` (D-extra), no `popTo(0)`.
+10. **T8 corregido** con las 11 observaciones aplicadas: D-13/D-15/D-18/D-extra reformulados, nueva §3.8 ("Handlers de tap nuevos en GrafoMapa.svelte") con código explícito para tap en satélite + tap en canvas vacío, §3.5 con `$effect` async + cancelled flag, §3.7 paso 7 simplificado (un solo ESC cierra todo en lugar de capa-por-capa), §7 corregido (Host recibe 2 props nuevas).
+
+### Decisiones clave
+
+- **Rama F1 parqueada, no descartada.** Sigue en remoto navegable. El día que F2 necesite mirar cómo se calculaba la posición radial o el `readTokens` de F1, `git show feature/contras-visuales:src/lib/components/MiniGrafoContras.svelte` da acceso sin checkout.
+- **F2 = mutación in-place sobre la misma instancia Cytoscape** (D-11). Sin destruir/recrear. Reusa zoom, pan, posiciones cacheadas de fcose, estado interno.
+- **`getContras` es async, las contras se resuelven en el padre** (D-18). El `$effect` que sincroniza `mapaModalStack` con el grafo es async con flag `cancelled` para evitar race conditions si el usuario hace tap-tap-tap rápido entre contras.
+- **Un solo ESC cierra todo (modo + modal)** en lugar de capa-por-capa. Simplificación tras Reader Test. Si en uso real se siente brusco, se reabre como mejora F2.2.
+- **F2.1 (deep-link con URL)** queda diferido: F2.0 valida la mutación in-place sin meter complejidad de history/URL. Si el owner pide deep-link tras probar, F2.1 lo añade en sesión separada con su propio plan ~2h.
+
+### Próximo paso concreto
+
+Al retomar la implementación de F2.0:
+
+1. `git checkout feature/contras-mapa-inplace` (la rama ya está creada localmente; tras push de main de esta sesión, hacer `git merge main --ff-only` para que la rama incluya el commit de T8 + ESTADO_ACTUAL).
+2. **Paso 1 del T8** — copiar `computeRadialPositions` desde la rama parqueada al final del `<script>` de `GrafoMapa.svelte` + añadir 3 selectores nuevos al `buildStylesheet`. `pnpm check` 0/0/0.
+3. **Paso 2** — implementar `enterContrasMode` y `exitContrasMode` con snapshot interno + handlers tap del modo (§3.8). Test manual desde DevTools o botón temporal en `+page.svelte`.
+4. **Paso 3** (paralelizable con Paso 2 tras Paso 1) — implementar `transitionContrasMode`.
+5. **Paso 4** — estado `contrasMode` + `$effect` async + handler `handleShowInGraph` + AlertDialog dirty + guard al `$effect` de `panToEntity` + ocultación de botones de edición + botón "Volver al mapa" en `+page.svelte`.
+6. **Paso 5** (paralelizable con Paso 4) — botón "Ver contras en el mapa" en `TecnicaModalContent.svelte`, prop nueva al `MapaModalHost`.
+7. **Paso 6** — verificación E2E con todos los casos del §4 paso 6 del T8. Si OK, push y actualización de ESTADO_ACTUAL para sesión 45.
+
+### Archivos modificados (3)
+
+- `.claude/T8_PLAN_contras_mapa_inplace.md` (nuevo, ~420 líneas)
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
+- Rama nueva: `feature/contras-mapa-inplace` (sin commits aún; tras este push se hará `merge main --ff-only` para incorporar el T8 a la rama de trabajo)
+
+### Reportes de subagentes (gitignored)
+
+- `.claude/agent-reports/20260522-contras-mapa-inplace-plan/plan.md` — informe del Plan agent.
+- `.claude/agent-reports/20260522-contras-mapa-inplace-plan/reader-test.md` — auditoría del Reader Test.
 
 ---
 
