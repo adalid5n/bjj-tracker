@@ -20,6 +20,7 @@
 	 * el input visible sería el campo de búsqueda y no podemos enseñar
 	 * el label seleccionado al estilo "Trigger button" que el brief pide.
 	 */
+	import { onMount, tick } from 'svelte';
 	import { Popover, Command } from 'bits-ui';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
@@ -38,6 +39,7 @@
 		onCreateNew,
 		createNewLabel,
 		disabled = false,
+		defaultOpen = false,
 		ariaLabel
 	}: {
 		/** id seleccionado o null. */
@@ -51,10 +53,23 @@
 		onCreateNew?: () => void;
 		createNewLabel?: string;
 		disabled?: boolean;
+		/** Si true, el popover arranca abierto al montar. Útil cuando el Combobox
+		 * aparece tras un toggle (p.ej. "+ Añadir contra") y queremos evitar
+		 * el segundo click para abrir la lista. */
+		defaultOpen?: boolean;
 		ariaLabel?: string;
 	} = $props();
 
 	let open = $state(false);
+
+	// bits-ui `Popover.Root` no respeta `open=true` inicial sin anchor montado.
+	// Diferimos a onMount + tick para que el Trigger ya esté en el DOM.
+	onMount(async () => {
+		if (defaultOpen) {
+			await tick();
+			open = true;
+		}
+	});
 
 	const selected = $derived(value === null ? null : (items.find((i) => i.id === value) ?? null));
 

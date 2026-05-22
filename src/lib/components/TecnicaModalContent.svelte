@@ -546,6 +546,7 @@
 							onCreateNew={handleCreateNuevaTecnica}
 							createNewLabel="Crear nueva técnica"
 							disabled={addingContra}
+							defaultOpen
 							ariaLabel="Añadir contra"
 						/>
 						<div class="flex justify-end">
