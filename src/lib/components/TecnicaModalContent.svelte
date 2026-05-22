@@ -42,7 +42,21 @@
 	} from './mapa-modal-stack.svelte';
 	import { settings } from '$lib/settings.svelte';
 
-	let { tecnica, onChanged }: { tecnica: Tecnica; onChanged?: () => void } = $props();
+	let {
+		tecnica,
+		onChanged,
+		onShowInGraph
+	}: {
+		tecnica: Tecnica;
+		onChanged?: () => void;
+		// T8 Paso 5: callback opcional para entrar al "modo contras" del
+		// grafo principal. Solo se pasa cuando el modal se abre desde
+		// `/mapa` (vía `MapaModalHost`). Si no se pasa (modal abierto
+		// desde `/rolls`, `/sesion/[id]`, etc., donde no hay grafo
+		// principal disponible), el botón "Ver contras en el mapa" no
+		// se renderiza.
+		onShowInGraph?: (tecnicaId: string) => void;
+	} = $props();
 
 	const TIPO_TECNICA_LABEL: Record<TipoTecnica, string> = {
 		ataque: 'Ataque',
@@ -404,6 +418,22 @@
 			<pre class="mt-1 text-xs whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else}
+		<!--
+		  T8 Paso 5: botón "Ver contras en el mapa". Visible solo si:
+		    - `onShowInGraph` se pasa (modal abierto desde `/mapa`).
+		    - La técnica tiene al menos una contra registrada.
+		  Al pulsarlo, el padre (`mapa/+page.svelte` vía `MapaModalHost`)
+		  orquesta la entrada al "modo contras" del grafo principal —
+		  este componente solo dispara el callback con el id de la técnica.
+		-->
+		{#if onShowInGraph && contras.length > 0}
+			<div>
+				<Button variant="outline" size="sm" onclick={() => onShowInGraph!(tecnica.id)}>
+					Ver contras en el mapa
+				</Button>
+			</div>
+		{/if}
+
 		<!-- Origen: bloque card navegable. Flecha ← al inicio (lado izquierdo)
 		     para indicar "vienes de aquí — tap para ir hacia atrás en la
 		     cadena". Mismo lenguaje visual que la lista de técnicas del

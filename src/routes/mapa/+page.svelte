@@ -13,6 +13,7 @@
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
 	import { buildGrafoElements } from '$lib/grafo';
+	import { getContras } from '$lib/contras';
 	import { useMediaQuery } from '$lib/hooks/use-media.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
@@ -168,6 +169,21 @@
 				target: { kind: 'posicion' | 'sumision' | 'tecnica'; id: string },
 				presentation: 'dialog' | 'sheet-side' | 'sheet-bottom'
 			) => void;
+			// T8 Paso 4: API imperativa del modo contras. Las contras
+			// llegan YA resueltas (D-18) — la orquestación async
+			// (`await getContras(...)`) la hace el padre antes de
+			// llamar.
+			enterContrasMode: (
+				hub: Tecnica,
+				contras: Tecnica[],
+				posicionesById: Record<string, string>
+			) => void;
+			transitionContrasMode: (
+				newHub: Tecnica,
+				newContras: Tecnica[],
+				posicionesById: Record<string, string>
+			) => void;
+			exitContrasMode: () => void;
 		} | undefined
 	>(undefined);
 	let grafoDirty = $state(false);
@@ -177,6 +193,14 @@
 	// el flujo de arrastre. El usuario debe salir del modo para volver
 	// a navegar.
 	let grafoEditing = $state(false);
+	// T8 Paso 4: tecnicaId del hub actual del "modo contras" del grafo,
+	// o `null` cuando NO estamos en modo contras. El estado del modo en
+	// sí (snapshots de viewport, display, elementos inyectados) vive
+	// dentro de `GrafoMapa.svelte` (D-13). Aquí solo tenemos la bandera
+	// que enchufa/desenchufa la lógica de orquestación (guard del
+	// `$effect` de pan, `$effect` async de sincronización con el stack,
+	// markup condicional del sub-header, callback de ESC del modal).
+	let contrasMode = $state<string | null>(null);
 	// AlertDialog "¿Descartar cambios del grafo?" usado cuando el
 	// usuario intenta cambiar a vista Lista con `grafoDirty=true`.
 	// Patrón controlado (open + onOpenChange, NO bind:open) idéntico al
@@ -209,6 +233,11 @@
 	//    tiene `cy` o si el id no existe; aquí solo filtramos por kind.
 	$effect(() => {
 		const top = mapaModalStack.top;
+		// T8 Paso 4: en modo contras, la navegación entre técnicas se
+		// orquesta vía `transitionContrasMode` (más abajo). El pan del
+		// grafo principal pelearía con la animación del layout radial
+		// y movería el viewport fuera de los satélites — guardamos.
+		if (contrasMode !== null) return;
 		if (!top || !grafoComponent) return;
 		if (
 			top.kind !== 'posicion' &&
@@ -488,6 +517,94 @@
 	function handleReorganizar() {
 		grafoComponent?.reorganize();
 	}
+
+	// T8 Paso 4: entrada al "modo contras" del grafo. Lo dispara el botón
+	// "Ver contras en el mapa" del `TecnicaModalContent` (cuando el modal
+	// se abre desde `/mapa`). Resolvemos las contras async ANTES de tocar
+	// el grafo (D-18: el grafo recibe datos crudos, sin promesas).
+	//
+	// Si el grafo tiene cambios sin guardar (`grafoDirty`), abrimos el
+	// AlertDialog existente "¿Descartar cambios del grafo?" (D-6) y
+	// dejamos la entrada al modo como acción post-descarte. Si cancelas,
+	// no entra; si descartas, entra. Reusamos el mismo diálogo del flujo
+	// "cambiar a vista Lista con dirty" — la promesa que hace ("se
+	// descartarán al volver") aplica idéntico aquí.
+	async function handleShowInGraph(tecnicaId: string) {
+		const contras = await getContras(tecnicaId);
+		const hub = tecnicas.find((t) => t.id === tecnicaId);
+		if (!hub) return; // defensivo: la técnica desapareció del catálogo
+
+		const enter = () => {
+			grafoComponent?.enterContrasMode(hub, contras, posicionesById);
+			contrasMode = tecnicaId;
+		};
+
+		if (grafoDirty) {
+			accionPostDescarteGrafo = enter;
+			mostrarConfirmDescartarGrafo = true;
+			return;
+		}
+
+		enter();
+	}
+
+	// T8 Paso 4: sincronización stack ↔ grafo en modo contras. Patrón
+	// async con flag de cancelación (Svelte 5) porque `getContras` es
+	// asíncrono. El `$effect` solo "intercepta" cuando estamos dentro
+	// del modo (`contrasMode !== null`); fuera del modo el grafo se
+	// gobierna por el `$effect` de `panToEntity` (que tiene su propio
+	// guard contra el modo).
+	//
+	// Por qué no entra en bucle infinito: cuando entramos a la rama
+	// `transitionContrasMode`, escribimos `contrasMode = newHub.id`,
+	// que coincide con `top.id`. En la siguiente reactivación el
+	// `if (top.id !== contrasMode)` ya es falso y nada se ejecuta.
+	// Quiescent en una iteración (§3.5).
+	//
+	// Cancelación: si el usuario hace tap rápido en otra contra mientras
+	// el primer `await getContras` está in-flight, el cleanup pone
+	// `cancelled = true` y el run anterior se aborta antes de llamar al
+	// método imperativo del grafo. El nuevo run arranca con el nuevo
+	// top y termina correctamente. Sin esto hay race (§3.5, riesgo
+	// crítico identificado).
+	$effect(() => {
+		const top = mapaModalStack.top;
+		if (contrasMode === null) return;
+
+		let cancelled = false;
+
+		(async () => {
+			if (top?.kind === 'tecnica' && top.id !== contrasMode) {
+				// Anidamiento o pop del breadcrumb a otra técnica:
+				// resolver sus contras y promover como nuevo hub.
+				const newHub = tecnicas.find((t) => t.id === top.id);
+				if (!newHub) return;
+				const newContras = await getContras(newHub.id);
+				if (cancelled) return;
+				grafoComponent?.transitionContrasMode(newHub, newContras, posicionesById);
+				contrasMode = newHub.id;
+			} else if (!top || top.kind !== 'tecnica') {
+				// Stack ya no apunta a una técnica (cerrado, o top es
+				// posición/sumisión/wizard): salir del modo.
+				grafoComponent?.exitContrasMode();
+				contrasMode = null;
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	// T8 Paso 4: salida del modo por tap-canvas-vacío. El grafo
+	// notifica al padre y el padre vacía todo el stack —
+	// `mapaModalStack.closeAll()` dispara el `$effect` de arriba, que
+	// detecta `!top` y llama a `exitContrasMode()`. NO llamamos a
+	// `exitContrasMode` directamente: dejamos que la sincronización
+	// converja sola (mismo patrón que el botón "Volver al mapa", D-extra).
+	function handleAttemptExitContrasMode() {
+		mapaModalStack.closeAll();
+	}
 </script>
 
 <svelte:head>
@@ -681,42 +798,69 @@
 						ariaLabel="Filtrar grafo por categoría de posición"
 					/>
 					<div class="ml-auto flex flex-wrap items-center gap-2">
-						<Button
-							variant={grafoEditing ? 'default' : 'outline'}
-							size="sm"
-							onclick={() => (grafoEditing = !grafoEditing)}
-							aria-pressed={grafoEditing}
-							aria-label={grafoEditing ? 'Salir del modo mover nodos' : 'Activar modo mover nodos'}
-							title={grafoEditing ? 'Salir del modo mover nodos' : 'Mover nodos'}
-						>
-							<MoveIcon class="size-4" />
-							<span class="hidden sm:inline">{grafoEditing ? 'Salir' : 'Mover nodos'}</span>
-						</Button>
-						{#if grafoEditing}
+						<!--
+						  T8 Paso 4: los botones de edición de layout (Mover
+						  nodos / Reorganizar / Guardar organización) se ocultan
+						  durante el modo contras. El modo es exploración pura
+						  (D-17), no edición — sin esta guardia los handlers de
+						  edición chocan con los satélites temporales y con la
+						  animación del layout radial. En su lugar mostramos un
+						  único botón "Volver al mapa" que vacía el stack del
+						  modal — el `$effect` async detecta `!top` y dispara
+						  `exitContrasMode` automáticamente (D-extra). No
+						  llamamos a `exitContrasMode` directamente desde aquí:
+						  dejamos que la sincronización converja sola.
+						-->
+						{#if contrasMode === null}
+							<Button
+								variant={grafoEditing ? 'default' : 'outline'}
+								size="sm"
+								onclick={() => (grafoEditing = !grafoEditing)}
+								aria-pressed={grafoEditing}
+								aria-label={grafoEditing
+									? 'Salir del modo mover nodos'
+									: 'Activar modo mover nodos'}
+								title={grafoEditing ? 'Salir del modo mover nodos' : 'Mover nodos'}
+							>
+								<MoveIcon class="size-4" />
+								<span class="hidden sm:inline">{grafoEditing ? 'Salir' : 'Mover nodos'}</span>
+							</Button>
+							{#if grafoEditing}
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={handleReorganizar}
+									aria-label="Reorganizar grafo"
+									title="Reorganizar grafo"
+								>
+									<RefreshCwIcon class="size-4" />
+									<span class="hidden sm:inline">Reorganizar</span>
+								</Button>
+							{/if}
+							{#if grafoDirty}
+								<Button
+									variant="default"
+									size="sm"
+									disabled={savingLayout}
+									onclick={handleGuardarOrganizacion}
+									aria-label="Guardar organización del grafo"
+								>
+									<SaveIcon class="size-4" />
+									<span class="hidden sm:inline"
+										>{savingLayout ? 'Guardando…' : 'Guardar organización'}</span
+									>
+									<span class="sm:hidden">{savingLayout ? '…' : 'Guardar'}</span>
+								</Button>
+							{/if}
+						{:else}
 							<Button
 								variant="outline"
 								size="sm"
-								onclick={handleReorganizar}
-								aria-label="Reorganizar grafo"
-								title="Reorganizar grafo"
+								onclick={() => mapaModalStack.closeAll()}
+								aria-label="Volver al mapa completo"
+								title="Volver al mapa completo"
 							>
-								<RefreshCwIcon class="size-4" />
-								<span class="hidden sm:inline">Reorganizar</span>
-							</Button>
-						{/if}
-						{#if grafoDirty}
-							<Button
-								variant="default"
-								size="sm"
-								disabled={savingLayout}
-								onclick={handleGuardarOrganizacion}
-								aria-label="Guardar organización del grafo"
-							>
-								<SaveIcon class="size-4" />
-								<span class="hidden sm:inline"
-									>{savingLayout ? 'Guardando…' : 'Guardar organización'}</span
-								>
-								<span class="sm:hidden">{savingLayout ? '…' : 'Guardar'}</span>
+								<span>Volver al mapa</span>
 							</Button>
 						{/if}
 					</div>
@@ -746,6 +890,7 @@
 					estados={estadosGrafo}
 					categorias={categoriasGrafo}
 					onAttemptPush={attemptPushModal}
+					onAttemptExitContrasMode={handleAttemptExitContrasMode}
 					{selectedGraphId}
 				/>
 			</div>
@@ -913,7 +1058,13 @@
 	</DropdownMenu.Root>
 {/if}
 
-<MapaModalHost bind:this={modalHost} onCatalogChanged={refresh} {presentation} />
+<MapaModalHost
+	bind:this={modalHost}
+	onCatalogChanged={refresh}
+	{presentation}
+	onShowInGraph={handleShowInGraph}
+	onContrasModeEscape={contrasMode !== null ? () => mapaModalStack.closeAll() : undefined}
+/>
 
 <!--
   AlertDialog "¿Descartar cambios del grafo?" (T-9.b.it3). Se abre

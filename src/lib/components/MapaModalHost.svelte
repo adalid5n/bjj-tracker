@@ -53,10 +53,25 @@
 	// handler y AlertDialog se mantiene intacta — es ortogonal al contenedor.
 	let {
 		onCatalogChanged,
-		presentation = 'dialog'
+		presentation = 'dialog',
+		onShowInGraph,
+		onContrasModeEscape
 	}: {
 		onCatalogChanged?: () => void;
 		presentation?: 'dialog' | 'sheet-side' | 'sheet-bottom';
+		// T8 Paso 4: callback opcional reenviado al `TecnicaModalContent`.
+		// Solo lo pasa `/mapa` (donde existe el grafo principal). Cuando no
+		// se pasa, `TecnicaModalContent` no renderiza el botón "Ver contras
+		// en el mapa" — exactamente el comportamiento desde `/rolls` o
+		// `/sesion/[id]`.
+		onShowInGraph?: (tecnicaId: string) => void;
+		// T8 Paso 4: el padre lo conecta SOLO cuando está activo el modo
+		// contras (`contrasMode !== null`). Cuando llega definido, el ESC
+		// invoca este callback EN LUGAR de `handleAttemptClose` — un solo
+		// ESC sale del modo + cierra el modal (D-3 simplificada). Cuando
+		// queda `undefined`, el ESC mantiene el comportamiento estándar
+		// (handleAttemptClose con guardia de dirty).
+		onContrasModeEscape?: () => void;
 	} = $props();
 
 	// Cache de detalles cargados bajo demanda (id → entidad).
@@ -461,7 +476,11 @@
 				<div class="-mx-3 min-h-0 flex-1 overflow-y-auto px-3 pt-1">
 					{#if tec}
 						{#key top.id}
-							<TecnicaModalContent tecnica={tec} onChanged={handleModalChanged} />
+							<TecnicaModalContent
+								tecnica={tec}
+								onChanged={handleModalChanged}
+								{onShowInGraph}
+							/>
 						{/key}
 					{:else}
 						<p class="text-sm text-muted-foreground">Cargando técnica…</p>
@@ -553,7 +572,7 @@
 			class="flex max-h-[90vh] flex-col sm:max-w-md"
 			showCloseButton={false}
 			onOpenAutoFocus={(e) => e.preventDefault()}
-			onEscapeKeydown={handleAttemptClose}
+			onEscapeKeydown={onContrasModeEscape ?? handleAttemptClose}
 			onInteractOutside={handleAttemptClose}
 		>
 			{@render modalContent()}
@@ -568,7 +587,7 @@
 			interactOutsideBehavior="ignore"
 			preventScroll={false}
 			onOpenAutoFocus={(e) => e.preventDefault()}
-			onEscapeKeydown={handleAttemptClose}
+			onEscapeKeydown={onContrasModeEscape ?? handleAttemptClose}
 		>
 			{@render modalContent()}
 		</Sheet.Content>
@@ -582,7 +601,7 @@
 			interactOutsideBehavior="ignore"
 			preventScroll={false}
 			onOpenAutoFocus={(e) => e.preventDefault()}
-			onEscapeKeydown={handleAttemptClose}
+			onEscapeKeydown={onContrasModeEscape ?? handleAttemptClose}
 		>
 			{@render modalContent()}
 		</Sheet.Content>

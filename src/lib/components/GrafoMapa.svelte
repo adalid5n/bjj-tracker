@@ -20,8 +20,9 @@
 
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import type { Core, LayoutOptions, StylesheetJson } from 'cytoscape';
+	import type { Core, EventObject, LayoutOptions, Position, StylesheetJson } from 'cytoscape';
 	import type { GrafoEdge, GrafoNode } from '$lib/grafo';
+	import type { Tecnica } from '$lib/types';
 	import { theme } from '$lib/theme.svelte';
 	import GrafoLeyenda from '$lib/components/GrafoLeyenda.svelte';
 	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
@@ -41,6 +42,12 @@
 		// interceptar para preguntar "¿Descartar?" si el wizard actual está
 		// dirty antes de cambiar de entidad.
 		onAttemptPush?: (entry: MapaModalEntry) => void;
+		// T8 / F2.0 (modo contras): callback invocado cuando el usuario
+		// hace tap sobre el canvas vacío estando en modo contras. El padre
+		// lo conecta a `mapaModalStack.closeAll()` para que el `$effect`
+		// de sincronización detecte la salida y dispare `exitContrasMode`.
+		// Opcional: si no se pasa, el tap sobre canvas vacío es no-op.
+		onAttemptExitContrasMode?: () => void;
 		// T-9.b.it3: bindable. El padre observa este flag para mostrar
 		// el botón "Guardar organización" y para interceptar navegación
 		// con AlertDialog "¿Descartar?".
@@ -72,6 +79,7 @@
 		estados = [],
 		categorias = [],
 		onAttemptPush,
+		onAttemptExitContrasMode,
 		dirty = $bindable(false),
 		editing = $bindable(false),
 		selectedGraphId = null
@@ -98,6 +106,18 @@
 	// Sustituido por un modo edición explícito: la prop `editing`
 	// controla si los nodos son arrastrables o solo navegables. El
 	// $effect de abajo sincroniza el estado de Cytoscape con la prop.
+
+	// T8 / F2.0 (modo contras): snapshot del viewport y del display
+	// vivos solo dentro del componente (D-13). Se capturan en
+	// `enterContrasMode` y se consumen en `exitContrasMode`. No son
+	// `$state` ni props: estado interno puramente imperativo.
+	let viewportSnapshotInterno: { pan: Position; zoom: number } | null = null;
+	let displaySnapshotInterno: Map<string, string> | null = null;
+	// Referencias a los handlers tap del modo, guardadas para poder
+	// hacer `cy.off()` limpio en `exitContrasMode`. Cytoscape requiere
+	// la MISMA referencia de función para desconectar selectivamente.
+	let tapSatelliteHandler: ((event: EventObject) => void) | null = null;
+	let tapEmptyCanvasHandler: ((event: EventObject) => void) | null = null;
 
 	/**
 	 * Lee tokens semánticos desde las CSS vars del documento como strings
@@ -290,6 +310,49 @@
 					'target-arrow-color': t.primary,
 					opacity: 1
 				}
+			},
+			// Modo contras (T8 / F2.0): satélites temporales y aristas
+			// hub→contra inyectados por enterContrasMode. Los selectores
+			// usan el flag `data.temp = true` (selector por truthiness,
+			// D-15). Quedan permanentes en el stylesheet aunque no haya
+			// elementos `temp` montados — sólo se activan cuando los hay,
+			// y así el `$effect` de tema (dark/light) los re-aplica sin
+			// perderlos.
+			{
+				selector: 'node[temp][kind = "contra"]',
+				style: {
+					'background-color': t.muted,
+					'background-opacity': 1,
+					'border-color': t.mutedForeground,
+					'border-width': 2,
+					width: 36,
+					height: 36,
+					label: 'data(label)',
+					'text-valign': 'bottom',
+					'text-halign': 'center',
+					'text-wrap': 'wrap',
+					'text-max-width': '90px',
+					color: t.foreground,
+					'text-background-color': t.muted,
+					'text-background-opacity': 1,
+					'text-background-padding': 3,
+					'text-background-shape': 'round-rectangle'
+				}
+			},
+			{
+				selector: 'edge[temp]',
+				style: {
+					'curve-style': 'bezier',
+					'target-arrow-shape': 'triangle',
+					width: 2,
+					'line-color': t.mutedForeground,
+					'target-arrow-color': t.mutedForeground,
+					'arrow-scale': 1.1
+				}
+			},
+			{
+				selector: 'edge[temp][tipo = "transicion"]',
+				style: { 'line-style': 'dashed' }
 			}
 		] as unknown as StylesheetJson;
 	}
@@ -824,6 +887,322 @@
 		cy?.destroy();
 		cy = null;
 	});
+
+	/**
+	 * Construye el label multi-línea de un satélite contra (D-10).
+	 * `{nombre técnica}\ndesde {posición origen}`, o con `(variante)`
+	 * intercalado si la técnica tiene variante.
+	 */
+	function buildSateliteLabel(c: Tecnica, posicionesById: Record<string, string>): string {
+		const cabecera = c.variante ? `${c.nombre} (${c.variante})` : c.nombre;
+		const origen = posicionesById[c.posicion_origen_id] ?? '?';
+		return `${cabecera}\ndesde ${origen}`;
+	}
+
+	/**
+	 * Inyecta el hub-as-node central + satélites + aristas dirigidas y
+	 * corre el layout preset radial animado. Compartido entre
+	 * `enterContrasMode` y `transitionContrasMode` para no duplicar la
+	 * lógica de inyección + animación (D-15, D-12). El cap N=20 (D-16)
+	 * se aplica aquí.
+	 */
+	function injectContrasElements(
+		instance: Core,
+		hub: Tecnica,
+		contras: Tecnica[],
+		posicionesById: Record<string, string>
+	): void {
+		const hubNodeId = `contra-node:${hub.id}`;
+		// D-16: cap visual N=20. La lista de overflow vive en el modal,
+		// no en el canvas.
+		const visibles = contras.slice(0, 20);
+
+		const elementsToAdd: Parameters<Core['add']>[0] = [];
+		elementsToAdd.push({
+			group: 'nodes',
+			data: {
+				id: hubNodeId,
+				temp: true,
+				kind: 'hub-tecnica',
+				tecnicaId: hub.id,
+				label: hub.nombre
+			}
+		});
+		for (const c of visibles) {
+			const satId = `contra-node:${c.id}`;
+			elementsToAdd.push({
+				group: 'nodes',
+				data: {
+					id: satId,
+					temp: true,
+					kind: 'contra',
+					tecnicaId: c.id,
+					label: buildSateliteLabel(c, posicionesById)
+				}
+			});
+			elementsToAdd.push({
+				group: 'edges',
+				data: {
+					id: `contra-edge:${hub.id}->${c.id}`,
+					temp: true,
+					source: hubNodeId,
+					target: satId,
+					tipo: c.tipo
+				}
+			});
+		}
+
+		instance.batch(() => {
+			instance.add(elementsToAdd);
+		});
+
+		const satIds = visibles.map((c) => `contra-node:${c.id}`);
+		const positionsMap = computeRadialPositions(satIds, hubNodeId);
+
+		instance.stop();
+		instance
+			.layout({
+				name: 'preset',
+				positions: (node: { id(): string }) =>
+					positionsMap.get(node.id()) ?? { x: 0, y: 0 },
+				animate: true,
+				animationDuration: 350,
+				animationEasing: 'ease-in-out',
+				fit: true,
+				padding: 40
+			} as unknown as LayoutOptions)
+			.run();
+	}
+
+	/**
+	 * Pone `display:'none'` a todo excepto la arista del hub y sus dos
+	 * nodos extremos. Usado en `enterContrasMode` y en
+	 * `transitionContrasMode` (cuando cambia el hub, hay que recalcular
+	 * qué arista + extremos quedan visibles). Asume `cy.batch()` por
+	 * fuera para agrupar las mutaciones.
+	 */
+	function hideAllExceptHubEdge(instance: Core, hubId: string): void {
+		const hubEdge = instance.getElementById(hubId);
+		const srcId = !hubEdge.empty() && hubEdge.isEdge() ? hubEdge.source().id() : null;
+		const tgtId = !hubEdge.empty() && hubEdge.isEdge() ? hubEdge.target().id() : null;
+		instance.elements().forEach((el) => {
+			// Los elementos temporales siempre visibles (ya marcados con
+			// `data.temp`); no los toca el modo.
+			if (el.data('temp')) {
+				el.style('display', 'element');
+				return;
+			}
+			const id = el.id();
+			if (id === hubId || id === srcId || id === tgtId) {
+				el.style('display', 'element');
+			} else {
+				el.style('display', 'none');
+			}
+		});
+	}
+
+	/**
+	 * Entra al modo contras: captura snapshot interno (viewport + display
+	 * por id), oculta todo el grafo excepto la arista del hub + sus
+	 * extremos, inyecta el hub-as-node central + los satélites con
+	 * aristas dirigidas, corre layout preset radial animado y cablea los
+	 * dos handlers tap nuevos (sobre satélites/hub-as-node y sobre canvas
+	 * vacío). T8 §3.2.
+	 *
+	 * Idempotente desde fuera: si ya hay un modo activo, el padre debe
+	 * llamar a `exitContrasMode` antes — o usar `transitionContrasMode`.
+	 */
+	export function enterContrasMode(
+		hub: Tecnica,
+		contras: Tecnica[],
+		posicionesById: Record<string, string>
+	): void {
+		if (!cy) return;
+		const instance = cy;
+
+		// 1. Snapshot viewport.
+		viewportSnapshotInterno = { pan: { ...instance.pan() }, zoom: instance.zoom() };
+
+		// 2. Snapshot display por id.
+		const snap = new Map<string, string>();
+		instance.elements().forEach((el) => {
+			snap.set(el.id(), el.style('display'));
+		});
+		displaySnapshotInterno = snap;
+
+		// 3. Ocultar todo excepto la arista del hub + sus extremos.
+		instance.batch(() => {
+			hideAllExceptHubEdge(instance, hub.id);
+		});
+
+		// 4 + 5 + 6. Inyectar elementos + layout radial animado.
+		injectContrasElements(instance, hub, contras, posicionesById);
+
+		// 7. Cablear handlers tap del modo. Guardamos referencias para
+		// poder `cy.off()` selectivo en `exitContrasMode`.
+		tapSatelliteHandler = (event: EventObject) => {
+			const node = event.target;
+			// Filtramos por `kind === 'contra'`: el hub-as-node central
+			// también matchea `node[temp]`, pero un tap sobre él sería
+			// un no-op (top del stack ya es el hub) — evitamos disparar
+			// un push redundante. Decisión registrada en el reporte T8.
+			const kind = node.data('kind') as string | undefined;
+			if (kind !== 'contra') return;
+			const tecnicaId = node.data('tecnicaId') as string;
+			const nombre = (node.data('label') as string).split('\n')[0];
+			onAttemptPush?.({ kind: 'tecnica', id: tecnicaId, nombre });
+		};
+		tapEmptyCanvasHandler = (event: EventObject) => {
+			if (event.target === instance) {
+				onAttemptExitContrasMode?.();
+			}
+		};
+		instance.on('tap', 'node[temp]', tapSatelliteHandler);
+		instance.on('tap', tapEmptyCanvasHandler);
+	}
+
+	/**
+	 * Transiciona el modo contras al hub `newHub` sin salir del modo:
+	 * elimina los elementos temporales actuales, ajusta el display para
+	 * que sea la nueva arista del hub + sus extremos lo único visible,
+	 * inyecta el nuevo hub-as-node + satélites y anima. NO captura
+	 * snapshot, NO toca handlers tap (ya cableados desde `enter`). T8 §3.2.
+	 */
+	export function transitionContrasMode(
+		newHub: Tecnica,
+		newContras: Tecnica[],
+		posicionesById: Record<string, string>
+	): void {
+		if (!cy) return;
+		const instance = cy;
+
+		instance.stop();
+
+		// Limpiamos elementos temporales del hub anterior. El selector
+		// por truthiness `[temp]` (D-15) matchea cualquier elemento con
+		// `data.temp` veraz, sin importar el valor.
+		instance.remove('node[temp], edge[temp]');
+
+		// Reajustamos `display` del grafo real: la arista del nuevo hub
+		// + sus extremos deben ser visibles; el resto oculto. Esto cubre
+		// el caso en que el hub previo y el nuevo no comparten extremos.
+		instance.batch(() => {
+			hideAllExceptHubEdge(instance, newHub.id);
+		});
+
+		// Re-inyectamos hub-as-node central + satélites + aristas y
+		// disparamos animación.
+		injectContrasElements(instance, newHub, newContras, posicionesById);
+	}
+
+	/**
+	 * Sale del modo contras: descablea handlers tap del modo, elimina
+	 * elementos temporales, restaura el `display` desde el snapshot,
+	 * anima posiciones a `positionsCache` (fcose original) y al
+	 * terminar restaura el viewport (pan + zoom) capturado en `enter`.
+	 * T8 §3.2.
+	 */
+	export function exitContrasMode(): void {
+		if (!cy) return;
+		const instance = cy;
+
+		instance.stop();
+
+		// Descableamos handlers tap del modo. `cy.off` con misma
+		// referencia + mismo selector es selectivo: no toca los handlers
+		// `tap` permanentes del grafo (sobre `node` y `edge` reales).
+		if (tapSatelliteHandler) {
+			instance.off('tap', 'node[temp]', tapSatelliteHandler);
+			tapSatelliteHandler = null;
+		}
+		if (tapEmptyCanvasHandler) {
+			instance.off('tap', tapEmptyCanvasHandler);
+			tapEmptyCanvasHandler = null;
+		}
+
+		// Quitamos temporales. Si el id ya no existe (limpieza paralela
+		// improbable), el selector simplemente devuelve colección vacía.
+		instance.remove('node[temp], edge[temp]');
+
+		// Restauramos `display` desde el snapshot. Si un id ya no existe
+		// en el grafo (entidad borrada mientras estuvimos en modo
+		// contras), `getElementById` devuelve colección vacía y `style`
+		// es no-op — seguro.
+		const snap = displaySnapshotInterno;
+		if (snap) {
+			instance.batch(() => {
+				snap.forEach((d, id) => {
+					instance.getElementById(id).style('display', d);
+				});
+			});
+		}
+
+		// Layout preset animado a las posiciones cacheadas de fcose.
+		// `fit:false` para no resetear el viewport; lo restauramos
+		// manualmente abajo desde el snapshot.
+		const snapshot = viewportSnapshotInterno;
+		instance.one('layoutstop', () => {
+			if (!snapshot) return;
+			instance.animate({
+				pan: snapshot.pan,
+				zoom: snapshot.zoom,
+				duration: 300,
+				easing: 'ease-in-out'
+			} as Parameters<typeof instance.animate>[0]);
+		});
+		instance
+			.layout({
+				name: 'preset',
+				positions: (node: { id(): string; position(): Position }) =>
+					positionsCache.get(node.id()) ?? node.position(),
+				animate: true,
+				animationDuration: 350,
+				animationEasing: 'ease-in-out',
+				fit: false,
+				padding: 40
+			} as unknown as LayoutOptions)
+			.run();
+
+		// Limpiamos snapshots: el siguiente `enter` capturará otros nuevos.
+		viewportSnapshotInterno = null;
+		displaySnapshotInterno = null;
+	}
+
+	/**
+	 * Posiciones radiales para el modo contras (T8 §3.1): hub en (0,0)
+	 * y satélite i en (R·cos θᵢ, R·sin θᵢ) con θᵢ = -π/2 + 2π·i/N.
+	 * Primer satélite a las 12 y resto en sentido horario.
+	 *
+	 * R se calcula internamente como clamp(80, 50+N·12, 140) — crece con
+	 * N pero saturado para que no se desborde el canvas con N grande.
+	 *
+	 * Mitigación N=1: con θ=-π/2 el satélite caería justo encima del
+	 * label del hub. Lo movemos a θ=0 (derecha) para no chocar.
+	 *
+	 * Devuelve un Map<id, {x,y}> donde `id` es el id ya con prefijo
+	 * `contra-node:<tecnicaId>` (D-15) tal y como se inyecta al grafo
+	 * desde enterContrasMode/transitionContrasMode. El hub (también
+	 * con prefijo `contra-node:<hubId>`) entra en el Map en (0,0).
+	 */
+	function computeRadialPositions(
+		ids: string[],
+		hubId: string
+	): Map<string, { x: number; y: number }> {
+		const positions = new Map<string, { x: number; y: number }>();
+		positions.set(hubId, { x: 0, y: 0 });
+		const N = ids.length;
+		if (N === 0) return positions;
+		const R = Math.max(80, Math.min(140, 50 + N * 12));
+		const isSingle = N === 1;
+		for (let i = 0; i < N; i += 1) {
+			const theta = isSingle ? 0 : -Math.PI / 2 + (2 * Math.PI * i) / N;
+			positions.set(ids[i], {
+				x: R * Math.cos(theta),
+				y: R * Math.sin(theta)
+			});
+		}
+		return positions;
+	}
 </script>
 
 <!--
