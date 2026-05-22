@@ -1,8 +1,65 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-22 (sesión 42, plan técnico cerrado de Fase 1 de contras visuales)
+**Última actualización:** 2026-05-22 (sesión 43, Fase 1 implementada en rama, approach en revisión pre-merge)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
-**Próxima iteración:** sin decidir como iteración formal. Trabajo en cola con plan técnico cerrado: **Fase 1 de Visualización de contras en el grafo** (mini-grafo en modal de técnica) en [`T7_PLAN_contras_fase1.md`](T7_PLAN_contras_fase1.md), rama `feature/contras-visuales` a crear al arrancar Paso 1. Otros candidatos del backlog: reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+**Próxima iteración:** **decisión pendiente** sobre approach de visualización de contras. Fase 1 (mini-grafo dentro del modal de técnica) implementada en rama `feature/contras-visuales` y pusheada como spike, pero el owner cuestiona el approach tras verlo en preview — prefiere mutación in-place del grafo principal (`/mapa`), esencialmente Fase 2 del backlog. Sin decidir todavía: mergear F1 como entrega intermedia, parquear la rama, o descartarla y arrancar plan formal de F2. Otros candidatos del backlog que siguen vivos: reducir copy en pantallas (con `/rolls` como ancla), sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+
+---
+
+## Sesión 43 (2026-05-22) — Fase 1 implementada en rama, approach del mini-grafo en revisión
+
+**Hecho — implementación completa de Fase 1 según [`T7_PLAN_contras_fase1.md`](T7_PLAN_contras_fase1.md) en rama `feature/contras-visuales`, más fix UX colateral en Combobox.** En preview, el owner cuestionó la base del approach: esperaba una transición animada desde el grafo principal (`/mapa`) hacia la vista de contras, no un mini-grafo aislado dentro de un modal. Decisión sobre qué hacer con la rama queda abierta — push sí, merge a main no.
+
+### Flujo
+
+1. Arranque: rama `feature/contras-visuales` creada desde `main`. Dos subagentes lanzados en paralelo (decisión del orquestador por petición explícita del owner de maximizar paralelo):
+   - Agente A (`general-purpose`): implementa `MiniGrafoContras.svelte` entero (Pasos 1-4 del plan). Informe en `.claude/agent-reports/20260522-contras-fase1-impl/componente.md`.
+   - Agente B (`general-purpose`): sustituye el bloque `<ul>` de contras en `TecnicaModalContent.svelte` por el nuevo componente (Paso 5). Informe en `.claude/agent-reports/20260522-contras-fase1-impl/sustitucion.md`.
+2. Hallazgo del Agente A sobre el modelo de datos: la columna `tipo` para decidir si la arista va dashed NO vive en `tecnica_contras` (que es solo relacional: `tecnica_id`, `contra_tecnica_id`, `created_at`), sino en `Tecnica.tipo` de cada contra. La API del plan §3 queda exactamente como estaba — cero cambio para el padre.
+3. Hallazgo del Agente B (regresión no prevista en el plan): el botón ✕ que disparaba el `AlertDialog` de "Quitar contra" vivía DENTRO del `<ul>` eliminado. Al sustituir el bloque, `handleQuitarContraClick` y el AlertDialog quedaron huérfanos (definidos pero sin disparador). Plan asumió que se quedaban "debajo del canvas" sin caer en cuenta.
+4. Orquestador abre opción al owner: (A) chips compactos debajo del mini-grafo, (B) diferir a F1.1 long-press, (C) long-press ahora. Owner elige (A) — chips conservan AlertDialog intacto, cero regresión.
+5. Edit inline en `TecnicaModalContent.svelte`: bloque de chips `[nombre técnica] ✕` con hover destructive sutil, dentro del mismo `{#if contras.length > 0}`, reutilizando `XIcon` y `handleQuitarContraClick`.
+6. Verificación local: `pnpm check` 1061/0/0, `pnpm build` 9.16s, SW generado sin warnings nuevos.
+7. Owner arranca preview por su lado, prueba, y reporta: "no me gusta el grafo dentro del sheet, pensaba que habría una transición animada del grafo inicial". Orquestador abre 3 interpretaciones via `AskUserQuestion`. Owner elige la más radical: mutación in-place del grafo de `/mapa`, sin modal.
+8. Segundo feedback del owner (independiente del approach): "+ Añadir contra" abre Combobox que requiere otro click para mostrar la lista — quiere que arranque abierto directo. Fix aplicado: prop `defaultOpen` en `Combobox.svelte`. Primer intento `let open = $state(defaultOpen)` no funcionó (bits-ui `Popover.Root` no respeta `open=true` inicial sin Trigger montado). Corregido con `onMount` + `tick()` antes de poner `open = true`.
+
+### Decisiones tomadas
+
+- **Chips de "Quitar contra" debajo del canvas** (opción A del orquestador). Mantienen el AlertDialog intacto, cero regresión. Si en Fase 2 el approach cambia, los chips probablemente desaparecen también.
+- **Fix del `defaultOpen` del Combobox** queda válido independientemente del approach de las contras — es una mejora UX reusable. Si se descarta `feature/contras-visuales`, este fix se rescata como commit separado a main.
+- **Approach del mini-grafo en revisión.** El owner valida que F1 técnicamente funciona y verifica el flujo, pero rechaza la UX de "mini dentro de modal" como entrega final. Lo que él quiere es esencialmente F2 (mutación in-place del grafo principal). NO se mergea a main hoy.
+- **Push de la rama sí, merge a main no.** La rama queda en remoto como spike documentado.
+
+### Decisiones pendientes (para próxima sesión)
+
+1. **Qué hacer con `feature/contras-visuales`**: mergear como entrega intermedia (deja en main código que probablemente se vuelve a tocar en F2), parquear sin merge (queda en remoto, navegable), o descartar y rescatar solo el fix del Combobox.
+2. **Plan formal de Fase 2** (mutación in-place del `/mapa`): si arrancamos plan con `Plan agent` + `doc-coauthoring`, o si pasamos a otro candidato del backlog primero (reducir copy, sugerencia de compañero, etc.).
+3. **UX de F2** (decisiones gordas):
+   - ¿El modal de técnica sigue existiendo (con descripción, editar/borrar) o todo pasa a sidebar/sheet adyacente?
+   - ¿Cómo se entra al "modo contras de X" y cómo se vuelve al mapa entero?
+   - Tap en una contra dentro de la vista expandida: ¿navega a "modo contras de Y" o abre otro panel?
+   - ¿Hay breadcrumb? ¿Persiste estado al recargar?
+
+### Archivos modificados (4)
+
+- `src/lib/components/MiniGrafoContras.svelte` (nuevo, 504 líneas) — componente Cytoscape hub-spoke. Implementa D-1 a D-12 del plan sin desviaciones funcionales. Defensivos añadidos por el agente: `userZoomingEnabled: false` (no pelea con scroll del Sheet), `autoungrabify: true` (consistente con D-11 read-only).
+- `src/lib/components/TecnicaModalContent.svelte` — sustituido `<ul>` de contras (líneas 491-529 originales) por `<MiniGrafoContras .../>` + bloque de chips `[nombre técnica] ✕` debajo. Import `MiniGrafoContras` en línea 30. `XIcon` y `handleQuitarContraClick` vuelven a tener uso runtime.
+- `src/lib/components/Combobox.svelte` — nueva prop `defaultOpen?: boolean = false`. Cuando `true`, el popover arranca abierto. Implementado con `onMount` + `tick()` porque `bind:open` inicial a `true` no funciona sin Trigger montado (limitación bits-ui).
+- `.claude/ESTADO_ACTUAL.md` — esta entrada.
+
+### Archivos NO tocados pese a tener relación
+
+- ADR-009 (`docs/adr/009-mini-grafo-contras.md`) **NO creado.** El plan §6 lo pedía al cerrar Fase 1, pero como Fase 1 no se da por cerrada hasta resolver la decisión de F1 vs F2, queda pendiente. Si descartamos el approach, este ADR no llega a existir.
+- `MEJORAS_FUTURAS.md` línea 379 **NO actualizada.** Por el mismo motivo: el texto "color del tipo de cada contra" debía pasar a "paleta monocromática consistente" al cerrar F1; con F1 en revisión, no se toca.
+- `ROADMAP.md` / `CHANGELOG.md` **sin entradas nuevas.** Sin merge a main no hay release.
+
+### Próximo paso concreto
+
+Al retomar:
+
+1. Owner decide qué hacer con la rama (mergear / parquear / descartar) — ver "Decisiones pendientes" §1.
+2. Si va a F2: arrancar `Plan agent` con brief para evaluar factibilidad técnica de mutación in-place del `/mapa` (¿se puede sin tocar `+layout.svelte` ni `vite.config.ts`? ¿cómo persiste el estado "modo contras"? ¿cómo es la animación entre layouts fcose y radial sobre la misma instancia Cytoscape?). El informe del agent va antes de redactar `T8_PLAN_contras_mapa_inplace.md` con `doc-coauthoring`.
+3. Si va a otro candidato del backlog: re-priorizar y abrir nuevo plan ese.
 
 ---
 
