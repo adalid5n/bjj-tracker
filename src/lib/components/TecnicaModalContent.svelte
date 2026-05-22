@@ -27,6 +27,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import Combobox from '$lib/components/Combobox.svelte';
+	import MiniGrafoContras from '$lib/components/MiniGrafoContras.svelte';
 	import XIcon from '@lucide/svelte/icons/x';
 	import type {
 		EstadoTecnica,
@@ -489,42 +490,24 @@
 			</h3>
 
 			{#if contras.length > 0}
-				<div class="mt-2 rounded border border-border">
-					<ul class="divide-y divide-border">
-						{#each contras as c (c.id)}
-							<li class="flex items-stretch">
-								<button
-									type="button"
-									class="block flex-1 p-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-									onclick={() => pushTecnica(c)}
-								>
-									<div class="font-medium">
-										{c.nombre}{#if c.variante}<span class="text-muted-foreground"
-												> ({c.variante})</span
-											>{/if}
-									</div>
-									<div class="mt-0.5 text-xs text-muted-foreground">
-										desde {posicionesById[c.posicion_origen_id] ?? '¿?'}
-									</div>
-								</button>
-								<!--
-								  Botón ✕ para quitar esta contra. stopPropagation evita que
-								  dispare el click del item (push del modal de la contra).
-								-->
-								<button
-									type="button"
-									class="flex items-center justify-center px-3 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:outline-none"
-									onclick={(e) => {
-										e.stopPropagation();
-										handleQuitarContraClick(c);
-									}}
-									aria-label="Quitar contra «{c.nombre}»"
-								>
-									<XIcon class="size-4" aria-hidden="true" />
-								</button>
-							</li>
-						{/each}
-					</ul>
+				<MiniGrafoContras
+					{tecnica}
+					{contras}
+					{posicionesById}
+					onTapContra={pushTecnica}
+				/>
+				<div class="mt-2 flex flex-wrap gap-1.5" aria-label="Quitar contras">
+					{#each contras as contra (contra.id)}
+						<button
+							type="button"
+							class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							onclick={() => handleQuitarContraClick(contra)}
+							aria-label={`Quitar contra ${contra.nombre}`}
+						>
+							<span class="max-w-48 truncate">{contra.nombre}</span>
+							<XIcon class="size-3 shrink-0" />
+						</button>
+					{/each}
 				</div>
 			{/if}
 
