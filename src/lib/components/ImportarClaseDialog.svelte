@@ -94,6 +94,7 @@
 
 	let speechSoportado = $state(false);
 	let grabando = $state(false);
+	let deberiaGrabar = false;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let recognition: any = null;
 
@@ -127,6 +128,7 @@
 
 	$effect(() => {
 		if (!open) {
+			deberiaGrabar = false;
 			recognition?.stop();
 			grabando = false;
 		}
@@ -198,6 +200,7 @@
 	);
 
 	function handleClose() {
+		deberiaGrabar = false;
 		recognition?.stop();
 		grabando = false;
 		confirmDescartarOpen = false;
@@ -217,6 +220,7 @@
 
 	function toggleGrabacion() {
 		if (grabando) {
+			deberiaGrabar = false;
 			recognition?.stop();
 			grabando = false;
 			return;
@@ -238,7 +242,15 @@
 			if (chunk.trim()) textoClase = textoClase ? textoClase + ' ' + chunk.trim() : chunk.trim();
 		};
 		recognition.onend = () => {
-			grabando = false;
+			if (deberiaGrabar) {
+				// En móvil el sistema para el reconocimiento tras cada pausa —
+				// relanzamos si el usuario no ha pulsado detener explícitamente.
+				setTimeout(() => {
+					if (deberiaGrabar) recognition?.start();
+				}, 150);
+			} else {
+				grabando = false;
+			}
 		};
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		recognition.onerror = (e: any) => {
@@ -247,6 +259,7 @@
 				errorAI = 'Error de micrófono: ' + e.error;
 			}
 		};
+		deberiaGrabar = true;
 		recognition.start();
 		grabando = true;
 	}
