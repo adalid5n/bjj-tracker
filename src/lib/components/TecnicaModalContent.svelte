@@ -380,7 +380,8 @@
   por MapaModalHost). El Dialog.Title con tecnica.nombre lo renderiza
   el host; aquí empezamos por la fila de chips.
 -->
-<div class="space-y-3">
+<div class="flex h-full min-h-0 flex-col">
+<div class="-mx-3 min-h-0 flex-1 space-y-3 overflow-y-auto px-3">
 	<!-- Chips de tipo + estado + (opcional) variante -->
 	<div class="flex flex-wrap gap-1">
 		<span class="rounded px-2 py-0.5 text-xs {TIPO_TECNICA_BADGE[tecnica.tipo]}">
@@ -469,13 +470,13 @@
 		</div>
 
 		<!-- Detalles + Errores comunes (T-3.it6): solo modo avanzado, si hay contenido. -->
-		{#if settings.modoAvanzado && tecnica.detalles?.trim().length > 0}
+		{#if tecnica.detalles?.trim().length > 0}
 			<div>
 				<h3 class="text-sm font-semibold">Detalles</h3>
 				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{tecnica.detalles}</p>
 			</div>
 		{/if}
-		{#if settings.modoAvanzado && tecnica.errores_comunes?.trim().length > 0}
+		{#if tecnica.errores_comunes?.trim().length > 0}
 			<div>
 				<h3 class="text-sm font-semibold">Errores comunes</h3>
 				<p class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{tecnica.errores_comunes}</p>
@@ -603,12 +604,11 @@
 		{/if}
 	{/if}
 
+	</div><!-- fin scrollable -->
+
 	<!--
-	  Acciones editar / borrar (T-10). Visibles también en móvil. El botón
-	  Borrar se deshabilita si la técnica es contra de otra(s); en ese
-	  caso un Tooltip envuelve un <span> con el botón disabled (los buttons
-	  disabled no emiten hover, el span sí). Mismo patrón que en
-	  PosicionModalContent y SumisionModalContent.
+	  Acciones editar / borrar (T-10). Footer fijo fuera del scroll.
+	  El botón Borrar se deshabilita si la técnica es contra de otra(s).
 	-->
 	{#if status === 'ready'}
 		<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">

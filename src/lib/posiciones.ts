@@ -34,14 +34,15 @@ export async function createPosicion(data: NewPosicion): Promise<Posicion> {
 	// INSERT con complementaria=NULL primero (la sincronía la aplica
 	// syncComplementaria tras el insert para que escriba ambos lados a la vez).
 	await run(
-		`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, posicion_complementaria_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+		`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, posicion_complementaria_id, disciplina, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
 		[
 			posicion.id,
 			posicion.nombre,
 			posicion.categoria,
 			posicion.tipo ?? null,
 			posicion.notas,
+			posicion.disciplina,
 			posicion.created_at,
 			posicion.updated_at
 		]
@@ -59,9 +60,9 @@ export async function updatePosicion(data: PosicionUpdate): Promise<void> {
 	// aplica vía syncComplementaria para mantener la simetría bidireccional.
 	await run(
 		`UPDATE posiciones
-		 SET nombre = ?, categoria = ?, tipo = ?, notas = ?, updated_at = ?
+		 SET nombre = ?, categoria = ?, tipo = ?, notas = ?, disciplina = ?, updated_at = ?
 		 WHERE id = ?`,
-		[data.nombre, data.categoria, data.tipo ?? null, data.notas, now, data.id]
+		[data.nombre, data.categoria, data.tipo ?? null, data.notas, data.disciplina, now, data.id]
 	);
 	await syncComplementaria(data.id, data.posicion_complementaria_id ?? null);
 }
@@ -95,7 +96,7 @@ export async function deletePosicion(id: string): Promise<void> {
  *
  * Lanza si newB === aId (auto-referencia prohibida).
  */
-async function syncComplementaria(aId: string, newBId: string | null): Promise<void> {
+export async function syncComplementaria(aId: string, newBId: string | null): Promise<void> {
 	if (newBId === aId) {
 		throw new Error('Una posición no puede ser su propia complementaria.');
 	}

@@ -285,7 +285,7 @@ export type PosicionWizardDraftState = {
 	/** Discriminador: 'crear' o 'editar:<id>'. Si no coincide al montar el wizard, se ignora y limpia. */
 	key: string;
 	nombre: string;
-	categoria: 'guardia' | 'control_superior' | 'espalda' | 'transicion' | 'otro' | undefined;
+	categoria: 'guardia' | 'control' | 'transicion' | 'otro' | undefined;
 	tipo: 'ofensiva' | 'defensiva' | 'neutral' | undefined;
 	complementariaId: string | null;
 	// T-3.it6: re-introducidas bajo modoAvanzado. En modoHobbyist se

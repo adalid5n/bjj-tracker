@@ -73,13 +73,7 @@
 
 	// Orden por categoría (igual que en /mapa) y alfabético dentro de cada
 	// categoría. Mismo criterio que `CATEGORIAS_ORDEN` en `/mapa`.
-	const CATEGORIAS_ORDEN: CategoriaPosicion[] = [
-		'guardia',
-		'control_superior',
-		'espalda',
-		'transicion',
-		'otro'
-	];
+	const CATEGORIAS_ORDEN: CategoriaPosicion[] = ['guardia', 'control', 'transicion', 'otro'];
 
 	let {
 		open = $bindable(false),
@@ -267,8 +261,7 @@
 
 	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = {
 		guardia: 'Guardia',
-		control_superior: 'Control superior',
-		espalda: 'Espalda',
+		control: 'Control',
 		transicion: 'Transición',
 		otro: 'Otro'
 	};

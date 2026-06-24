@@ -244,6 +244,34 @@
 		</div>
 	</section>
 
+	<!-- Disciplina activa: BJJ o Grappling. Afecta qué técnicas/posiciones
+	     se muestran en el mapa y qué disciplina se asigna a los nuevos registros. -->
+	<section class="space-y-3 rounded border border-border p-4">
+		<div class="space-y-1">
+			<p class="text-sm font-semibold text-foreground">Disciplina</p>
+			<p class="text-sm text-muted-foreground">
+				Filtra el mapa para mostrar solo tu disciplina. Se puede cambiar en cualquier momento desde el mapa.
+			</p>
+		</div>
+		<div
+			role="group"
+			aria-label="Disciplina activa"
+			class="inline-flex rounded-md border border-border bg-muted p-0.5"
+		>
+			{#each [{ value: 'bjj', label: 'BJJ' }, { value: 'grappling', label: 'Grappling' }] as opt}
+				<button
+					type="button"
+					disabled={!settings.initialized}
+					aria-pressed={settings.disciplinaActiva === opt.value}
+					onclick={() => settings.setDisciplinaActiva(opt.value as 'bjj' | 'grappling')}
+					class="rounded px-4 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 {settings.disciplinaActiva === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+				>
+					{opt.label}
+				</button>
+			{/each}
+		</div>
+	</section>
+
 	<!--
 	  M7: selector de tema. Auto sigue `prefers-color-scheme` del SO. Claro /
 	  Oscuro lo fuerzan. La preferencia se persiste en localStorage (`theme`).

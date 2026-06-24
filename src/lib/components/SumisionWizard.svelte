@@ -32,7 +32,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import type { SumisionTerminal } from '$lib/types';
+	import type { Disciplina, SumisionTerminal } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
@@ -75,6 +75,7 @@
 	// preservar el dato existente al editar.
 	let notas = $state('');
 	let notasOriginal = $state('');
+	let disciplina = $state<Disciplina>('bjj');
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -98,7 +99,10 @@
 	let snapshot = $state<{ nombre: string; notas: string }>({ nombre: '', notas: '' });
 
 	onMount(async () => {
-		settings.init();
+		await settings.init();
+		if (modo !== 'editar') {
+			disciplina = settings.disciplinaActiva;
+		}
 		// Registra el dirty handler en el stack (solo `stack`). En
 		// `standalone` el padre se entera vía `onDirtyChange`.
 		if (mode === 'stack') {
@@ -138,6 +142,7 @@
 			nombre = s.nombre;
 			notas = s.notas;
 			notasOriginal = s.notas;
+			disciplina = s.disciplina;
 			snapshot = { nombre: s.nombre, notas: s.notas };
 			status = 'ready';
 		} catch (err) {
@@ -319,7 +324,8 @@
 				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
 				const nueva = await createSumision({
 					nombre: nombreFinal,
-					notas: notasFinal
+					notas: notasFinal,
+					disciplina
 				});
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
@@ -355,7 +361,8 @@
 				const update: Omit<SumisionTerminal, 'created_at' | 'updated_at'> = {
 					id: sumisionId,
 					nombre: nombreFinal,
-					notas: notasFinal
+					notas: notasFinal,
+					disciplina
 				};
 				await updateSumision(update);
 				if (mode === 'stack') {

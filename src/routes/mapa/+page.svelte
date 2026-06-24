@@ -15,35 +15,33 @@
 	import { buildGrafoElements } from '$lib/grafo';
 	import { useMediaQuery } from '$lib/hooks/use-media.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import ImportarClaseDialog from '$lib/components/ImportarClaseDialog.svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import XIcon from '@lucide/svelte/icons/x';
 	import type {
 		CategoriaPosicion,
 		EstadoTecnica,
 		Posicion,
 		SumisionTerminal,
+		Tag,
 		Tecnica,
 		TipoRolPosicion,
 		TipoTecnica
 	} from '$lib/types';
+	import { settings } from '$lib/settings.svelte';
 
 	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = {
 		guardia: 'Guardia',
-		control_superior: 'Control superior',
-		espalda: 'Espalda',
+		control: 'Control',
 		transicion: 'Transición',
 		otro: 'Otro'
 	};
 
 	// Orden fijo de secciones; las que queden vacías tras filtro no se renderizan.
-	const CATEGORIAS_ORDEN: CategoriaPosicion[] = [
-		'guardia',
-		'control_superior',
-		'espalda',
-		'transicion',
-		'otro'
-	];
+	const CATEGORIAS_ORDEN: CategoriaPosicion[] = ['guardia', 'control', 'transicion', 'otro'];
 
 	const TIPO_ROL_LABEL: Record<TipoRolPosicion, string> = {
 		ofensiva: 'Ofensiva',
@@ -125,6 +123,14 @@
 	let tiposGrafo = $state<string[]>([]);
 	let estadosGrafo = $state<string[]>([]);
 	let categoriasGrafo = $state<string[]>([]);
+
+	let allTags = $state<Tag[]>([]);
+	let tagsPerPosicion = $state<Map<string, Tag[]>>(new Map());
+	let modoSeleccion = $state(false);
+	let posicionesSeleccionadas = $state<Set<string>>(new Set());
+	let bulkTagAñadir = $state('');
+	let bulkTagQuitar = $state('');
+	let bulkWorking = $state(false);
 
 	// T-8.b: detección reactiva de breakpoint para decidir cómo presentar
 	// el modal del mapa. `md` es 768px en Tailwind, mismo valor que usa el
@@ -254,13 +260,15 @@
 
 	async function refresh() {
 		try {
+			await settings.init();
 			const { listPosiciones } = await import('$lib/posiciones');
 			const { listSumisiones } = await import('$lib/sumisiones');
 			const { listTecnicas } = await import('$lib/tecnicas');
-			[posiciones, sumisiones, tecnicas] = await Promise.all([
-				listPosiciones(),
-				listSumisiones(),
-				listTecnicas()
+			const { listTags, getAllTagsPerPosicion } = await import('$lib/tags');
+			[[posiciones, sumisiones, tecnicas], allTags, tagsPerPosicion] = await Promise.all([
+				Promise.all([listPosiciones(), listSumisiones(), listTecnicas()]),
+				listTags(),
+				getAllTagsPerPosicion()
 			]);
 			status = 'ready';
 		} catch (err) {
@@ -270,18 +278,79 @@
 		}
 	}
 
+	async function toggleDisciplina() {
+		const siguiente = settings.disciplinaActiva === 'bjj' ? 'grappling' : 'bjj';
+		await settings.setDisciplinaActiva(siguiente);
+	}
+
+	async function handleBulkAñadirTag() {
+		if (!bulkTagAñadir || posicionesSeleccionadas.size === 0 || bulkWorking) return;
+		bulkWorking = true;
+		try {
+			const { addTagToPosicion, getAllTagsPerPosicion } = await import('$lib/tags');
+			await Promise.all([...posicionesSeleccionadas].map((id) => addTagToPosicion(id, bulkTagAñadir)));
+			tagsPerPosicion = await getAllTagsPerPosicion();
+			bulkTagAñadir = '';
+		} finally {
+			bulkWorking = false;
+		}
+	}
+
+	async function handleBulkQuitarTag() {
+		if (!bulkTagQuitar || posicionesSeleccionadas.size === 0 || bulkWorking) return;
+		bulkWorking = true;
+		try {
+			const { removeTagFromPosicion, getAllTagsPerPosicion } = await import('$lib/tags');
+			await Promise.all([...posicionesSeleccionadas].map((id) => removeTagFromPosicion(id, bulkTagQuitar)));
+			tagsPerPosicion = await getAllTagsPerPosicion();
+			bulkTagQuitar = '';
+		} finally {
+			bulkWorking = false;
+		}
+	}
+
+	function toggleSeleccion(id: string) {
+		const s = new Set(posicionesSeleccionadas);
+		if (s.has(id)) s.delete(id); else s.add(id);
+		posicionesSeleccionadas = s;
+	}
+
+	function salirModoSeleccion() {
+		modoSeleccion = false;
+		posicionesSeleccionadas = new Set();
+		bulkTagAñadir = '';
+		bulkTagQuitar = '';
+	}
+
 	const queryNormalized = $derived(query.trim().toLowerCase());
+
+	// Filtra por disciplina activa: muestra la disciplina seleccionada + ambos.
+	const posicionesPorDisciplina = $derived(
+		posiciones.filter(
+			(p) => p.disciplina === settings.disciplinaActiva || p.disciplina === 'ambos'
+		)
+	);
+	const sumisionesPorDisciplina = $derived(
+		sumisiones.filter(
+			(s) => s.disciplina === settings.disciplinaActiva || s.disciplina === 'ambos'
+		)
+	);
+	const tecnicasPorDisciplina = $derived(
+		tecnicas.filter(
+			(t) => t.disciplina === settings.disciplinaActiva || t.disciplina === 'ambos'
+		)
+	);
 
 	const posicionesFiltradas = $derived(
 		queryNormalized === ''
-			? posiciones
-			: posiciones.filter((p) => p.nombre.toLowerCase().includes(queryNormalized))
+			? posicionesPorDisciplina
+			: posicionesPorDisciplina.filter((p) => p.nombre.toLowerCase().includes(queryNormalized))
 	);
 
 	const sumisionesFiltradas = $derived(
 		queryNormalized === ''
-			? sumisiones
-			: sumisiones.filter((s) => s.nombre.toLowerCase().includes(queryNormalized))
+			? sumisionesPorDisciplina
+			: sumisionesPorDisciplina.filter((s) => s.nombre.toLowerCase().includes(queryNormalized))
 	);
 
 	// Agrupa las posiciones filtradas por categoría manteniendo el orden de
@@ -320,7 +389,7 @@
 	// `listTecnicas` ya ordena por nombre pero no garantiza desempate por
 	// variante; ordenamos en JS para mantener el contrato visual estable.
 	const tecnicasOrdenadas = $derived(
-		[...tecnicas].sort((a, b) => {
+		[...tecnicasPorDisciplina].sort((a, b) => {
 			const nombreCmp = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
 			if (nombreCmp !== 0) return nombreCmp;
 			const va = a.variante ?? '';
@@ -381,7 +450,9 @@
 
 	// Elementos del grafo (nodos + aristas) derivados del catálogo. Se
 	// recalculan solo cuando cambia el catálogo, no en cada render.
-	const grafoElements = $derived(buildGrafoElements(posiciones, sumisiones, tecnicas));
+	const grafoElements = $derived(
+		buildGrafoElements(posicionesPorDisciplina, sumisionesPorDisciplina, tecnicasPorDisciplina)
+	);
 
 	// Helper: cierra el modal actual respetando el dirty handler, y solo
 	// cuando el cierre se confirma (inmediato si limpio, tras "Descartar"
@@ -410,6 +481,8 @@
 	function openTecnica(t: Tecnica) {
 		attemptPushModal({ kind: 'tecnica', id: t.id, nombre: t.nombre });
 	}
+
+	let importarDialogOpen = $state(false);
 
 	function openWizardCrearPosicion() {
 		attemptPushModal({ kind: 'wizard-posicion', modo: 'crear', nombre: 'Nueva posición' });
@@ -526,40 +599,56 @@
 			class="sticky top-14 z-20 -mx-4 space-y-3 border-b border-border bg-background px-4 pb-2"
 		>
 			<!--
-			  Fila 1: toggle Grafo / Lista. Mismo patrón visual que el tablist
-			  anterior (buttons + role=tab + aria-selected + estilo condicional
-			  con tokens semánticos). `min-h-9` para que la fila tenga la misma
-			  altura aunque se cambie de vista y se evite micro-CLS.
+			  Fila 1: toggle Grafo / Lista + toggle de disciplina a la derecha.
+			  Todo en una sola fila para no añadir altura al header sticky.
 			-->
-			<div
-				role="tablist"
-				aria-label="Vista del mapa"
-				class="inline-flex min-h-9 rounded-md border border-border bg-muted p-0.5"
-			>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={vistaPrincipal === 'grafo'}
-					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
-					'grafo'
-						? 'bg-background text-foreground shadow-sm'
-						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => requestVistaChange('grafo')}
+			<div class="flex min-h-9 items-center gap-3">
+				<div
+					role="tablist"
+					aria-label="Vista del mapa"
+					class="inline-flex rounded-md border border-border bg-muted p-0.5"
 				>
-					Grafo
-				</button>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={vistaPrincipal === 'lista'}
-					class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
-					'lista'
-						? 'bg-background text-foreground shadow-sm'
-						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => requestVistaChange('lista')}
-				>
-					Lista
-				</button>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={vistaPrincipal === 'grafo'}
+						class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
+						'grafo'
+							? 'bg-background text-foreground shadow-sm'
+							: 'text-muted-foreground hover:text-foreground'}"
+						onclick={() => requestVistaChange('grafo')}
+					>
+						Grafo
+					</button>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={vistaPrincipal === 'lista'}
+						class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
+						'lista'
+							? 'bg-background text-foreground shadow-sm'
+							: 'text-muted-foreground hover:text-foreground'}"
+						onclick={() => requestVistaChange('lista')}
+					>
+						Lista
+					</button>
+				</div>
+
+				{#if settings.initialized}
+					<button
+						type="button"
+						onclick={toggleDisciplina}
+						class="ml-auto inline-flex rounded-md border border-border bg-muted p-0.5"
+						aria-label="Alternar disciplina entre BJJ y Grappling"
+					>
+						<span class="rounded px-3 py-1.5 text-sm font-medium transition-colors {settings.disciplinaActiva === 'bjj' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">
+							BJJ
+						</span>
+						<span class="rounded px-3 py-1.5 text-sm font-medium transition-colors {settings.disciplinaActiva === 'grappling' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">
+							Grappling
+						</span>
+					</button>
+				{/if}
 			</div>
 
 			<!--
@@ -638,6 +727,16 @@
 						/>
 					</div>
 
+					{#if subVistaLista === 'posiciones'}
+						<Button
+							variant={modoSeleccion ? 'default' : 'outline'}
+							size="sm"
+							onclick={() => { if (modoSeleccion) salirModoSeleccion(); else modoSeleccion = true; }}
+							aria-pressed={modoSeleccion}
+						>
+							{modoSeleccion ? 'Cancelar selección' : 'Seleccionar'}
+						</Button>
+					{/if}
 					{#if subVistaLista === 'tecnicas'}
 						<MultiChips
 							options={tipoOptions}
@@ -764,14 +863,27 @@
 						</h2>
 						<ul class="space-y-2">
 							{#each grupo.items as p (p.id)}
+								{@const seleccionada = posicionesSeleccionadas.has(p.id)}
+								{@const pTags = tagsPerPosicion.get(p.id) ?? []}
 								<li>
 									<button
 										type="button"
-										class="block w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-										onclick={() => openPosicion(p)}
+										class="block w-full rounded-lg border p-3 text-left shadow-xs transition-colors focus-visible:outline-none {modoSeleccion
+											? seleccionada
+												? 'border-primary bg-primary/5 focus-visible:bg-primary/10'
+												: 'border-border bg-card hover:bg-accent focus-visible:bg-accent'
+											: 'border-border bg-card hover:bg-accent focus-visible:bg-accent'}"
+										onclick={() => modoSeleccion ? toggleSeleccion(p.id) : openPosicion(p)}
 									>
-										<div class="font-medium">{p.nombre}</div>
-										<div class="mt-1 flex flex-wrap gap-1">
+										<div class="flex items-center gap-2">
+											{#if modoSeleccion}
+												<span class="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border {seleccionada ? 'bg-primary border-primary' : 'bg-background'}">
+													{#if seleccionada}<CheckIcon class="h-3 w-3 text-primary-foreground" />{/if}
+												</span>
+											{/if}
+											<span class="font-medium">{p.nombre}</span>
+										</div>
+										<div class="mt-1 flex flex-wrap gap-1 {modoSeleccion ? 'ml-6' : ''}">
 											{#if p.tipo}
 												<span class="rounded px-2 py-0.5 text-xs {TIPO_ROL_BADGE[p.tipo]}">
 													{TIPO_ROL_LABEL[p.tipo]}
@@ -780,6 +892,12 @@
 											<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 												{CATEGORIA_LABEL[p.categoria]}
 											</span>
+											{#each pTags as tag (tag.id)}
+												<span
+													class="rounded px-2 py-0.5 text-xs font-medium text-white"
+													style="background-color: {tag.color}"
+												>{tag.nombre}</span>
+											{/each}
 										</div>
 									</button>
 								</li>
@@ -909,11 +1027,62 @@
 		<DropdownMenu.Content align="end" side="top" sideOffset={8}>
 			<DropdownMenu.Item onSelect={openWizardCrearPosicion}>Nueva posición</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={openWizardCrearSumision}>Nueva sumisión</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={() => (importarDialogOpen = true)}>✨ Importar de clase</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 {/if}
 
+<!-- Panel bulk edit tags (visible cuando hay selección activa) -->
+{#if modoSeleccion && posicionesSeleccionadas.size > 0}
+	<div class="fixed right-0 bottom-14 left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg">
+		<div class="flex flex-wrap items-center gap-3">
+			<span class="text-sm font-medium">{posicionesSeleccionadas.size} seleccionada{posicionesSeleccionadas.size !== 1 ? 's' : ''}</span>
+			<div class="flex flex-1 flex-wrap items-center gap-2">
+				<select
+					bind:value={bulkTagAñadir}
+					class="h-8 rounded border border-border bg-background px-2 text-sm"
+					disabled={bulkWorking}
+				>
+					<option value="">+ Añadir tag…</option>
+					{#each allTags as tag (tag.id)}
+						<option value={tag.id}>{tag.nombre}</option>
+					{/each}
+				</select>
+				{#if bulkTagAñadir}
+					<Button size="sm" onclick={handleBulkAñadirTag} disabled={bulkWorking}>
+						{bulkWorking ? '…' : 'Aplicar'}
+					</Button>
+				{/if}
+				<select
+					bind:value={bulkTagQuitar}
+					class="h-8 rounded border border-border bg-background px-2 text-sm"
+					disabled={bulkWorking}
+				>
+					<option value="">— Quitar tag…</option>
+					{#each allTags as tag (tag.id)}
+						<option value={tag.id}>{tag.nombre}</option>
+					{/each}
+				</select>
+				{#if bulkTagQuitar}
+					<Button size="sm" variant="outline" onclick={handleBulkQuitarTag} disabled={bulkWorking}>
+						{bulkWorking ? '…' : 'Quitar'}
+					</Button>
+				{/if}
+			</div>
+			<button type="button" onclick={salirModoSeleccion} aria-label="Cerrar selección">
+				<XIcon class="h-5 w-5 text-muted-foreground hover:text-foreground" />
+			</button>
+		</div>
+	</div>
+{/if}
+
 <MapaModalHost bind:this={modalHost} onCatalogChanged={refresh} {presentation} />
+
+<ImportarClaseDialog
+	bind:open={importarDialogOpen}
+	onClose={() => (importarDialogOpen = false)}
+	onCatalogChanged={refresh}
+/>
 
 <!--
   AlertDialog "¿Descartar cambios del grafo?" (T-9.b.it3). Se abre

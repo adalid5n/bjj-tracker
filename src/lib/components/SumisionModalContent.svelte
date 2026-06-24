@@ -143,7 +143,7 @@
 -->
 <div class="space-y-3">
 	<!-- Notas (T-3.it6): solo en modo avanzado y si hay contenido. -->
-	{#if settings.modoAvanzado && sumision.notas?.trim().length > 0}
+	{#if sumision.notas?.trim().length > 0}
 		<p class="text-sm whitespace-pre-wrap text-muted-foreground">{sumision.notas}</p>
 	{/if}
 
@@ -203,24 +203,33 @@
 	  motivo del bloqueo de forma accesible.
 	-->
 	{#if status === 'ready'}
-		<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">
-			<Button variant="outline" size="sm" onclick={handleEdit} disabled={deleting}>
-				Editar
-			</Button>
-			{#if tecnicasCount > 0}
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<span {...props} class="inline-flex">
-									<Button variant="destructive" size="sm" disabled>Borrar</Button>
-								</span>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>{motivoBloqueoBorrado}</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			{:else}
+		{#if tecnicas.length > 0}
+			<!-- Bloqueado por técnicas: mostrar links navegables -->
+			<div class="mt-3 space-y-2 border-t border-border pt-3">
+				<p class="text-xs text-muted-foreground">
+					Borra antes {tecnicas.length === 1 ? 'esta técnica' : `estas ${tecnicas.length} técnicas`}:
+				</p>
+				<div class="flex flex-wrap gap-1">
+					{#each tecnicas as t (t.id)}
+						<button
+							type="button"
+							onclick={() => pushTecnica(t)}
+							class="rounded border border-border px-2 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+						>
+							{t.nombre}{#if t.variante} ({t.variante}){/if}
+						</button>
+					{/each}
+				</div>
+				<div class="flex justify-end gap-2">
+					<Button variant="outline" size="sm" onclick={handleEdit}>Editar</Button>
+					<Button variant="destructive" size="sm" disabled>Borrar</Button>
+				</div>
+			</div>
+		{:else}
+			<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">
+				<Button variant="outline" size="sm" onclick={handleEdit} disabled={deleting}>
+					Editar
+				</Button>
 				<Button
 					variant="destructive"
 					size="sm"
@@ -229,8 +238,8 @@
 				>
 					{deleting ? 'Borrando…' : 'Borrar'}
 				</Button>
-			{/if}
-		</div>
+			</div>
+		{/if}
 	{/if}
 </div>
 

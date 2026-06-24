@@ -7,6 +7,9 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 ## [Unreleased]
 
 ### Added
+- **Importación de clase vía IA** (Groq / llama-3.3-70b): pipeline de 3 fases — normalización de texto dictado por voz (corrige términos, resalta cambios), extracción de posiciones/técnicas/sumisiones, validación automática con rúbrica. Dialog paso a paso con revisión y edición de detalles de ejecución.
+- **Tags para posiciones**: sistema de etiquetas con colores preset. Nuevo paso en `PosicionWizard`; gestión bulk (añadir/quitar) en modo edición del mapa.
+- **Filtro por disciplina** (BJJ / Grappling): campo `disciplina` en posiciones, técnicas y sumisiones. Toggle en `/ajustes` y en la barra del mapa. El grafo y la lista filtran según la disciplina activa.
 - Selected state en grafo + reorden de chips + Origen/Destino navegables en mapa.
 - "+ Crear nueva" en wizards standalone.
 
@@ -14,8 +17,11 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 - Toast de actualización PWA: feedback visual y fallback de reload al pulsar Recargar.
 - Bug z-index AlertDialog en mapa.
 - Bug de complementaria en flujos de roll.
+- Scroll en mapa roto al añadir toggle de disciplina como fila extra (movido a la misma fila que tabs Grafo/Lista).
 
 ### Changed
+- Notas (posición, sumisión) y detalles/errores comunes (técnica) siempre visibles en modales cuando tienen contenido, sin requerir vista avanzada.
+- Categorías de posición simplificadas: `control_superior` + `espalda` → `control` (4 valores: guardia, control, transicion, otro).
 - Pulido UX en rolls, mapa y wizards (post-it.6).
 
 ## [0.6.0] — 2026-05-20

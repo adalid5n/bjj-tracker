@@ -12,6 +12,7 @@ function pos(id: string, nombre = id, overrides: Partial<Posicion> = {}): Posici
 		categoria: 'guardia',
 		tipo: 'neutral',
 		notas: '',
+		disciplina: 'bjj',
 		created_at: ts,
 		updated_at: ts,
 		...overrides
@@ -19,7 +20,7 @@ function pos(id: string, nombre = id, overrides: Partial<Posicion> = {}): Posici
 }
 
 function sum(id: string, nombre = id): SumisionTerminal {
-	return { id, nombre, notas: '', created_at: ts, updated_at: ts };
+	return { id, nombre, notas: '', disciplina: 'bjj', created_at: ts, updated_at: ts };
 }
 
 function tec(id: string, overrides: Partial<Tecnica> & Pick<Tecnica, 'posicion_origen_id'>): Tecnica {
@@ -32,6 +33,7 @@ function tec(id: string, overrides: Partial<Tecnica> & Pick<Tecnica, 'posicion_o
 		estado: 'probando',
 		detalles: '',
 		errores_comunes: '',
+		disciplina: 'bjj',
 		created_at: ts,
 		updated_at: ts,
 		...rest

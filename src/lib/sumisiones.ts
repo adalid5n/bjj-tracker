@@ -38,9 +38,9 @@ export async function createSumision(data: NewSumisionTerminal): Promise<Sumisio
 		updated_at: now
 	};
 	await run(
-		`INSERT INTO sumisiones_terminales (id, nombre, notas, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?)`,
-		[sumision.id, sumision.nombre, sumision.notas, sumision.created_at, sumision.updated_at]
+		`INSERT INTO sumisiones_terminales (id, nombre, notas, disciplina, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		[sumision.id, sumision.nombre, sumision.notas, sumision.disciplina, sumision.created_at, sumision.updated_at]
 	);
 	return sumision;
 }
@@ -50,9 +50,9 @@ export async function updateSumision(data: SumisionTerminalUpdate): Promise<void
 	const now = new Date().toISOString();
 	await run(
 		`UPDATE sumisiones_terminales
-		 SET nombre = ?, notas = ?, updated_at = ?
+		 SET nombre = ?, notas = ?, disciplina = ?, updated_at = ?
 		 WHERE id = ?`,
-		[data.nombre, data.notas, now, data.id]
+		[data.nombre, data.notas, data.disciplina, now, data.id]
 	);
 }
 

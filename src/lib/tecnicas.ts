@@ -62,8 +62,8 @@ export async function createTecnica(data: NewTecnica): Promise<Tecnica> {
 		`INSERT INTO tecnicas (
 			id, nombre, variante, posicion_origen_id, posicion_destino_id,
 			sumision_destino_id, tipo, estado, detalles, errores_comunes,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			disciplina, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			tecnica.id,
 			tecnica.nombre,
@@ -75,6 +75,7 @@ export async function createTecnica(data: NewTecnica): Promise<Tecnica> {
 			tecnica.estado,
 			tecnica.detalles,
 			tecnica.errores_comunes,
+			tecnica.disciplina,
 			tecnica.created_at,
 			tecnica.updated_at
 		]
@@ -90,7 +91,7 @@ export async function updateTecnica(data: TecnicaUpdate): Promise<void> {
 		`UPDATE tecnicas
 		 SET nombre = ?, variante = ?, posicion_origen_id = ?, posicion_destino_id = ?,
 		     sumision_destino_id = ?, tipo = ?, estado = ?, detalles = ?, errores_comunes = ?,
-		     updated_at = ?
+		     disciplina = ?, updated_at = ?
 		 WHERE id = ?`,
 		[
 			data.nombre,
@@ -102,6 +103,7 @@ export async function updateTecnica(data: TecnicaUpdate): Promise<void> {
 			data.estado,
 			data.detalles,
 			data.errores_comunes,
+			data.disciplina,
 			now,
 			data.id
 		]

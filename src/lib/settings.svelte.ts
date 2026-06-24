@@ -5,7 +5,7 @@
  * nunca a nivel de módulo en `.svelte.ts` (rompe el bundle minificado
  * en prod — ver CONTEXTO_AGENTE.md, histórico T-8).
  *
- * Hidratación: `init()` lee de BD y poblará `#modoAvanzado`. Es
+ * Hidratación: `init()` lee de BD y poblará los campos. Es
  * idempotente y se puede llamar desde cualquier consumidor sin riesgo
  * — sigue el patrón de `theme.init()` y de los DAOs (`await init()` al
  * principio de cada función). La primera llamada hace el round-trip a
@@ -19,14 +19,20 @@
 import { getSetting, setSetting } from '$lib/settings';
 
 const KEY_MODO_AVANZADO = 'modo_avanzado';
+const KEY_DISCIPLINA_ACTIVA = 'disciplina_activa';
 
 class SettingsState {
 	#modoAvanzado = $state(false);
+	#disciplinaActiva = $state<'bjj' | 'grappling'>('bjj');
 	#initialized = $state(false);
 	#initPromise: Promise<void> | null = null;
 
 	get modoAvanzado(): boolean {
 		return this.#modoAvanzado;
+	}
+
+	get disciplinaActiva(): 'bjj' | 'grappling' {
+		return this.#disciplinaActiva;
 	}
 
 	get initialized(): boolean {
@@ -42,10 +48,14 @@ class SettingsState {
 	async init(): Promise<void> {
 		if (this.#initPromise) return this.#initPromise;
 		this.#initPromise = (async () => {
-			const raw = await getSetting(KEY_MODO_AVANZADO);
+			const [rawAvanzado, rawDisciplina] = await Promise.all([
+				getSetting(KEY_MODO_AVANZADO),
+				getSetting(KEY_DISCIPLINA_ACTIVA)
+			]);
 			// `raw === null` solo debería darse si la migración no corrió
-			// (BD inconsistente). Default seguro: hobbyist.
-			this.#modoAvanzado = raw === 'true';
+			// (BD inconsistente). Defaults seguros.
+			this.#modoAvanzado = rawAvanzado === 'true';
+			this.#disciplinaActiva = rawDisciplina === 'grappling' ? 'grappling' : 'bjj';
 			this.#initialized = true;
 		})();
 		return this.#initPromise;
@@ -54,6 +64,11 @@ class SettingsState {
 	async setModoAvanzado(v: boolean): Promise<void> {
 		await setSetting(KEY_MODO_AVANZADO, v ? 'true' : 'false');
 		this.#modoAvanzado = v;
+	}
+
+	async setDisciplinaActiva(v: 'bjj' | 'grappling'): Promise<void> {
+		await setSetting(KEY_DISCIPLINA_ACTIVA, v);
+		this.#disciplinaActiva = v;
 	}
 }
 

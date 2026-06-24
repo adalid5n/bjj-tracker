@@ -1,8 +1,107 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-05-22 (sesión 45, F2 implementada y rechazada en preview; pivot a F3 cerrado)
+**Última actualización:** 2026-06-24 (sesiones 46-48 — tags, disciplina, importación IA)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
-**Próxima iteración:** **F3 de visualización de contras** — sub-grafo filtrado del grafo principal, contras como aristas (no nodos), color "amenazante" rojo apagado, posiciones fcose preservadas. Pendiente plan formal (T9 a redactar) y rama nueva `feature/contras-subgrafo` desde main. Aprovecha ~60% del cableado de F2 (botón, $effect async, AlertDialog dirty, breadcrumb integrado). Ramas F1 (`feature/contras-visuales`, commit `f936282`) y F2 (`feature/contras-mapa-inplace`, commit `dabfa88`) parqueadas en remoto como spikes documentados. Otros candidatos del backlog que siguen vivos: reducir copy en pantallas, sugerencia automática de compañero, "Forzar actualización" en `/ajustes`, Node 24 en workflow, sistematizar sombras en tokens.
+**Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
+
+---
+
+## Sesiones 46-48 (2026-06-24) — Tags, disciplina, simplificación categorías + importación IA de clase
+
+**Hecho — cuatro bloques de trabajo sin tag de iteración, todos en `main`.**
+
+### Bloque 1 — Sistema de tags para posiciones (schema V7)
+
+- **`SCHEMA_V7_MIGRATION`**: tablas `tags` (id, nombre, color, created_at) y `posicion_tags` (posicion_id, tag_id). Relación N:M posición↔tag con cascade delete.
+- **`src/lib/tags.ts`** (nuevo): DAL completo — `listTags`, `createTag`, `updateTag`, `deleteTag`, `addTagToPosicion`, `removeTagFromPosicion`, `getTagsForPosicion`, `getAllTagsPerPosicion`. Colores preset en `TAG_PRESET_COLORS`.
+- **`PosicionWizard.svelte`**: nuevo paso "Tags" (paso 5, antes de Notas). Selección de tags existentes + creación inline de nuevo tag con color picker de preset. `allTags` cargado en `onMount`.
+- **`mapa/+page.svelte`**: bulk tag — selección múltiple de posiciones + "Añadir tag" / "Quitar tag" en modo edición. `tagsPerPosicion` como Map cargado junto a los datos principales.
+- **`types/index.ts`**: interfaz `Tag`.
+
+### Bloque 2 — Filtro por disciplina (BJJ / Grappling)
+
+- **`Disciplina`** = `'bjj' | 'grappling' | 'ambos'` en types.
+- Campo `disciplina` añadido a `posiciones`, `tecnicas`, `sumisiones_terminales` (no requirió migración separada — aprovechó V7 o campo DEFAULT en creación).
+- **`settings.svelte.ts`**: `disciplinaActiva` (`'bjj'|'grappling'`) persistida en `app_settings` vía `KEY_DISCIPLINA_ACTIVA`. `setDisciplinaActiva()`.
+- **`ajustes/+page.svelte`**: selector de disciplina (toggle BJJ / Grappling) bajo el switch de vista avanzada.
+- **`mapa/+page.svelte`**: toggle de disciplina integrado en la misma fila que tabs Grafo/Lista (fix scroll: antes ocupaba fila propia y rompía `calc(100dvh-13rem)`). El grafo y la lista se filtran por `disciplinaActiva`.
+- **Wizards**: `PosicionWizard`, `TecnicaWizard`, `SumisionWizard` arrancan con `disciplina = settings.disciplinaActiva` y permiten cambiarlo por posición.
+
+### Bloque 3 — Simplificación de categorías de posición (schema V8)
+
+- Fusión `control_superior` + `espalda` → `control`. Quedan 4 valores: `guardia | control | transicion | otro`.
+- **`SCHEMA_V8_MIGRATION`**: dos `UPDATE posiciones SET categoria = 'control'` para los dos valores antiguos.
+- **`CategoriaPosicion`** en types actualizado.
+- Todos los selectores de categoría en wizards y filtros actualizados.
+
+### Bloque 4 — Importación de clase vía IA (feature principal)
+
+Pipeline de 3 fases con Groq (llama-3.3-70b-versatile):
+
+**Fase 1 — Normalización** (`normalizarDescripcion`):
+- Corrección de términos mal transcritos por voz (`look down` → `Lockdown`, `Underwood` → `Underhook`). Marca correcciones con `**...**` e inciertos con `~~...~~`.
+- UI: panel superior read-only con palabras originales cambiadas resaltadas (amarillo), panel inferior editable con correcciones resaltadas (amarillo = corregido, naranja = incierto). `spellcheck="false"` en el contenteditable. Misma altura `h-52` en ambos paneles.
+- `contenteditable` gestionado con `bind:this` + `$effect` que setea `innerHTML` directamente (no Svelte rendering — conflicto con DOM management).
+
+**Fase 2 — Extracción** (`generarPropuestaDeClase`):
+- Extrae posiciones nuevas, sumisiones nuevas y técnicas con sus detalles de ejecución.
+- Reglas explícitas en el prompt: controles no son posiciones (lockdown, underhook), variantes de posición (Dogfight underhook vs overhook), tildes, detalles de setup/ejecución en campo `detalles`.
+
+**Fase 3 — Validación** (`validarPropuesta`):
+- Rúbrica explícita: controles como posiciones → eliminar; posición no en texto → eliminar; genérico+variante coexistiendo → eliminar genérico; dos variantes opuestas → eliminar la no confirmada en texto.
+- Restauración de `detalles` en código tras la validación (el modelo los elimina al devolver JSON reducido) — `Map<nombre, detalles>` del extractor.
+- Silenciosa para el usuario (loading "Verificando propuesta…").
+
+**UI del dialog**:
+- Pasos: `input` → `normalizado` → `review` → `detalles`.
+- Step `detalles`: textareas pre-rellenas con los detalles extraídos por la IA.
+- `capitalizeFirst` aplicado en todos los nombres al construir el draft.
+
+### Bloque 5 — Notas/detalles siempre visibles en modales
+
+- `TecnicaModalContent`: `detalles` y `errores_comunes` ahora visibles siempre que tengan contenido (antes solo en `modoAvanzado`).
+- `PosicionModalContent`: `notas` siempre visible si hay contenido.
+- `SumisionModalContent`: `notas` siempre visible si hay contenido.
+
+### Decisiones clave
+
+- **Tags en posiciones únicamente** (por ahora). Técnicas y sumisiones no tienen tags — añadirlos requeriría tablas de unión adicionales; se deja para cuando haya caso de uso claro.
+- **Disciplina `'ambos'`** en el tipo pero los filtros de mapa solo muestran `bjj` o `grappling` según la activa, más los que tienen `'ambos'`.
+- **Validator silencioso**: el usuario no ve qué corrigió el validador — se eliminó el banner verde tras feedback. La validación mejora la propuesta sin ruido visual.
+- **`detalles` restaurados en código**, no vía prompt: más fiable que pedirle al modelo que propague un campo opcional.
+- **Groq key en `.env.local`** (`PUBLIC_GROQ_KEY`). NUNCA comitear. La app falla con error explícito si la key no está.
+
+### Archivos modificados/nuevos
+
+**Nuevos:**
+- `src/lib/ai.ts`
+- `src/lib/components/ImportarClaseDialog.svelte`
+- `src/lib/tags.ts`
+
+**Modificados:**
+- `src/lib/db/schema.ts` (V7 + V8)
+- `src/lib/types/index.ts` (Tag, CategoriaPosicion, Disciplina)
+- `src/lib/settings.svelte.ts` (disciplinaActiva)
+- `src/lib/posiciones.ts` (disciplina)
+- `src/lib/sumisiones.ts` (disciplina)
+- `src/lib/tecnicas.ts` (disciplina)
+- `src/lib/components/PosicionWizard.svelte` (tags + disciplina)
+- `src/lib/components/PosicionModalContent.svelte` (notas siempre visible)
+- `src/lib/components/SumisionModalContent.svelte` (notas siempre visible)
+- `src/lib/components/TecnicaModalContent.svelte` (detalles siempre visible)
+- `src/lib/components/TecnicaWizard.svelte` (disciplina)
+- `src/lib/components/SumisionWizard.svelte` (disciplina)
+- `src/lib/components/mapa-modal-stack.svelte.ts`
+- `src/lib/components/RollEditor.svelte`
+- `src/routes/mapa/+page.svelte` (disciplina toggle + tags bulk + fix scroll)
+- `src/routes/ajustes/+page.svelte` (selector disciplina)
+- `src/routes/rolls/+page.svelte`
+- `src/lib/grafo.spec.ts`
+- `.claude/ESTADO_ACTUAL.md` (esta entrada)
+
+### Próximo paso concreto
+
+Decidir próxima iteración entre candidatos. La más preparada técnicamente es F3 (contras sub-grafo) — plan T9 pendiente de redactar. Alternativas: tags en técnicas/sumisiones si el owner reporta necesidad, o candidatos del ROADMAP.
 
 ---
 

@@ -43,17 +43,10 @@
 
 	// T-13: orden de categorías idéntico al de `/mapa` y `RollEditor`. Si
 	// alguna vez cambia el orden canónico, ese cambio debe replicarse aquí.
-	const CATEGORIAS_ORDEN: CategoriaPosicion[] = [
-		'guardia',
-		'control_superior',
-		'espalda',
-		'transicion',
-		'otro'
-	];
+	const CATEGORIAS_ORDEN: CategoriaPosicion[] = ['guardia', 'control', 'transicion', 'otro'];
 	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = {
 		guardia: 'Guardia',
-		control_superior: 'Control superior',
-		espalda: 'Espalda',
+		control: 'Control',
 		transicion: 'Transición',
 		otro: 'Otro'
 	};

@@ -337,16 +337,80 @@ function migrate5To6(db: MigrationDb): void {
 	db.exec(SCHEMA_V6_MIGRATION);
 }
 
+export const SCHEMA_V7_MIGRATION = `
+CREATE TABLE tags (
+  id TEXT PRIMARY KEY,
+  nombre TEXT NOT NULL UNIQUE,
+  color TEXT NOT NULL DEFAULT '#6366f1',
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE posicion_tags (
+  posicion_id TEXT NOT NULL REFERENCES posiciones(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (posicion_id, tag_id)
+);
+
+UPDATE schema_meta SET value = '7' WHERE key = 'version';
+`;
+
+function migrate6To7(db: MigrationDb): void {
+	db.exec(SCHEMA_V7_MIGRATION);
+}
+
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v7:
- *   { from: 6, to: 7, run: (db) => { ... } }
+ * DDL incremental para subir de schema v7 a v8.
+ *
+ * Simplificación de categorías de posición: fusiona `control_superior` y
+ * `espalda` en un único valor `control`. Quedan 4 valores:
+ * guardia | control | transicion | otro.
+ *
+ * Solo es un UPDATE de datos — no cambia DDL (SQLite no tiene CHECK en
+ * `categoria`; el dominio lo impone la capa TS con el tipo union).
+ */
+export const SCHEMA_V8_MIGRATION = `
+UPDATE posiciones SET categoria = 'control' WHERE categoria = 'control_superior';
+UPDATE posiciones SET categoria = 'control' WHERE categoria = 'espalda';
+UPDATE schema_meta SET value = '8' WHERE key = 'version';
+`;
+
+function migrate7To8(db: MigrationDb): void {
+	db.exec(SCHEMA_V8_MIGRATION);
+}
+
+/**
+ * DDL incremental para subir de schema v8 a v9.
+ *
+ * Añade campo `disciplina` (bjj | grappling | ambos) a posiciones,
+ * tecnicas y sumisiones_terminales. Default 'bjj' para registros
+ * existentes (se puede cambiar en bulk desde el mapa).
+ * También siembra `disciplina_activa` en app_settings si no existe.
+ */
+export const SCHEMA_V9_MIGRATION = `
+ALTER TABLE posiciones ADD COLUMN disciplina TEXT NOT NULL DEFAULT 'bjj';
+ALTER TABLE tecnicas ADD COLUMN disciplina TEXT NOT NULL DEFAULT 'bjj';
+ALTER TABLE sumisiones_terminales ADD COLUMN disciplina TEXT NOT NULL DEFAULT 'bjj';
+INSERT OR IGNORE INTO app_settings (key, value) VALUES ('disciplina_activa', 'bjj');
+UPDATE schema_meta SET value = '9' WHERE key = 'version';
+`;
+
+function migrate8To9(db: MigrationDb): void {
+	db.exec(SCHEMA_V9_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v10:
+ *   { from: 9, to: 10, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
 	{ from: 2, to: 3, run: migrate2To3 },
 	{ from: 3, to: 4, run: migrate3To4 },
 	{ from: 4, to: 5, run: migrate4To5 },
-	{ from: 5, to: 6, run: migrate5To6 }
+	{ from: 5, to: 6, run: migrate5To6 },
+	{ from: 6, to: 7, run: migrate6To7 },
+	{ from: 7, to: 8, run: migrate7To8 },
+	{ from: 8, to: 9, run: migrate8To9 }
 ];
 
 /**

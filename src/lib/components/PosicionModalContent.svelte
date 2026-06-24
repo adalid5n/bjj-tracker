@@ -21,6 +21,7 @@
 	import type {
 		CategoriaPosicion,
 		Posicion,
+		Tag,
 		Tecnica,
 		TipoRolPosicion,
 		TipoTecnica
@@ -32,8 +33,7 @@
 
 	const CATEGORIA_LABEL: Record<CategoriaPosicion, string> = {
 		guardia: 'Guardia',
-		control_superior: 'Control superior',
-		espalda: 'Espalda',
+		control: 'Control',
 		transicion: 'Transición',
 		otro: 'Otro'
 	};
@@ -82,6 +82,7 @@
 	// decidir si el botón Borrar está habilitado (desktop only).
 	let rollsProblemaCount = $state<number>(0);
 	let deleting = $state(false);
+	let tags = $state<Tag[]>([]);
 	// AlertDialog de confirmación de borrado (sustituye al `confirm()`
 	// nativo del agente previo). bits-ui controla el overlay del
 	// AlertDialog sin chocar con el Dialog que monta `MapaModalHost`.
@@ -106,12 +107,15 @@
 				import('$lib/rolls')
 			]);
 
-			const [tecs, todasPos, todasSum, rollsCount] = await Promise.all([
+			const { getTagsForPosicion } = await import('$lib/tags');
+			const [tecs, todasPos, todasSum, rollsCount, tagsLoaded] = await Promise.all([
 				getTecnicasByPosicion(posicion.id),
 				listPosiciones(),
 				listSumisiones(),
-				countRollsByPosicion(posicion.id)
+				countRollsByPosicion(posicion.id),
+				getTagsForPosicion(posicion.id)
 			]);
+			tags = tagsLoaded;
 
 			posicionesById = Object.fromEntries(todasPos.map((p) => [p.id, p.nombre]));
 			sumisionesById = Object.fromEntries(todasSum.map((s) => [s.id, s.nombre]));
@@ -284,7 +288,7 @@
 -->
 <div class="flex h-full min-h-0 flex-col">
 	<div class="-mx-3 min-h-0 flex-1 space-y-3 overflow-y-auto px-3">
-	<!-- Chips de tipo + categoría: mismo estilo que /mapa -->
+	<!-- Chips de tipo + categoría + tags -->
 	<div class="flex flex-wrap gap-1">
 		{#if posicion.tipo}
 			<span class="rounded px-2 py-0.5 text-xs {TIPO_ROL_BADGE[posicion.tipo]}">
@@ -294,10 +298,16 @@
 		<span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 			{CATEGORIA_LABEL[posicion.categoria]}
 		</span>
+		{#each tags as tag (tag.id)}
+			<span
+				class="rounded px-2 py-0.5 text-xs font-medium text-white"
+				style="background-color: {tag.color}"
+			>{tag.nombre}</span>
+		{/each}
 	</div>
 
 	<!-- Notas (T-3.it6): solo en modo avanzado y si hay contenido. -->
-	{#if settings.modoAvanzado && posicion.notas.trim().length > 0}
+	{#if posicion.notas.trim().length > 0}
 		<p class="text-sm whitespace-pre-wrap text-muted-foreground">{posicion.notas}</p>
 	{/if}
 
@@ -453,34 +463,58 @@
 	  emiten hover, el span sí) para mostrar el motivo del bloqueo.
 	-->
 	{#if status === 'ready'}
-		<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">
-			<Button variant="outline" size="sm" onclick={handleEdit} disabled={deleting}>
-				Editar
-			</Button>
-			{#if refsBloqueantes > 0}
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<span {...props} class="inline-flex">
-									<Button variant="destructive" size="sm" disabled>Borrar</Button>
-								</span>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>{motivoBloqueoBorrado}</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			{:else}
-				<Button
-					variant="destructive"
-					size="sm"
-					onclick={handleDeleteClick}
-					disabled={deleting}
-				>
-					{deleting ? 'Borrando…' : 'Borrar'}
+		{#if tecnicas.length > 0}
+			<!-- Bloqueado por técnicas: mostrar links navegables -->
+			<div class="mt-3 space-y-2 border-t border-border pt-3">
+				<p class="text-xs text-muted-foreground">
+					Borra antes {tecnicas.length === 1 ? 'esta técnica' : `estas ${tecnicas.length} técnicas`}:
+				</p>
+				<div class="flex flex-wrap gap-1">
+					{#each tecnicas as t (t.id)}
+						<button
+							type="button"
+							onclick={() => pushTecnica(t)}
+							class="rounded border border-border px-2 py-0.5 text-xs transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+						>
+							{t.nombre}{#if t.variante} ({t.variante}){/if}
+						</button>
+					{/each}
+				</div>
+				<div class="flex justify-end gap-2">
+					<Button variant="outline" size="sm" onclick={handleEdit}>Editar</Button>
+					<Button variant="destructive" size="sm" disabled>Borrar</Button>
+				</div>
+			</div>
+		{:else}
+			<div class="mt-3 flex justify-end gap-2 border-t border-border pt-3">
+				<Button variant="outline" size="sm" onclick={handleEdit} disabled={deleting}>
+					Editar
 				</Button>
-			{/if}
-		</div>
+				{#if rollsProblemaCount > 0}
+					<Tooltip.Provider>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<span {...props} class="inline-flex">
+										<Button variant="destructive" size="sm" disabled>Borrar</Button>
+									</span>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>{motivoBloqueoBorrado}</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				{:else}
+					<Button
+						variant="destructive"
+						size="sm"
+						onclick={handleDeleteClick}
+						disabled={deleting}
+					>
+						{deleting ? 'Borrando…' : 'Borrar'}
+					</Button>
+				{/if}
+			</div>
+		{/if}
 	{/if}
 </div>
 

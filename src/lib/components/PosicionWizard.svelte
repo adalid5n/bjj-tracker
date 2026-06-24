@@ -61,7 +61,8 @@
 	import Combobox from '$lib/components/Combobox.svelte';
 
 	type ComboboxItem = { id: string; label: string; sublabel?: string };
-	import type { CategoriaPosicion, Posicion, TipoRolPosicion } from '$lib/types';
+	import type { CategoriaPosicion, Disciplina, Posicion, Tag, TipoRolPosicion } from '$lib/types';
+	import { TAG_PRESET_COLORS } from '$lib/tags';
 	import { mapaModalStack, posicionWizardDraft } from './mapa-modal-stack.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
@@ -126,8 +127,7 @@
 
 	const CATEGORIAS: { value: CategoriaPosicion; label: string }[] = [
 		{ value: 'guardia', label: 'Guardia' },
-		{ value: 'control_superior', label: 'Control superior' },
-		{ value: 'espalda', label: 'Espalda' },
+		{ value: 'control', label: 'Control' },
 		{ value: 'transicion', label: 'Transición' },
 		{ value: 'otro', label: 'Otro' }
 	];
@@ -142,16 +142,22 @@
 		{ value: 'neutral', label: 'Neutral' }
 	];
 
-	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria, 5=Notas.
-	// El paso 5 (Notas) solo aparece en modo avanzado (T-3.it6).
+	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
+		{ value: 'bjj', label: 'BJJ' },
+		{ value: 'grappling', label: 'Grappling' },
+		{ value: 'ambos', label: 'Ambos' }
+	];
+
+	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria,
+	// 5=Tags (siempre), 6=Notas (solo modo avanzado, T-3.it6).
 	// Cuando el wizard es un sub-wizard de "+ Crear nueva complementaria"
 	// (con o sin id del padre), el paso 4 se salta — la complementaria es
 	// implícita (el padre). El último paso visible siempre es el que renderiza
 	// "Guardar".
 	const visibleSteps = $derived<number[]>(
 		isComplementariaSubWizard
-			? settings.modoAvanzado ? [1, 2, 3, 5] : [1, 2, 3]
-			: settings.modoAvanzado ? [1, 2, 3, 4, 5] : [1, 2, 3, 4]
+			? settings.modoAvanzado ? [1, 2, 3, 5, 6] : [1, 2, 3, 5]
+			: settings.modoAvanzado ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]
 	);
 	const totalSteps = $derived(visibleSteps.length);
 
@@ -171,10 +177,20 @@
 	// `notas` (T-3.it6): editable bajo `settings.modoAvanzado`. En hobbyist
 	// no se renderiza el paso, pero `notasOriginal` se sigue cargando de BD
 	// para preservar el dato existente al editar (clave: si un user creó la
-	// posición con notas en avanzado y luego cambia a hobbyist y la edita,
-	// las notas no se pisan con '' — se mantienen).
+	// posición con avanzado y luego la edita en hobbyist, las notas no se
+	// pisan con '' — se mantienen).
 	let notas = $state('');
 	let notasOriginal = $state('');
+	// `disciplina`: el usuario puede especificar si la posición pertenece a
+	// BJJ, Grappling o ambos. Arranca con la disciplina activa global.
+	let disciplina = $state<Disciplina>(settings.disciplinaActiva);
+
+	let allTags = $state<Tag[]>([]);
+	let tagsSeleccionados = $state<string[]>([]);
+	let nuevoTagNombre = $state('');
+	let nuevoTagColor = $state(TAG_PRESET_COLORS[5]);
+	let creandoNuevoTag = $state(false);
+	let savingTag = $state(false);
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -230,7 +246,12 @@
 	onMount(async () => {
 		// Hidrata el state de settings (idempotente). Permite leer
 		// `settings.modoAvanzado` sincrónicamente desde el render.
-		settings.init();
+		await settings.init();
+		// Ahora que settings está hidratado, actualiza disciplina con el
+		// valor real (solo en crear; en editar se sobreescribe desde BD).
+		if (modo !== 'editar') {
+			disciplina = settings.disciplinaActiva;
+		}
 		// Registra el dirty handler en el stack (solo `stack`). En
 		// `standalone` el padre se entera vía `onDirtyChange` (efecto
 		// reactivo más abajo).
@@ -247,6 +268,13 @@
 		} catch (err) {
 			// No es crítico: el catch del UNIQUE en handleSave sigue cubriendo.
 			console.warn('[PosicionWizard] no se pudo cargar listPosiciones:', err);
+		}
+
+		try {
+			const { listTags } = await import('$lib/tags');
+			allTags = await listTags();
+		} catch (err) {
+			console.warn('[PosicionWizard] no se pudo cargar tags:', err);
 		}
 
 		// Si hay un draft persistido que coincide con la clave del wizard
@@ -304,12 +332,20 @@
 				tipo = p.tipo;
 				complementariaId = p.posicion_complementaria_id ?? null;
 				notas = p.notas;
+				disciplina = p.disciplina;
 			}
 			// Preserva las notas existentes en BD. En hobbyist el paso no se
 			// renderiza, pero al guardar usamos `notasOriginal` para no pisar
 			// el dato. En avanzado, `notas` es editable y arranca con este
 			// valor.
 			notasOriginal = p.notas;
+			try {
+				const { getTagsForPosicion } = await import('$lib/tags');
+				const currentTags = await getTagsForPosicion(posicionId);
+				tagsSeleccionados = currentTags.map((t) => t.id);
+			} catch (err) {
+				console.warn('[PosicionWizard] no se pudo cargar tags de posicion:', err);
+			}
 			snapshot = {
 				nombre: p.nombre,
 				categoria: p.categoria,
@@ -542,10 +578,8 @@
 			(tipo !== undefined ? handleContinueStep3 : handleSkipTipo)();
 			return;
 		}
-		// Paso 4 (Complementaria) en modo avanzado no es el último (5 lo es).
-		// Permitimos avanzar al paso 5 al pulsar Enter.
 		const lastStep = visibleSteps[visibleSteps.length - 1];
-		if (currentStep === 4 && currentStep !== lastStep) {
+		if ((currentStep === 4 || currentStep === 5) && currentStep !== lastStep) {
 			intercept();
 			advance();
 			return;
@@ -607,6 +641,32 @@
 		advance();
 	}
 
+	function toggleTag(id: string) {
+		if (tagsSeleccionados.includes(id)) {
+			tagsSeleccionados = tagsSeleccionados.filter((t) => t !== id);
+		} else {
+			tagsSeleccionados = [...tagsSeleccionados, id];
+		}
+	}
+
+	async function handleCreateTag() {
+		if (!nuevoTagNombre.trim() || savingTag) return;
+		savingTag = true;
+		try {
+			const { createTag } = await import('$lib/tags');
+			const tag = await createTag({ nombre: nuevoTagNombre.trim(), color: nuevoTagColor });
+			allTags = [...allTags, tag].sort((a, b) => a.nombre.localeCompare(b.nombre));
+			tagsSeleccionados = [...tagsSeleccionados, tag.id];
+			nuevoTagNombre = '';
+			nuevoTagColor = TAG_PRESET_COLORS[5];
+			creandoNuevoTag = false;
+		} catch (err) {
+			console.warn('[PosicionWizard] error creando tag:', err);
+		} finally {
+			savingTag = false;
+		}
+	}
+
 	function cancel() {
 		// El host se encarga de preguntar "¿descartar cambios?" si procede.
 		if (onRequestClose) {
@@ -645,8 +705,13 @@
 					categoria: categoriaFinal,
 					tipo,
 					notas: notasFinal,
-					posicion_complementaria_id: complementariaId
+					posicion_complementaria_id: complementariaId,
+					disciplina
 				});
+				if (tagsSeleccionados.length > 0) {
+					const { setTagsForPosicion } = await import('$lib/tags');
+					await setTagsForPosicion(nueva.id, tagsSeleccionados);
+				}
 				if (mode === 'stack') {
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.
@@ -697,9 +762,12 @@
 					categoria: categoriaFinal,
 					tipo,
 					notas: notasFinal,
-					posicion_complementaria_id: complementariaId
+					posicion_complementaria_id: complementariaId,
+					disciplina
 				};
 				await updatePosicion(update);
+				const { setTagsForPosicion } = await import('$lib/tags');
+				await setTagsForPosicion(posicionId, tagsSeleccionados);
 				if (mode === 'stack') {
 					mapaModalStack.setDirtyHandler(null);
 					posicionWizardDraft.clear();
@@ -806,8 +874,15 @@
 					onChange={handleCategoriaChange}
 					ariaLabel="Categoría de la posición"
 				/>
+				<h3 class="text-sm font-semibold pt-1">Disciplina</h3>
+				<Chips
+					options={DISCIPLINAS}
+					value={disciplina}
+					onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+					ariaLabel="Disciplina de la posición"
+				/>
 				<p class="text-xs text-muted-foreground">
-					Si la saltas, queda como "Otro". Se puede cambiar después.
+					Si la saltas, queda como "Otro". Disciplina se puede cambiar después.
 				</p>
 			</div>
 
@@ -846,9 +921,57 @@
 				</p>
 			</div>
 
+			<!-- Paso 5: Tags (siempre visible, skippable). -->
+			<div class="space-y-3" class:hidden={currentStep !== 5}>
+				<h3 class="text-sm font-semibold">Tags (opcional)</h3>
+				{#if allTags.length > 0}
+					<div class="flex flex-wrap gap-2">
+						{#each allTags as tag (tag.id)}
+							<button
+								type="button"
+								onclick={() => toggleTag(tag.id)}
+								class="rounded-full px-3 py-1 text-xs font-medium text-white transition-all {tagsSeleccionados.includes(tag.id) ? 'ring-2 ring-offset-1 ring-foreground' : 'opacity-50'}"
+								style="background-color: {tag.color}"
+							>{tag.nombre}</button>
+						{/each}
+					</div>
+				{/if}
+				{#if !creandoNuevoTag}
+					<button
+						type="button"
+						onclick={() => (creandoNuevoTag = true)}
+						class="text-xs text-muted-foreground hover:text-foreground"
+					>+ Crear tag</button>
+				{:else}
+					<div class="rounded border border-border p-3 space-y-2">
+						<Input bind:value={nuevoTagNombre} placeholder="Nombre del tag" class="h-7 text-sm" />
+						<div class="flex flex-wrap gap-2">
+							{#each TAG_PRESET_COLORS as c}
+								<button
+									type="button"
+									style="background-color: {c}"
+									aria-label="Color {c}"
+									onclick={() => (nuevoTagColor = c)}
+									class="h-6 w-6 rounded-full border-2 transition-all {nuevoTagColor === c ? 'border-foreground scale-110' : 'border-transparent'}"
+								></button>
+							{/each}
+						</div>
+						<div class="flex gap-2">
+							<Button size="sm" onclick={handleCreateTag} disabled={!nuevoTagNombre.trim() || savingTag}>
+								{savingTag ? '…' : 'Crear'}
+							</Button>
+							<Button variant="outline" size="sm" onclick={() => { creandoNuevoTag = false; nuevoTagNombre = ''; }}>
+								Cancelar
+							</Button>
+						</div>
+					</div>
+				{/if}
+				<p class="text-xs text-muted-foreground">Puedes saltarte este paso y añadir tags después.</p>
+			</div>
+
 			{#if settings.modoAvanzado}
-				<!-- Paso 5: Notas (solo modo avanzado, T-3.it6). -->
-				<div class="space-y-3" class:hidden={currentStep !== 5}>
+				<!-- Paso 6: Notas (solo modo avanzado, T-3.it6). -->
+				<div class="space-y-3" class:hidden={currentStep !== 6}>
 					<h3 class="text-sm font-semibold">Notas (opcional)</h3>
 					<Textarea
 						bind:value={notas}
@@ -914,8 +1037,10 @@
 					Continuar
 				</Button>
 			{:else if currentStep !== visibleSteps[visibleSteps.length - 1] && currentStep === 4}
-				<!-- Modo avanzado (T-3.it6): paso 4 (Complementaria) no es el
-				     último cuando hay paso de Notas. Botón Continuar avanza al 5. -->
+				<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
+					Continuar
+				</Button>
+			{:else if currentStep !== visibleSteps[visibleSteps.length - 1] && currentStep === 5}
 				<Button variant="outline" size="sm" onclick={advance} disabled={saving}>
 					Continuar
 				</Button>
@@ -964,6 +1089,16 @@
 				</div>
 
 				<div class="space-y-1.5">
+					<Label>Disciplina</Label>
+					<Chips
+						options={DISCIPLINAS}
+						value={disciplina}
+						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+						ariaLabel="Disciplina de la posición"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
 					<Label>Tipo de rol</Label>
 					<Chips
 						options={TIPOS_ROL}
@@ -993,6 +1128,52 @@
 					<p class="text-xs text-muted-foreground">
 						Otra vista de la misma situación (p. ej. "Mount top" ↔ "Mount bottom").
 					</p>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Tags</Label>
+					{#if allTags.length > 0}
+						<div class="flex flex-wrap gap-2">
+							{#each allTags as tag (tag.id)}
+								<button
+									type="button"
+									onclick={() => toggleTag(tag.id)}
+									class="rounded-full px-3 py-1 text-xs font-medium text-white transition-all {tagsSeleccionados.includes(tag.id) ? 'ring-2 ring-offset-1 ring-foreground' : 'opacity-50'}"
+									style="background-color: {tag.color}"
+								>{tag.nombre}</button>
+							{/each}
+						</div>
+					{/if}
+					{#if !creandoNuevoTag}
+						<button
+							type="button"
+							onclick={() => (creandoNuevoTag = true)}
+							class="text-xs text-muted-foreground hover:text-foreground"
+						>+ Crear tag</button>
+					{:else}
+						<div class="rounded border border-border p-3 space-y-2">
+							<Input bind:value={nuevoTagNombre} placeholder="Nombre del tag" class="h-7 text-sm" />
+							<div class="flex flex-wrap gap-2">
+								{#each TAG_PRESET_COLORS as c}
+									<button
+										type="button"
+										style="background-color: {c}"
+										aria-label="Color {c}"
+										onclick={() => (nuevoTagColor = c)}
+										class="h-6 w-6 rounded-full border-2 transition-all {nuevoTagColor === c ? 'border-foreground scale-110' : 'border-transparent'}"
+									></button>
+								{/each}
+							</div>
+							<div class="flex gap-2">
+								<Button size="sm" onclick={handleCreateTag} disabled={!nuevoTagNombre.trim() || savingTag}>
+									{savingTag ? '…' : 'Crear'}
+								</Button>
+								<Button variant="outline" size="sm" onclick={() => { creandoNuevoTag = false; nuevoTagNombre = ''; }}>
+									Cancelar
+								</Button>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				{#if settings.modoAvanzado}

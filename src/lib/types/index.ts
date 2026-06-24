@@ -44,12 +44,16 @@ export interface Roll {
 
 // --- Mapa técnico (schema v2) ---
 
-export type CategoriaPosicion =
-	| 'guardia'
-	| 'control_superior'
-	| 'espalda'
-	| 'transicion'
-	| 'otro';
+export interface Tag {
+	id: string;
+	nombre: string;
+	color: string;
+	created_at: string;
+}
+
+export type CategoriaPosicion = 'guardia' | 'control' | 'transicion' | 'otro';
+
+export type Disciplina = 'bjj' | 'grappling' | 'ambos';
 
 export type TipoRolPosicion = 'ofensiva' | 'defensiva' | 'neutral';
 
@@ -64,6 +68,7 @@ export interface Posicion {
 	tipo?: TipoRolPosicion;
 	notas: string;
 	posicion_complementaria_id?: string | null;
+	disciplina: Disciplina;
 	created_at: string;
 	updated_at: string;
 }
@@ -72,6 +77,7 @@ export interface SumisionTerminal {
 	id: string;
 	nombre: string;
 	notas: string;
+	disciplina: Disciplina;
 	created_at: string;
 	updated_at: string;
 }
@@ -87,6 +93,7 @@ export interface Tecnica {
 	estado: EstadoTecnica;
 	detalles: string;
 	errores_comunes: string;
+	disciplina: Disciplina;
 	created_at: string;
 	updated_at: string;
 }

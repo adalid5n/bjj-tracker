@@ -47,6 +47,7 @@
 	import Chips from '$lib/components/Chips.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
 	import type {
+		Disciplina,
 		EstadoTecnica,
 		Posicion,
 		SumisionTerminal,
@@ -150,6 +151,7 @@
 	let detallesOriginal = $state('');
 	let erroresComunes = $state('');
 	let erroresComunesOriginal = $state('');
+	let disciplina = $state<Disciplina>('bjj');
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -220,7 +222,10 @@
 	onMount(async () => {
 		// Hidrata el state de settings (idempotente). Permite leer
 		// `settings.modoAvanzado` sincrónicamente desde el render.
-		settings.init();
+		await settings.init();
+		if (modo !== 'editar') {
+			disciplina = settings.disciplinaActiva;
+		}
 		if (mode === 'stack') {
 			mapaModalStack.setDirtyHandler(() => isDirty);
 		}
@@ -315,6 +320,7 @@
 				estado = t.estado;
 				detalles = t.detalles;
 				erroresComunes = t.errores_comunes;
+				disciplina = t.disciplina;
 			}
 			// Preserva los textos existentes en BD. En hobbyist los pasos no
 			// se renderizan, pero al guardar usamos `*Original` para no pisar
@@ -818,7 +824,8 @@
 					tipo,
 					estado: estadoFinal,
 					detalles: detallesFinal,
-					errores_comunes: erroresComunesFinal
+					errores_comunes: erroresComunesFinal,
+					disciplina
 				});
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
@@ -870,7 +877,8 @@
 					tipo,
 					estado: estadoFinal,
 					detalles: detallesFinal,
-					errores_comunes: erroresComunesFinal
+					errores_comunes: erroresComunesFinal,
+					disciplina
 				});
 				if (mode === 'stack') {
 					onSaved?.(tecnicaId, 'editar');
