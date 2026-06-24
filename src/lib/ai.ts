@@ -1,4 +1,4 @@
-import { PUBLIC_GROQ_KEY } from '$env/static/public';
+const PUBLIC_GROQ_KEY = import.meta.env.VITE_GROQ_KEY as string | undefined;
 import type { CategoriaPosicion, TipoRolPosicion, TipoTecnica } from '$lib/types';
 
 export type CatalogoSnapshot = {
