@@ -32,6 +32,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import Chips from '$lib/components/Chips.svelte';
 	import type { Disciplina, SumisionTerminal } from '$lib/types';
 	import { mapaModalStack } from './mapa-modal-stack.svelte';
 	import { settings } from '$lib/settings.svelte';
@@ -76,6 +77,12 @@
 	let notas = $state('');
 	let notasOriginal = $state('');
 	let disciplina = $state<Disciplina>('bjj');
+
+	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
+		{ value: 'bjj', label: 'BJJ' },
+		{ value: 'grappling', label: 'Grappling' },
+		{ value: 'ambos', label: 'Ambos' }
+	];
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -459,6 +466,14 @@
 						? 'Pulsa Enter o "Continuar" para añadir notas.'
 						: 'Pulsa Enter o "Guardar" para crear la sumisión.'}
 				</p>
+
+				<h3 class="text-sm font-semibold pt-1">Disciplina</h3>
+				<Chips
+					options={DISCIPLINAS}
+					value={disciplina}
+					onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+					ariaLabel="Disciplina de la sumisión"
+				/>
 			</div>
 
 			{#if settings.modoAvanzado}
@@ -518,6 +533,16 @@
 					{#if nombreError}
 						<p id="sumision-form-nombre-error" class="text-sm text-destructive">{nombreError}</p>
 					{/if}
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Disciplina</Label>
+					<Chips
+						options={DISCIPLINAS}
+						value={disciplina}
+						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+						ariaLabel="Disciplina de la sumisión"
+					/>
 				</div>
 
 				{#if errorMsg}

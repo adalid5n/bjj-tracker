@@ -275,7 +275,11 @@
 			textoParaPropuesta = resultado.textoConMarcas.replace(/\*\*/g, '');
 			step = 'normalizado';
 		} catch (err) {
-			errorAI = err instanceof Error ? err.message : String(err);
+			if (err instanceof Error && err.message === 'AI_TIMEOUT') {
+				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
+			} else {
+				errorAI = err instanceof Error ? err.message : String(err);
+			}
 		} finally {
 			loadingAI = false;
 			loadingLabel = '';
@@ -370,11 +374,13 @@
 			step = 'review';
 		} catch (err) {
 			if (err instanceof Error && err.message === 'GROQ_KEY_MISSING') {
-				errorAI = 'No hay clave de Groq configurada (PUBLIC_GROQ_KEY vacía).';
+				errorAI = 'No hay clave de Groq configurada.';
+			} else if (err instanceof Error && err.message === 'AI_TIMEOUT') {
+				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
 			} else if (err instanceof Error && err.message === 'AI_RESPONSE_INVALID') {
 				errorAI = 'El AI devolvió una respuesta inesperada. Inténtalo de nuevo.';
 			} else if (err instanceof Error && err.message.includes('503')) {
-				errorAI = 'El servidor de Gemini está saturado ahora mismo. Espera un minuto e inténtalo de nuevo.';
+				errorAI = 'El servidor de Groq está saturado ahora mismo. Espera un minuto e inténtalo de nuevo.';
 			} else if (err instanceof Error && err.message.includes('429')) {
 				errorAI = 'Límite de uso alcanzado. Espera unos segundos e inténtalo de nuevo.';
 			} else {
@@ -552,7 +558,9 @@
 				return { ...t, nombre: capitalizeFirst(t.nombre), seleccionado: puedeCrearse, puedeCrearse, detalles: t.detalles };
 			});
 		} catch (err) {
-			if (err instanceof Error && err.message.includes('429')) {
+			if (err instanceof Error && err.message === 'AI_TIMEOUT') {
+				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
+			} else if (err instanceof Error && err.message.includes('429')) {
 				errorAI = 'Límite de uso alcanzado. Espera unos segundos e inténtalo de nuevo.';
 			} else {
 				errorAI = err instanceof Error ? err.message : String(err);

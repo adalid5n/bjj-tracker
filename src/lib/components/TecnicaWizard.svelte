@@ -116,6 +116,12 @@
 		{ value: 'descartada', label: 'Descartada' }
 	];
 
+	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
+		{ value: 'bjj', label: 'BJJ' },
+		{ value: 'grappling', label: 'Grappling' },
+		{ value: 'ambos', label: 'Ambos' }
+	];
+
 	// Pasos semánticos: 1=Nombre, 2=Variante, 3=Posición origen, 4=Tipo,
 	// 5=Destino, 6=Estado, 7=Detalles, 8=Errores comunes.
 	// Los pasos 7 y 8 (textareas) solo aparecen en modo avanzado (T-3.it6).
@@ -1039,6 +1045,14 @@
 				El tipo decide a qué nodo llega la técnica: posición (ataque/sweep/escape/transición)
 				o sumisión terminal.
 			</p>
+
+			<h3 class="text-sm font-semibold pt-1">Disciplina</h3>
+			<Chips
+				options={DISCIPLINAS}
+				value={disciplina}
+				onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+				ariaLabel="Disciplina de la técnica"
+			/>
 		</div>
 
 		<!-- Paso 5: Destino (rama por tipo) -->
@@ -1255,6 +1269,16 @@
 						value={tipo ?? null}
 						onChange={handleTipoChange}
 						ariaLabel="Tipo de técnica"
+					/>
+				</div>
+
+				<div class="space-y-1.5">
+					<Label>Disciplina</Label>
+					<Chips
+						options={DISCIPLINAS}
+						value={disciplina}
+						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+						ariaLabel="Disciplina de la técnica"
 					/>
 				</div>
 

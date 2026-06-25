@@ -1,8 +1,27 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-06-24 (sesiones 46-48 — tags, disciplina, importación IA)
+**Última actualización:** 2026-06-25 (sesión 49 — auditoría de cambios IA/schema + selector de disciplina en Sumisión/Técnica + fixes menores IA)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
+
+---
+
+## Sesión 49 (2026-06-25) — Auditoría de cambios sesiones 46-48 + selector disciplina + fixes IA
+
+Sesión de revisión: las sesiones 46-48 se implementaron con otra herramienta (Claude Sonnet 4.6). Se auditaron contra las reglas duras del proyecto.
+
+**Auditoría — resultado:**
+- ✅ Migraciones V7/V8/V9 inmutables y bien añadidas al final del array (no se tocó V1-V6).
+- ✅ Capa de datos: SQL crudo parametrizado, sin ORM, transacciones nativas.
+- ✅ Runas: `settings.svelte.ts` con patrón canónico (sin `$state` a nivel de módulo).
+- ⚠️ **API key de Groq pública en el bundle de cliente** (`VITE_GROQ_KEY` se inlinea). Decisión del owner: aceptable para el POC (key gratuita de Groq, uso acotado a usuarios del POC). Pendiente reevaluar antes de abrir más (proxy serverless o restricción por dominio). La key nunca se commiteó (`.env.local` gitignoreado).
+
+**Cambios entregados (todos en `main`):**
+- **Selector de disciplina en `SumisionWizard` y `TecnicaWizard`** (igualados a `PosicionWizard`): `Chips` con BJJ/Grappling/Ambos, en vista por pasos y en formulario de edición. Colgado de un paso existente (Nombre en Sumisión, Tipo en Técnica) — sin renumerar pasos ni tocar validación/save. `SumisionWizard` no importaba `Chips`: añadido.
+- **Fixes menores IA** (`ImportarClaseDialog.svelte`): texto de error "Gemini" → "Groq"; quitada mención a `PUBLIC_GROQ_KEY` (nombre viejo); mensaje de timeout.
+- **Timeout en llamadas a Groq** (`ai.ts`): nuevo helper `fetchGroq(body)` con `AbortController` (30s) que elimina la duplicación de los 4 `fetch` y aborta peticiones colgadas (mala red en móvil). Lanza `AI_TIMEOUT`, mapeado a mensaje amable en los 3 manejadores de error del dialog.
+
+`pnpm check` y `pnpm build`: limpios.
 
 ---
 
@@ -25,7 +44,7 @@
 - **`settings.svelte.ts`**: `disciplinaActiva` (`'bjj'|'grappling'`) persistida en `app_settings` vía `KEY_DISCIPLINA_ACTIVA`. `setDisciplinaActiva()`.
 - **`ajustes/+page.svelte`**: selector de disciplina (toggle BJJ / Grappling) bajo el switch de vista avanzada.
 - **`mapa/+page.svelte`**: toggle de disciplina integrado en la misma fila que tabs Grafo/Lista (fix scroll: antes ocupaba fila propia y rompía `calc(100dvh-13rem)`). El grafo y la lista se filtran por `disciplinaActiva`.
-- **Wizards**: `PosicionWizard`, `TecnicaWizard`, `SumisionWizard` arrancan con `disciplina = settings.disciplinaActiva` y permiten cambiarlo por posición.
+- **Wizards**: `PosicionWizard`, `TecnicaWizard`, `SumisionWizard` arrancan con `disciplina = settings.disciplinaActiva`. ⚠️ *Corrección sesión 49*: en su entrega original solo `PosicionWizard` exponía selector para cambiar la disciplina por entidad; `Sumisión` y `Técnica` la heredaban del toggle global sin posibilidad de editarla. Resuelto en sesión 49 (ver abajo).
 
 ### Bloque 3 — Simplificación de categorías de posición (schema V8)
 

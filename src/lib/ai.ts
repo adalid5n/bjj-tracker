@@ -41,6 +41,30 @@ export type AIPropuesta = {
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_TIMEOUT_MS = 30000;
+
+// Llamada a Groq con timeout vía AbortController: si la red es lenta o el
+// servidor no responde, abortamos a los 30s en vez de dejar el spinner
+// colgado indefinidamente (típico en móvil con mala cobertura).
+async function fetchGroq(body: object): Promise<Response> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+	try {
+		return await fetch(GROQ_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PUBLIC_GROQ_KEY}` },
+			body: JSON.stringify(body),
+			signal: controller.signal
+		});
+	} catch (err) {
+		if (err instanceof DOMException && err.name === 'AbortError') {
+			throw new Error('AI_TIMEOUT');
+		}
+		throw err;
+	} finally {
+		clearTimeout(timeoutId);
+	}
+}
 
 function buildPrompt(texto: string, catalogo: CatalogoSnapshot): string {
 	return `Eres un asistente de análisis de clases de BJJ (Brazilian Jiu-Jitsu).
@@ -160,15 +184,11 @@ Responde ÚNICAMENTE con JSON (sin markdown):
   "correcciones": ["descripción corrección 1", "descripción corrección 2"]
 }`;
 
-	const response = await fetch(GROQ_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PUBLIC_GROQ_KEY}` },
-		body: JSON.stringify({
-			model: GROQ_MODEL,
-			messages: [{ role: 'user', content: prompt }],
-			response_format: { type: 'json_object' },
-			temperature: 0.1
-		})
+	const response = await fetchGroq({
+		model: GROQ_MODEL,
+		messages: [{ role: 'user', content: prompt }],
+		response_format: { type: 'json_object' },
+		temperature: 0.1
 	});
 
 	if (!response.ok) {
@@ -293,15 +313,11 @@ Responde ÚNICAMENTE con JSON (sin markdown):
 TEXTO ORIGINAL:
 ${texto}`;
 
-	const response = await fetch(GROQ_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PUBLIC_GROQ_KEY}` },
-		body: JSON.stringify({
-			model: GROQ_MODEL,
-			messages: [{ role: 'user', content: prompt }],
-			response_format: { type: 'json_object' },
-			temperature: 0.2
-		})
+	const response = await fetchGroq({
+		model: GROQ_MODEL,
+		messages: [{ role: 'user', content: prompt }],
+		response_format: { type: 'json_object' },
+		temperature: 0.2
 	});
 
 	if (!response.ok) {
@@ -333,15 +349,11 @@ export async function refinarPropuesta(
 ): Promise<AIPropuesta> {
 	if (!PUBLIC_GROQ_KEY) throw new Error('GROQ_KEY_MISSING');
 
-	const response = await fetch(GROQ_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PUBLIC_GROQ_KEY}` },
-		body: JSON.stringify({
-			model: GROQ_MODEL,
-			messages: [{ role: 'user', content: buildRefinamientoPrompt(texto, propuestaActual, correcciones, catalogo) }],
-			response_format: { type: 'json_object' },
-			temperature: 0.2
-		})
+	const response = await fetchGroq({
+		model: GROQ_MODEL,
+		messages: [{ role: 'user', content: buildRefinamientoPrompt(texto, propuestaActual, correcciones, catalogo) }],
+		response_format: { type: 'json_object' },
+		temperature: 0.2
 	});
 
 	if (!response.ok) {
@@ -413,18 +425,11 @@ export async function generarPropuestaDeClase(
 		throw new Error('GROQ_KEY_MISSING');
 	}
 
-	const response = await fetch(GROQ_URL, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${PUBLIC_GROQ_KEY}`
-		},
-		body: JSON.stringify({
-			model: GROQ_MODEL,
-			messages: [{ role: 'user', content: buildPrompt(texto, catalogo) }],
-			response_format: { type: 'json_object' },
-			temperature: 0.2
-		})
+	const response = await fetchGroq({
+		model: GROQ_MODEL,
+		messages: [{ role: 'user', content: buildPrompt(texto, catalogo) }],
+		response_format: { type: 'json_object' },
+		temperature: 0.2
 	});
 
 	if (!response.ok) {
