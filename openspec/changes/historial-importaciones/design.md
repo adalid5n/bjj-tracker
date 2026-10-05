@@ -53,9 +53,7 @@ CREATE TABLE importaciones (
   updated_at TEXT NOT NULL,
   titulo TEXT NOT NULL,
   titulo_origen TEXT NOT NULL CHECK (titulo_origen IN ('ia','texto')),
-  texto_original TEXT NOT NULL,
-  texto_interpretado TEXT,
-  propuesta_json TEXT,
+  texto TEXT NOT NULL,
   aceptado_json TEXT,
   estado TEXT NOT NULL CHECK (estado IN ('importada','sin_terminar','fallo')),
   error TEXT
@@ -64,9 +62,14 @@ CREATE INDEX idx_importaciones_created_at ON importaciones(created_at);
 UPDATE schema_meta SET value = '10' WHERE key = 'version';
 ```
 
-- `propuesta_json` / `aceptado_json`: JSON serializado (SQL crudo, sin
-  ORM). Se guarda JSON (no texto legible) para poder re-formatear o, en
-  el futuro, revertir; la conversión a lista legible es solo de UI.
+- Contenido: **solo** `texto` (el último texto analizado; si al
+  reintentar se edita y se vuelve a analizar, lo sustituye) y
+  `aceptado_json` (lo creado de verdad). El texto interpretado y la
+  propuesta de la IA **no se guardan** (decisión del owner); el resto son
+  metadatos (título, origen del título, estado, error, fechas).
+- `aceptado_json`: JSON serializado (SQL crudo, sin ORM). Se guarda JSON
+  (no texto legible) para poder re-formatear o, en el futuro, revertir;
+  la conversión a lista legible es solo de UI.
 - `aceptado_json` incluye nombres **y** ids creados (`{posiciones:[{id,
   nombre, categoria}], sumisiones:[…], tecnicas:[{id, nombre, tipo,
   origen, destino}]}`). Coste cero hoy; deja la puerta abierta a
@@ -76,7 +79,7 @@ UPDATE schema_meta SET value = '10' WHERE key = 'version';
 
 ### 2. DAO `src/lib/importaciones.ts`
 
-`createImportacion(textoOriginal)`, `updateImportacion(id, patch)`,
+`createImportacion(texto)`, `updateImportacion(id, patch)`,
 `listImportaciones()` (`ORDER BY created_at DESC`),
 `deleteImportacion(id)`. SQL crudo sobre `run` / `query`. Ids con
 `crypto.randomUUID()` y fechas ISO, como `sumisiones.ts`.
@@ -84,14 +87,17 @@ UPDATE schema_meta SET value = '10' WHERE key = 'version';
 ### 3. Enganche en `ImportarClaseDialog.svelte`
 
 Nuevo `let importacionId = $state<string | null>(null)` (local del
-componente, no state compartido):
+componente, no state compartido). Se fija al crear la entrada en el
+primer "Analizar clase" o al abrir el diálogo desde "Reintentar" (ver
+Decisión 7), así que volver a analizar en la misma ventana **siempre
+actualiza la misma entrada**:
 
 | Momento | Escritura |
 |---|---|
-| `handleNormalizar` antes de llamar a la IA | si `importacionId` es null → `create` (título = primeras ~6 palabras, `titulo_origen='texto'`, estado `sin_terminar`); si no → `update texto_original` |
-| normalización OK | `texto_interpretado`, `titulo` de la IA (`titulo_origen='ia'`), estado `sin_terminar` |
+| `handleNormalizar` antes de llamar a la IA | si `importacionId` es null → `create` (título = primeras ~6 palabras, `titulo_origen='texto'`, estado `sin_terminar`); si no → `update texto` (el texto analizado sustituye al guardado), estado `sin_terminar`, `error = null` |
+| normalización OK | `titulo` de la IA (`titulo_origen='ia'`), estado `sin_terminar` |
 | normalización / propuesta / refinado KO | estado `fallo`, `error` = mensaje de usuario |
-| propuesta OK (tras validación) y refinado OK | `texto_interpretado = textoParaPropuesta` (versión editada por el usuario), `propuesta_json`, estado `sin_terminar` |
+| propuesta OK (tras validación) y refinado OK | estado `sin_terminar`, `error = null` (la propuesta no se guarda) |
 | `handleConfirmar` al terminar | `aceptado_json` (lo creado de verdad, recogiendo ids de los `create*`), estado `importada` |
 | `resetState()` | `importacionId = null` (cerrar no borra nada). El `AlertDialog` de cierre usa el texto "¿Cerrar? Quedará en el historial como Sin terminar" cuando `importacionId` no es null |
 
@@ -129,8 +135,10 @@ la IA omite el campo, se mantiene el título de respaldo.
   y Codespaces son https). Feedback "Copiado ✓" con timeout ~2 s por
   bloque (estado local del componente). Si `clipboard` falla, mensaje
   "No se pudo copiar".
-- Formato legible: helper puro `formatPropuestaLegible()` /
-  `formatAceptadoLegible()` en `src/lib/importaciones.ts`:
+- Bloques de la tarjeta desplegada: **Texto** y **Aceptado** (este solo
+  en estado Importada).
+- Formato legible: helper puro `formatAceptadoLegible()` en
+  `src/lib/importaciones.ts`:
   `Posiciones nuevas:\n- Nombre (Categoría)`, `Sumisiones nuevas:\n- …`,
   `Técnicas:\n- Nombre: Origen → Destino (Tipo)`.
 - Estado con tokens: Importada `bg-success/15 text-success`, Sin
@@ -148,9 +156,19 @@ resto del sub-header.
 
 ### 7. Reintentar
 
-`ImportarClaseDialog` gana la prop `textoInicial?: string`; al abrirse
-con ella hace `textoClase = textoInicial` en el paso `input`. `/mapa`
-mantiene `textoReintento` y abre el diálogo tras cerrar el panel.
+`ImportarClaseDialog` gana las props `textoInicial?: string` e
+`importacionIdInicial?: string`; al abrirse con ellas hace
+`textoClase = textoInicial` en el paso `input` e `importacionId =
+importacionIdInicial`. Así la importación reintentada **reutiliza la
+misma entrada**: al pulsar "Analizar clase" se hace `update texto` (el
+texto, editado o no, sustituye al guardado) en vez de crear otra. El
+título se regenera con la nueva respuesta de la IA; si la IA no responde,
+se conserva el título que ya tenía la entrada. `/mapa` mantiene
+`reintento = { id, texto }` y abre el diálogo tras cerrar el panel.
+
+Consecuencia: reintentar una entrada "Importada" y confirmar de nuevo
+sobrescribe su `aceptado_json` con lo creado en el nuevo intento (ver
+Open Questions).
 
 ### 8. Copia de seguridad (incluye arreglo de pérdida de datos)
 
@@ -231,3 +249,8 @@ con código v9 no baja de versión — aceptable (mismo caso que v9).
 - Accordion `single` (una tarjeta abierta a la vez) vs `multiple`.
   Propuesta: `single` (menos scroll en el panel inferior de 50 dvh).
   No cambia specs ni tareas.
+- Reintentar una entrada ya "Importada" reutiliza la entrada y, si se
+  confirma otra vez, lo aceptado pasa a ser lo creado en el último
+  intento (lo de la primera vez deja de constar en el historial, aunque
+  sigue en el catálogo). Pendiente de que el owner lo confirme; no cambia
+  tareas.

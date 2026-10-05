@@ -17,14 +17,25 @@ flecha.
 - **THEN** el nodo "Dogfight" y la flecha laten con el color de resaltado y no son más grandes por ello
 
 ### Requirement: Leyenda de la vista previa
-Durante la vista previa, el mapa SHALL mostrar una leyenda fija, siempre
-visible también en móvil, con el recuento de lo nuevo por tipo (p. ej. "2
-posiciones, 1 sumisión y 3 técnicas nuevas", omitiendo los tipos a cero)
-y los botones "Aceptar" y "Cancelar".
+Durante la vista previa, el mapa SHALL mostrar una barra fija, siempre
+visible también en móvil, con el indicador del paso ("Vista previa 1 de
+1 · Grappling", "Vista previa 1 de 2 · BJJ"…), el recuento de lo nuevo
+por tipo (p. ej. "2 posiciones, 1 sumisión y 3 técnicas nuevas",
+omitiendo los tipos a cero) y los botones del paso: "Cancelar" siempre;
+"← Atrás" si hay paso anterior; "Siguiente: <disciplina> →" si hay paso
+siguiente; "Aceptar" solo en el último.
 
 #### Scenario: Recuento
 - **WHEN** la importación añade 2 posiciones, ninguna sumisión y 3 técnicas
 - **THEN** la leyenda indica 2 posiciones y 3 técnicas nuevas y no menciona sumisiones
+
+#### Scenario: Barra del primer paso de "Ambos"
+- **WHEN** empieza la vista previa de una importación de "Ambos"
+- **THEN** la barra muestra "Vista previa 1 de 2 · BJJ", "Cancelar" y "Siguiente: Grappling →", sin "Aceptar"
+
+#### Scenario: Barra del último paso de "Ambos"
+- **WHEN** el usuario pasa al segundo paso de una importación de "Ambos"
+- **THEN** la barra muestra "Vista previa 2 de 2 · Grappling", "← Atrás", "Cancelar" y "Aceptar"
 
 ### Requirement: Movimiento reducido en la vista previa
 Si el sistema del usuario pide reducir el movimiento, la vista previa
@@ -36,10 +47,12 @@ animación.
 - **THEN** lo nuevo se ve con el color de resaltado, sin latir
 
 ### Requirement: Disciplina y filtros durante la vista previa
-Durante la vista previa el grafo SHALL mostrar la disciplina elegida en la
-importación (si es "Ambos", la disciplina activa) e ignorar los filtros de
-tipo, estado y categoría. Al salir de la vista previa MUST volver la
-disciplina activa y los filtros que había, sin haberlos cambiado.
+Durante cada paso de la vista previa el grafo SHALL mostrar la disciplina
+de ese paso (la de la importación; en una de "Ambos", BJJ y luego
+Grappling) e ignorar los filtros de tipo, estado y categoría. Al cancelar
+o salir MUST volver la disciplina activa y los filtros que había, sin
+cambiarlos. Al aceptar, los filtros vuelven y la disciplina activa pasa a
+la del último paso.
 
 #### Scenario: Importación de la otra disciplina
 - **WHEN** con BJJ activo y un filtro de tipo "Sweep" el usuario llega a la vista previa de una importación de Grappling
@@ -48,6 +61,14 @@ disciplina activa y los filtros que había, sin haberlos cambiado.
 #### Scenario: Volver tras cancelar
 - **WHEN** el usuario cancela esa vista previa
 - **THEN** el mapa vuelve a BJJ con el filtro "Sweep" aplicado
+
+#### Scenario: Volver tras aceptar
+- **WHEN** el usuario acepta esa vista previa
+- **THEN** el mapa queda en Grappling con el filtro "Sweep" aplicado
+
+#### Scenario: Pasos de una importación de "Ambos"
+- **WHEN** con Grappling activo el usuario llega a la vista previa de una importación de "Ambos"
+- **THEN** el primer paso muestra el grafo de BJJ (BJJ y Ambos) y el segundo el de Grappling (Grappling y Ambos), ambos con lo nuevo
 
 ### Requirement: Acciones bloqueadas durante la vista previa
 Durante la vista previa el mapa MUST NOT permitir acciones que cambien

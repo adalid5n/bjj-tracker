@@ -20,6 +20,11 @@ importación.
   ofrece BJJ / Grappling / Ambos (por defecto, la disciplina activa), con
   el mismo comportamiento de selector que el resto de la app (tocar elige;
   tocar la activa no hace nada). Todo lo creado lleva esa disciplina.
+- **Comparación con el catálogo por disciplina.** Para decidir qué ya
+  existe (y qué catálogo se envía a la IA) solo se mira la disciplina de
+  la importación: BJJ o Grappling → esa disciplina y "Ambos"; "Ambos" →
+  solo "Ambos". Lo que falta se crea con la disciplina de la importación,
+  aunque exista uno con el mismo nombre en la otra disciplina.
 - **Vista previa en el mapa.** En el punto de confirmar, la ventana de
   importación (y cualquier ficha abierta) se cierra y el usuario queda en
   el mapa, vista Grafo, viendo el grafo real con lo que se va a añadir
@@ -27,14 +32,26 @@ importación.
 - Mismo modelo visual que siempre: posiciones y sumisiones son nodos; las
   técnicas son flechas. Una posición existente que recibe una técnica
   nueva **no** late; solo late la flecha nueva.
-- **Leyenda fija** con el recuento ("N posiciones, M técnicas… nuevas") y
-  dos botones:
-  - **"Aceptar"** → se crea todo y el usuario se queda en el mapa, que
-    vuelve a la normalidad con los elementos ya reales.
+- **Pasos de la vista previa.** Una importación de BJJ o de Grappling
+  tiene una vista previa, en esa disciplina. Una de **"Ambos" tiene dos
+  seguidas**: "Vista previa 1 de 2 · BJJ" y "Vista previa 2 de 2 ·
+  Grappling". Siempre hay un indicador del paso visible.
+- **Barra fija** con el indicador del paso, el recuento ("N posiciones, M
+  técnicas… nuevas") y los botones del paso:
+  - **"Siguiente: Grappling →"** (solo en el primer paso de "Ambos") y
+    **"← Atrás"** (solo en el segundo).
+  - **"Aceptar"**, solo en el último paso → se crea todo **una sola
+    vez** y el usuario se queda en el mapa, que vuelve a la normalidad con
+    los elementos ya reales y con la **disciplina activa cambiada a la de
+    la importación** (en "Ambos", la del último paso: Grappling).
   - **"Cancelar"** → vuelve a la ventana de importación, en "Revisar
     propuesta", con todo lo que tenía. No se ha escrito nada.
-- Mientras dura la vista previa, el mapa muestra la disciplina de la
-  importación, ignora los filtros de tipo/estado/categoría y bloquea las
+- **Si un paso no se puede mostrar**, en lugar de la vista previa sale
+  "No se puede: <breve descripción>" con **"Retroceder"** (vuelve a
+  "Revisar propuesta") y, si hay paso siguiente, **"Seguir con la
+  siguiente disciplina"**. Ese paso no permite aceptar.
+- Mientras dura la vista previa, el mapa muestra la disciplina del paso,
+  ignora los filtros de tipo/estado/categoría y bloquea las
   acciones que cambian datos u organización (mover nodos, guardar
   organización, crear, abrir fichas, cambiar vista o disciplina).
 - Salir del mapa durante la vista previa equivale a cancelarla: no se
@@ -56,13 +73,23 @@ importación.
   Ambos en el primer paso (por defecto la activa) y todo lo creado la
   lleva. Va en este change (y no en uno aparte) porque la vista previa
   depende de ella: el mapa de la vista previa es el de esa disciplina.
+- Comparación con el catálogo (y catálogo enviado a la IA) por
+  disciplina: BJJ o Grappling → esa + "Ambos"; "Ambos" → solo "Ambos". Lo
+  que falta se crea con la disciplina de la importación.
+- BJJ o Grappling → una vista previa; al aceptar, la disciplina activa
+  pasa a ser la de la importación y el usuario se queda en `/mapa`.
+- "Ambos" → dos vistas previas consecutivas (BJJ, luego Grappling) con
+  Siguiente / Atrás / Cancelar y "Aceptar" solo en la última; se inserta
+  una sola vez; después la disciplina activa es Grappling.
+- Errores en un paso: "No se puede: <breve>" con "Retroceder" o "Seguir
+  con la siguiente disciplina".
 
 ## Fuera de alcance
 
-- Cómo se compara con el catálogo existente y qué catálogo se envía a la
-  IA según la disciplina de la importación (punto abierto, ver
-  `design.md`). El requisito actual "Reutilización de lo que ya existe en
-  el catálogo" no se toca todavía.
+- Detectar o fusionar duplicados entre disciplinas. Con la comparación
+  por disciplina **pueden aparecer duplicados** (p. ej. "Mount" de BJJ y
+  "Mount" de Grappling, o un "Kimura" de "Ambos" junto al de BJJ). Es
+  aceptado; los avisará el futuro panel de alertas (it.8).
 - Editar la propuesta desde la vista previa (renombrar, mover, desmarcar
   tocando el grafo): para corregir se cancela y se vuelve a la revisión.
 - Guardar la organización de los nodos nuevos durante la vista previa.
@@ -82,11 +109,15 @@ importación.
   - "Confirmar e insertar en el catálogo": se dispara con "Aceptar" en la
     vista previa del mapa y usa la disciplina elegida en la importación
     (se mantiene la marca de bug conocido).
+  - "Generación de la propuesta" y "Reutilización de lo que ya existe en
+    el catálogo": la IA recibe y la comparación usa solo el catálogo de la
+    disciplina de la importación ("Ambos" → solo "Ambos").
   - Nuevos: disciplina de la importación; paso a la vista previa en el
-    mapa; aceptar; cancelar.
+    mapa; pasos de la vista previa según la disciplina; aceptar (cambia la
+    disciplina activa); cancelar; paso que no se puede mostrar.
 - `mapa`: nuevo modo "vista previa de importación" (resaltado de lo nuevo,
-  leyenda, movimiento reducido, disciplina y filtros durante la vista
-  previa, acciones bloqueadas, salir del mapa).
+  barra con indicador de paso, movimiento reducido, disciplina y filtros
+  durante cada paso, acciones bloqueadas, salir del mapa).
 
 ## Impact
 

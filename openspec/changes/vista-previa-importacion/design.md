@@ -35,8 +35,8 @@ sobrevive al cierre del diálogo, organización guardada intacta, disciplina
 de la importación elegida por el usuario.
 
 **Non-Goals:** editar desde el grafo; persistir la organización de nodos
-no creados; decidir el emparejamiento con el catálogo por disciplina
-(Open Questions).
+no creados; detectar duplicados entre disciplinas (panel de alertas,
+it.8).
 
 ## Decisions
 
@@ -47,7 +47,8 @@ Nuevo `src/lib/importacion-borrador.svelte.ts` con una clase
 de CLAUDE.md; nunca `$state` a nivel de módulo). Contiene: paso actual,
 texto original, normalización, texto para propuesta, propuesta,
 borradores de posiciones/sumisiones/técnicas, catálogo base, disciplina
-elegida, `importacionId` del historial, y métodos `confirmar()`
+elegida, paso de vista previa (`pasoPreview`, índice en la lista de
+disciplinas a revisar), `importacionId` del historial, y métodos `confirmar()`
 (la lógica actual de `handleConfirmar`, usando `this.disciplina`) y
 `reset()`.
 
@@ -73,9 +74,13 @@ Estado de página `previewActivo` (derivado de `borrador.paso ===
 
 1. `modalHost.attemptCloseAll()` (cierra fichas, respetando wizards
    sucios), cierra el diálogo, `vistaPrincipal = 'grafo'`.
-2. **Disciplina de la vista previa** = `borrador.disciplina`, o la activa
-   si es `ambos`. Es un *override* de vista: no se llama a
-   `settings.setDisciplinaActiva` (no se persiste).
+2. **Pasos y disciplina de cada paso:** `pasosPreview =
+   borrador.disciplina === 'ambos' ? ['bjj', 'grappling'] :
+   [borrador.disciplina]`; `pasoPreview` empieza en 0. La disciplina del
+   grafo en cada paso es `pasosPreview[pasoPreview]` (catálogo de esa
+   disciplina + "Ambos", con lo nuevo encima; lo nuevo de una importación
+   "Ambos" sale en los dos pasos). Es un *override* de vista: durante la
+   vista previa no se llama a `settings.setDisciplinaActiva`.
 3. **Filtros:** a `GrafoMapa` se le pasan `tipos/estados/categorias`
    vacíos mientras dura; los arrays de la página no se tocan, así que al
    salir vuelven solos.
@@ -83,15 +88,29 @@ Estado de página `previewActivo` (derivado de `borrador.paso ===
    disciplina, "Mover nodos", "Reorganizar", "Guardar organización", FAB
    "Nuevo", icono de historial; `GrafoMapa` recibe `preview` y no emite
    `onAttemptPush` en taps ni permite `grabify`. Pan y zoom siguen.
-5. **Leyenda:** barra fija `bottom-14` (encima de la BottomNav, mismo
-   sitio que la barra de etiquetado masivo) con recuento + "Cancelar" +
-   "Aceptar". En móvil el grafo ya ocupa `100dvh − 13rem`; la barra
-   tapa la parte baja, así que se añade `padding` inferior al lienzo en
-   preview o se hace `fit` descontando la altura de la barra.
+5. **Barra fija:** `bottom-14` (encima de la BottomNav, mismo sitio que
+   la barra de etiquetado masivo) con indicador "Vista previa
+   {n} de {total} · {Disciplina}" (siempre visible, también con un solo
+   paso), recuento y botones según el paso: "Cancelar" siempre; "← Atrás"
+   si `pasoPreview > 0`; "Siguiente: {Disciplina} →" si no es el último;
+   "Aceptar" solo en el último. En móvil el grafo ya ocupa
+   `100dvh − 13rem`; la barra tapa la parte baja, así que se añade
+   `padding` inferior al lienzo en preview o se hace `fit` descontando la
+   altura de la barra. En móvil estrecho, cuatro elementos (indicador +
+   3 botones en el último paso de "Ambos") pueden no caber en una fila:
+   indicador y recuento en una línea, botones en otra.
 
-Al **Aceptar**: `await borrador.confirmar()` → transferir posiciones
-(Decisión 3) → `refresh()` → `borrador.reset()` → sale del modo. Al
-**Cancelar**: sale del modo, `borrador.paso = 'review'`, abre el diálogo.
+**Siguiente / Atrás:** solo cambian `pasoPreview`; el grafo se reconstruye
+con la disciplina del paso. Nada se escribe.
+
+Al **Aceptar** (solo último paso): `await borrador.confirmar()` (una sola
+inserción, con `borrador.disciplina`, también si es `ambos`) → transferir
+posiciones (Decisión 3) → `settings.setDisciplinaActiva(
+pasosPreview.at(-1))` (la de la importación; Grappling en "Ambos") →
+`refresh()` → `borrador.reset()` → sale del modo y se queda en `/mapa`.
+Los filtros de la página no se tocaron, así que vuelven solos. Al
+**Cancelar** (cualquier paso): sale del modo, `borrador.paso = 'review'`,
+abre el diálogo; la disciplina activa no ha cambiado.
 
 **Navegación durante la vista previa:** `beforeNavigate` no pide
 confirmación propia; deja navegar (la entrada queda "Sin terminar" en el
@@ -99,9 +118,34 @@ historial porque nunca pasó a "Importada"). El aviso existente de
 "¿Descartar cambios del grafo?" sigue aplicando si había organización sin
 guardar. Recarga/cierre: igual (no interceptable).
 
+### 2b. Paso que no se puede mostrar
+
+`buildPreviewElements` (Decisión 3) devuelve, además de los elementos,
+una lista de problemas del paso. Un paso tiene error si preparar su vista
+previa falla (p. ej. no se pudo leer el catálogo de esa disciplina o
+construir el grafo lanza una excepción) o si algo nuevo y marcado que sí
+se va a crear no se puede colocar en el grafo de esa disciplina. Las
+técnicas que no se van a crear (origen o destino renombrado o
+desmarcado, no resueltas) **no** son error del paso: no se pintan, como
+ya prevé el requisito "Confirmar e insertar". Con la comparación por
+disciplina (Decisión 5b) todo lo enlazado está en la disciplina del paso
+o en "Ambos", así que el segundo caso es defensivo. En caso de error el
+lienzo no pinta la vista previa y la barra muestra "No se puede: {motivo
+breve}" con:
+
+- "Retroceder" → igual que Cancelar (`borrador.paso = 'review'`, diálogo
+  abierto, nada escrito).
+- "Seguir con la siguiente disciplina" → solo si no es el último paso;
+  `pasoPreview + 1`.
+
+Un paso con error no ofrece "Aceptar" (en el último paso solo queda
+"Retroceder"). El motivo se redacta para el usuario (nombre del elemento
+y qué falta), nunca el error técnico en bruto.
+
 ### 3. Elementos fantasma en `GrafoMapa`
 
-- Función pura `buildPreviewElements(catalogoFiltrado, borrador)` en
+- Función pura `buildPreviewElements(catalogoFiltrado, borrador)` (el
+  catálogo filtrado por la disciplina **del paso**) en
   `src/lib/grafo.ts`: parte de `buildGrafoElements`, añade nodos
   `new-pos:<nombre-normalizado>` / `new-sum:<…>` y aristas `new-tec:<i>`
   con `data.nuevo = true`, resolviendo nombres con el mismo criterio que
@@ -147,6 +191,35 @@ de T-1). Valor inicial `settings.disciplinaActiva` al crear/resetear el
 borrador. `confirmar()` usa `borrador.disciplina` en los cuatro `create*`
 (hoy `settings.disciplinaActiva`).
 
+### 5b. Catálogo de la importación filtrado por disciplina
+
+Un helper puro `disciplinasDeCatalogo(d)` devuelve `['bjj','ambos']`,
+`['grappling','ambos']` o `['ambos']` (importación "Ambos" → **solo**
+"Ambos"). Se aplica en los dos sitios donde hoy se lee el catálogo
+entero:
+
+- Generación de la propuesta (`listPosiciones` / `listTecnicas` /
+  `listSumisiones` → `CatalogoSnapshot`): se filtra antes de construir el
+  snapshot, así que la IA (`generarPropuestaDeClase`,
+  `validarPropuesta`, refinado) solo recibe ese catálogo y
+  `catalogoPosicionesBase` / `catalogoSumisionesBase` (comparación "ya
+  existe" en la revisión) también. Efecto colateral: esas mismas listas
+  alimentan los selectores de origen/destino de "+ Añadir" en la
+  revisión, que pasan a ofrecer solo el catálogo de la importación (el
+  spec de "Añadir elementos a mano" no se cambia; pendiente de confirmar
+  con el owner, ver Open Questions).
+- `confirmar()`: los mapas nombre → id para resolver orígenes y destinos
+  se construyen con el catálogo filtrado; lo que no está ahí se crea con
+  `borrador.disciplina`, aunque exista con el mismo nombre en la otra
+  disciplina.
+
+Consecuencia aceptada por el owner: pueden aparecer duplicados entre
+disciplinas (p. ej. "Mount" de BJJ y "Mount" de Grappling); los avisará
+el panel de alertas (it.8). La disciplina elegida es fija una vez
+generada la propuesta (el selector está en el primer paso); si el usuario
+vuelve al primer paso y la cambia, el catálogo filtrado se recalcula al
+generar de nuevo la propuesta.
+
 ### 6. Flujo del diálogo
 
 `paso` gana `'preview'`. En "Añadir detalles" el botón principal pasa de
@@ -162,8 +235,13 @@ borrador. `confirmar()` usa `borrador.disciplina` en los cuatro `create*`
   `ImportacionBorrador`; el diálogo y la página solo la leen/llaman.
 - [Más modos en `/mapa`] → un solo flag `previewActivo` gobierna todos
   los bloqueos; se revisa la lista de controles de la página.
-- [Tras "Aceptar" una importación de otra disciplina] → el mapa vuelve a
-  la disciplina activa y lo recién creado no se ve. Ver Open Questions.
+- [Tras "Aceptar" la disciplina activa cambia sin que el usuario la
+  toque] → decisión del owner para que vea lo recién creado; el selector
+  de disciplina del mapa refleja el cambio en cuanto sale del modo.
+- [Importación "Ambos" con un paso que no se puede mostrar y "Seguir con
+  la siguiente disciplina"] → al aceptar en el último paso se inserta lo
+  marcado (todo "Ambos"), aunque el usuario no haya visto la vista previa
+  del paso con error. Ver Open Questions.
 - [Técnica "idéntica a una existente" que no se creará] → la vista previa
   la pinta como nueva (bug de línea base); aceptado.
 - [Usuario con fichas/wizard sucio abierto al pasar a vista previa] →
@@ -178,14 +256,13 @@ escritorio, con y sin "reducir movimiento" (DevTools → Rendering).
 
 ## Open Questions
 
-- **Emparejamiento con el catálogo y catálogo enviado a la IA según la
-  disciplina de la importación** (pendiente del owner, vía orquestador).
-  Hoy "Reutilización de lo que ya existe en el catálogo" compara con todo
-  el catálogo sea cual sea su disciplina, y la IA recibe todas las
-  posiciones y sumisiones. Con disciplinas aisladas habrá que decidir si
-  se filtra por la disciplina elegida (¿y "Ambos"?). Afecta a specs
-  (`importar-clase`) y a `buildPreviewElements`; no se cierra aquí.
-- **Disciplina activa tras "Aceptar" una importación de la otra
-  disciplina**: propuesta — cambiar la disciplina activa a la de la
-  importación para que el usuario vea lo que acaba de crear. Afecta a
-  specs; pendiente del owner.
+- **Aceptar tras saltar un paso con error** (importación "Ambos"): la
+  propuesta de este diseño es que "Aceptar" en el último paso inserte
+  todo lo marcado, igual que sin error. Alternativa: exigir que todos los
+  pasos se hayan visto sin error. Pendiente de confirmar con el owner; no
+  cambia tareas salvo la 4.8.
+- **Selectores de "+ Añadir" en la revisión:** con la Decisión 5b solo
+  ofrecen el catálogo de la disciplina de la importación (más lo nuevo).
+  Parece lo coherente (evita técnicas que cruzan disciplinas), pero el
+  requisito "Añadir elementos a mano en la revisión" dice "el catálogo"
+  sin más. Si el owner lo confirma, conviene precisarlo en el spec.
