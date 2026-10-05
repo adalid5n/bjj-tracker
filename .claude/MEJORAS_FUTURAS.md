@@ -362,6 +362,21 @@ it.6.
   expansión de scope, no la auditoría original.
 - **Cuándo:** cualquier sesión de pulido posterior. Sin urgencia.
 
+### Fallos catálogo e importación (baseline)
+
+- **Origen:** línea base OpenSpec (sesión 50, 2026-10-05). El subagente los encontró al describir la app a partir del código. En el spec van marcados como "⚠️ Bug conocido", con el comportamiento esperado.
+- **Bugs (marcados en el spec):**
+  - Borrar una posición que solo es destino → hoy da error técnico. **Esperado:** se bloquea y se nombran las técnicas que llegan a ella (`PosicionModalContent.svelte:221` solo cuenta las técnicas salientes).
+  - Importar: lo que no se puede crear se pierde en silencio y el diálogo se cierra igual (`ImportarClaseDialog.svelte:396-490`). **Esperado:** informar de qué no se creó y por qué.
+  - Importar sin key → se ve el texto interno `GROQ_KEY_MISSING`. **Esperado:** mensaje comprensible.
+  - "Otras variantes de …" muestra el literal "(variante)" (`TecnicaModalContent.svelte` ~592).
+  - La miga de navegación del mapa descarta los cambios sin guardar de un asistente sin preguntar (`MapaModalHost.svelte:376`).
+- **Decisiones pendientes (no son bugs; el spec las describe tal cual):**
+  - **it.7:** "Refinar" descarta lo editado a mano y parte del texto original; "Volver" desde la revisión vuelve al paso 1 y obliga a llamar otra vez a la IA; la IA no recibe las técnicas existentes; se pueden crear posiciones duplicadas renombrando en la revisión; las correcciones de la validación no se muestran; el paso de detalles ignora el modo hobbyist.
+  - **it.8:** origen = destino permitido sin aviso (también en el asistente manual); la comparación de nombres es exacta.
+  - **Sueltas:** la ficha de posición no filtra por disciplina; **borrar una técnica usada en rolls borra esos vínculos sin avisar** (afecta a datos de rolls).
+- **Cuándo:** los bugs de importar entran en la it.7. Los demás bugs y "borrar técnica con rolls", en un change de pulido cuando el owner lo decida.
+
 ### Importar clase 2.0 — historial, reintentar, vista previa y revertir
 
 - **Origen:** Adalid, 2026-10-05 (sesión 50), tras el primer uso con `gpt-oss-120b` (origen = destino en movimientos defensivos/transitorios).

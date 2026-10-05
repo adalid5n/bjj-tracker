@@ -46,6 +46,13 @@ cerrar la it.7 (si no compensa, los specs son markdown y se conservan).
   cierra sin archivar su change. Esto aplica también al pulido entre
   iteraciones: **ningún cambio de comportamiento visible sin spec**
   (motivo: `REQUISITOS.md` se quedó desfasado 4 meses por saltarse esto).
+- **Un spec nunca da por bueno un bug.** El escenario describe el
+  comportamiento *esperado* (SHALL/MUST); si hoy no se cumple, se añade
+  bajo la descripción del requisito
+  `> ⚠️ **Bug conocido:** <qué pasa hoy>. Ver MEJORAS_FUTURAS → "<entrada>"`.
+  Arreglarlo = quitar la marca. Lo que es decisión de diseño discutible
+  (no un fallo claro) se describe tal cual, sin marca, y se pregunta al
+  owner.
 - Contexto y reglas para los agentes en
   [`openspec/config.yaml`](openspec/config.yaml). Las skills
   `openspec-*` y los comandos `/opsx:*` de `.claude/` los genera

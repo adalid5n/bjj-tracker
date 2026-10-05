@@ -1,5 +1,7 @@
 # BJJ Tracker — Documento de Requisitos
 
+> **Nota (2026-10-05):** para **importar clase, mapa y catálogo técnico** la fuente viva es [`openspec/specs/`](../../openspec/specs/) (flujo SDD, ver `CLAUDE.md`). Este documento queda como histórico para esas partes; varias secciones (§3.3 categorías, §3.5 estilo de aristas y edición solo en escritorio) ya no reflejan la app.
+
 **Versión:** 1.0 (post licitación inicial)
 **Fecha:** 2026-05-01
 **Estado:** Aprobado para diseño técnico

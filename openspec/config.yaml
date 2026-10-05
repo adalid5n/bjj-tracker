@@ -23,6 +23,9 @@ context: |
   - Modelo visual coherente: una técnica es siempre una arista del grafo;
     posiciones y sumisiones son nodos.
   - Toda técnica lleva a algún sitio (posición o sumisión destino).
+  - Un spec nunca da por bueno un bug: el escenario describe lo esperado
+    y, si hoy no se cumple, el requisito lleva la línea
+    "> ⚠️ **Bug conocido:** <qué pasa hoy>. Ver .claude/MEJORAS_FUTURAS.md → <entrada>".
 
 rules:
   proposal:
