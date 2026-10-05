@@ -66,7 +66,10 @@ Codespace de la tablet).
   uses).
 - **Codespaces (tablet).** `.devcontainer/devcontainer.json` monta Node
   22, pnpm 11.0.9, Chromium de Playwright, Claude Code y las extensiones.
-  `VITE_GROQ_KEY` llega como Codespaces secret (no hay `.env.local`).
+  `VITE_GROQ_KEY`: en el Codespace vale un `.env.local` (gitignoreado; se
+  pierde si se borra/recrea el Codespace) o un Codespaces secret (persiste).
+  Prod (GitHub Pages) la recibe aparte, como secret de Actions en
+  `deploy.yml` — son tres sitios independientes.
   Los puertos 5173 (dev) y 4173 (preview) se abren en
   `https://<codespace>-<puerto>.app.github.dev`. **Ojo:** la BD SQLite
   vive en el navegador por origen — el Codespace tiene BD propia, vacía
