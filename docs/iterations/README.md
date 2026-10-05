@@ -14,7 +14,8 @@ Histórico de iteraciones del proyecto. Cada iteración tiene su propio document
 | 4     | [Pulido post-grafo y consistencia UX](ITERACION_4.md)               | ✅ Cerrada | `v0.4.1-it4`  | 2026-05-19    |
 | 5     | [Rediseño de home (calendario + dashboard)](ITERACION_5.md)         | ✅ Cerrada | `v0.5-it5`    | 2026-05-19    |
 | 6     | [Modo hobbyist vs avanzado](ITERACION_6.md)                         | ✅ Cerrada | `v0.6-it6`    | 2026-05-20    |
-| 7+    | (sin decidir — pausa entre iteraciones)                             | —         | —             | —             |
+| 7     | [Importar clase 2.0](ITERACION_7.md)                                | 📝 Abierta — plan | (`v0.7-it7`) | —        |
+| 8+    | (sin decidir)                                                       | —         | —             | —             |
 
 Para cambios entregados como pulido continuo (sin iteración propia), ver [CHANGELOG.md](../../CHANGELOG.md).
 

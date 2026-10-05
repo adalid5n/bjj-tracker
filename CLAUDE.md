@@ -237,6 +237,12 @@ cualquier máquina) las herede.
   destructiva / de alto impacto (force-push, borrar datos…). El primer
   OK del plan basta para sus commits rutinarios; "no avanzar sin
   aprobación" se refiere al OK del plan, no a un segundo OK.
+- **Feedback crítico sobre cada propuesta del owner, con el sombrero
+  que toque.** Cuando el owner propone UI/UX, responder como diseñador
+  UX/UI (patrones conocidos, accesibilidad, móvil, coherencia con el
+  resto de la app); cuando afecta a datos/arquitectura, como dev
+  (modelo, backup, migraciones, coste). Decir si no cuadra o si hay
+  una best practice mejor, con recomendación — antes de implementar.
 - **Respetar el alcance que el owner reserva.** Si dice "yo me encargo
   de X" o "no me hables de Y", quedarse estrictamente en lo restante.
   Si algo del ámbito excluido parece crítico, mencionarlo una vez en

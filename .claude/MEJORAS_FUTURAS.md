@@ -375,7 +375,7 @@ it.6.
   - **it.7:** "Refinar" descarta lo editado a mano y parte del texto original; "Volver" desde la revisión vuelve al paso 1 y obliga a llamar otra vez a la IA; la IA no recibe las técnicas existentes; se pueden crear posiciones duplicadas renombrando en la revisión; las correcciones de la validación no se muestran; el paso de detalles ignora el modo hobbyist.
   - **it.8:** origen = destino permitido sin aviso (también en el asistente manual); la comparación de nombres es exacta.
   - **Sueltas:** la ficha de posición no filtra por disciplina; **borrar una técnica usada en rolls borra esos vínculos sin avisar** (afecta a datos de rolls).
-- **Cuándo:** los bugs de importar entran en la it.7. Los demás bugs y "borrar técnica con rolls", en un change de pulido cuando el owner lo decida.
+- **Cuándo:** fuera de la it.7 por decisión del owner (solo entra lo que él ha pedido). Pendiente de decidir cuándo; "borrar técnica con rolls" es el más delicado porque afecta a datos.
 
 ### Importar clase 2.0 — historial, reintentar, vista previa y revertir
 
