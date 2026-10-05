@@ -40,7 +40,7 @@ export type AIPropuesta = {
 };
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_TIMEOUT_MS = 30000;
 
 // Llamada a Groq con timeout vía AbortController: si la red es lenta o el

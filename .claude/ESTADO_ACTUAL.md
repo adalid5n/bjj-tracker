@@ -30,9 +30,11 @@
 - `VITE_GROQ_KEY` en el Codespace vía `.env.local` (no como secret). Aclaración: hay tres sitios independientes para la key: `.env.local` en local, el secret de Actions para prod (`deploy.yml`) y `.env.local` o un secret de Codespaces en el Codespace. Prueba explícita de la IA de importar clase: sin confirmar.
 - Borrado `.git/hooks/post-checkout` (hook de Git LFS heredado; el repo no usa LFS, no hay `.gitattributes`): hacía fallar cada checkout. `post-commit`, `post-merge` y `pre-push` también eran de LFS (el pre-push bloqueaba el push); los borró el owner.
 
+- **IA rota en prod y en el Codespace:** Groq retiró `llama-3.3-70b-versatile` (404 `model_not_found`). Se cambió a `openai/gpt-oss-120b` en `src/lib/ai.ts` (también se probó `qwen/qwen3.8-27b`, que funciona; se eligió gpt-oss por tamaño). El owner confirmó que la importación funciona. Primer problema de calidad: creó una posición "Guarda K" duplicada de "Guardia K". La regla "usa EXACTAMENTE el mismo nombre" solo está en el prompt; el código compara el nombre exacto en minúsculas, sin detectar nombres parecidos. No existe historial de importaciones: el texto y la propuesta no se guardan.
+
 **Pendiente del owner (fuera del repo):** secret `VITE_GROQ_KEY` en Codespaces (limitado al repo), idle timeout/retention, copiar JSON a la tablet, `/login` de Claude Code en el Codespace.
 
-**Próximo paso concreto:** comprobar que las skills del plugin aparecen en una sesión nueva, probar la IA de importar clase en el Codespace y, si se quiere que la key sobreviva a recrear el Codespace, crear el secret de Codespaces. Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
+**Próximo paso concreto:** decidir el alcance de (a) detectar duplicados por similitud al importar y (b) historial de importaciones; comprobar que las skills del plugin aparecen en una sesión nueva y, si se quiere que la key sobreviva a recrear el Codespace, crear el secret de Codespaces. Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
 
 ---
 
