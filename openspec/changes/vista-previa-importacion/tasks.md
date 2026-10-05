@@ -2,8 +2,7 @@
 
 > Aplicar después de `selector-coherente` (prop `required` de `Chips`) y de
 > `historial-importaciones` (escrituras de historial que se mueven al
-> borrador). Antes de empezar, cerrar con el owner los Open Questions de
-> `design.md`.
+> borrador).
 
 ## 1. Borrador fuera del diálogo (sin cambio visible)
 
@@ -13,7 +12,7 @@
 ## 2. Disciplina de la importación
 
 - [ ] 2.1 Añadir en el paso `input` el selector BJJ / Grappling / Ambos (`Chips` con `required`, valor inicial = disciplina activa) y usar `borrador.disciplina` en todos los `create*`; verificar importando con BJJ activo y "Grappling" elegido que todo lo creado aparece con Grappling activo y no con BJJ
-- [ ] 2.2 Helper `disciplinasDeCatalogo` y filtrado del catálogo por la disciplina de la importación al generar la propuesta (snapshot enviado a la IA, validación, refinado, comparación "ya existe") y en `confirmar()` (resolución nombre → id); verificar en la pestaña Red de `pnpm dev` que una importación de Grappling no envía posiciones de BJJ, que una de "Ambos" solo envía las de "Ambos", y que un "Mount" que solo existe en BJJ se crea como nuevo en una importación de Grappling
+- [ ] 2.2 Helper `disciplinasDeCatalogo` y filtrado del catálogo por la disciplina de la importación al generar la propuesta (snapshot enviado a la IA, validación, refinado, comparación "ya existe") y en `confirmar()` (resolución nombre → id), y en los selectores de origen/destino de "+ Añadir" en la revisión; verificar en la pestaña Red de `pnpm dev` que una importación de Grappling no envía posiciones de BJJ (ni las ofrece en "+ Añadir"), que una de "Ambos" solo envía las de "Ambos", y que un "Mount" que solo existe en BJJ se crea como nuevo en una importación de Grappling
 
 ## 3. Token y elementos fantasma
 
@@ -31,7 +30,7 @@
 - [ ] 4.5 "Aceptar" (solo último paso): `confirmar()` una sola vez, transferir posiciones de fantasma a ids reales en el cache, disciplina activa = la del último paso, `refresh()`, `reset()`, salir del modo quedándose en el mapa; verificar que lo nuevo aparece donde se vio, que con BJJ activo una importación de Grappling deja Grappling activo, que una de "Ambos" se crea una sola vez y deja Grappling activo, y que la entrada del historial pasa a "Importada"
 - [ ] 4.6 "Cancelar" (cualquier paso): salir del modo y reabrir el diálogo en "Revisar propuesta" con selección, ediciones, detalles y disciplina intactos; verificar desde el paso 1 y el paso 2 de "Ambos" que no se ha creado nada y que la disciplina activa no cambió
 - [ ] 4.7 Navegar a otra pantalla durante la vista previa: sin aviso propio (salvo el de organización sin guardar ya existente), nada escrito, entrada "Sin terminar"; verificar desde la BottomNav
-- [ ] 4.8 Paso que no se puede mostrar: en lugar de la vista previa, "No se puede: <motivo breve>" con "Retroceder" (vuelve a "Revisar propuesta" con todo intacto) y, solo si hay paso siguiente, "Seguir con la siguiente disciplina"; sin "Aceptar" en ese paso; verificar en `pnpm dev` forzando temporalmente un fallo en `buildPreviewElements` (cambio local sin commitear) en una importación de una disciplina y en el paso 1 de "Ambos"
+- [ ] 4.8 Paso que no se puede mostrar: en lugar de la vista previa, "No se puede: <motivo breve>" con "Retroceder" (vuelve a "Revisar propuesta" con todo intacto) y, solo si hay paso siguiente, "Seguir con la siguiente disciplina"; sin "Aceptar" en ese paso; al seguir, acumular en `excluidosPorError` los elementos causantes y, al "Aceptar" en el último paso, crear todo salvo esos (y sus técnicas dependientes) mostrando cuáles no se crearon; verificar en `pnpm dev` forzando temporalmente un fallo en `buildPreviewElements` (cambio local sin commitear) en una importación de una disciplina y en el paso 1 de "Ambos" (seguir y aceptar: se crea todo salvo lo excluido y se avisa)
 
 ## 5. Verificación y cierre
 

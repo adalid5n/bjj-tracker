@@ -1,7 +1,7 @@
 # Estado actual del proyecto
 
 **Última actualización:** 2026-10-05 (sesión 50 — Codespaces para tablet + config de agente + fix modelo IA + piloto SDD con OpenSpec)
-**Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
+**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 (selector-coherente) en implementación.
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
 
 ---
@@ -46,6 +46,7 @@
 - [APLICADO] T-2: Reintentar **reutiliza la misma entrada**. Cada entrada guarda **solo el texto** (el último analizado, también si se editó al reintentar) **y lo aceptado**; el texto interpretado y la propuesta no se guardan.
 - T-3: vista previa **sobre el mapa real** (opción b): se cierra el diálogo, lo nuevo palpita en color (no en tamaño), barra fija con Aceptar/Cancelar, Aceptar = insertar y quedarse en el mapa, Cancelar = volver a la revisión. Selector de disciplina BJJ/Grappling/Ambos en el primer paso de la importación.
 - [APLICADO] T-3: comparación con el catálogo **por disciplina**: BJJ o Grappling → esa + "Ambos"; "Ambos" → solo "Ambos"; lo que falta se crea con la disciplina de la importación. Una importación de BJJ o Grappling tiene 1 vista previa y al aceptar la disciplina activa pasa a ser la suya. Una de **"Ambos" tiene 2 vistas previas** ("1 de 2 · BJJ" → "2 de 2 · Grappling", con Siguiente/Atrás/Cancelar y Aceptar solo en la última; se inserta una sola vez y el mapa se queda en la última disciplina). **Errores en la vista previa:** "No se puede: <breve>" con Retroceder o Seguir con la siguiente disciplina.
+- Cierre del plan: al reintentar una entrada ya Importada y volver a aceptar, el bloque "aceptado" **se acumula** (owner). "+ Añadir" en la revisión solo ofrece la disciplina de la importación, y al aceptar tras saltar un paso con error se crea todo menos lo que dio el error, avisando (decisiones del orquestador derivadas de las del owner).
 - Supuestos del subagente aceptados por el owner: el icono del historial es visible con el catálogo vacío; abrir el historial cierra las fichas; definición de "Falló"; acordeón de una tarjeta abierta a la vez; aviso de cambios sin guardar antes de la vista previa.
 - Fuera de la it.7 (decisión del owner: solo lo que él ha pedido): revertir, bugs de la línea base, panel de alertas.
 - Preferencia nueva del owner (en CLAUDE.md): feedback crítico con sombrero de diseñador UX/UI o de dev en cada propuesta.
@@ -54,7 +55,7 @@
 
 **Pendiente del owner (fuera del repo):** secret `VITE_GROQ_KEY` en Codespaces (limitado al repo), idle timeout/retention, copiar JSON a la tablet, `/login` de Claude Code en el Codespace.
 
-**Próximo paso concreto:** resolver con el owner las preguntas abiertas restantes de la it.7 (Reintentar sobre una entrada ya Importada), hacer el commit "abrir it.7" y empezar T-1 (`/opsx:apply selector-coherente`). **Lección:** en el Codespace, subir a menudo; un reinicio mató a un subagente a mitad de trabajo y las decisiones solo estaban en el chat. Opcional: crear el secret de Codespaces para que la key sobreviva a recrear el Codespace.
+**Próximo paso concreto:** plan de la it.7 cerrado y subido. T-1 (`selector-coherente`) lo está implementando un subagente → `pnpm check`/`build` → validación manual del owner → `/opsx:archive selector-coherente` → T-2. **Lección:** en el Codespace, subir a menudo; un reinicio mató a un subagente a mitad de trabajo y las decisiones solo estaban en el chat. Opcional: crear el secret de Codespaces para que la key sobreviva a recrear el Codespace.
 
 ---
 

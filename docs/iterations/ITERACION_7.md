@@ -134,7 +134,10 @@ confirmación") y REMOVED ("Sin historial de importaciones").
   (inserta una sola vez, se queda en el mapa y la disciplina activa pasa a
   la de la importación; en "Ambos", Grappling).
 - Si un paso no se puede mostrar: "No se puede: <breve>" con
-  "Retroceder" (a la revisión) o "Seguir con la siguiente disciplina".
+  "Retroceder" (a la revisión) o "Seguir con la siguiente disciplina";
+  aceptar después crea todo salvo lo que causó el error y avisa.
+- "+ Añadir" en la revisión ofrece origen/destino solo del catálogo de la
+  disciplina de la importación.
 - Durante la vista previa: se ve la disciplina del paso, se
   ignoran los filtros, se bloquean las acciones que cambian datos u
   organización; salir del mapa = cancelar (queda "Sin terminar").
@@ -142,17 +145,14 @@ confirmación") y REMOVED ("Sin historial de importaciones").
   elementos fantasma nunca se guardan en la organización del grafo.
 
 **Specs:** `importar-clase` MODIFIED ("Generación de la propuesta",
-"Reutilización de lo que ya existe en el catálogo", "Confirmar e insertar
-en el catálogo") + ADDED (disciplina de la importación, paso a la vista
+"Reutilización de lo que ya existe en el catálogo", "Añadir elementos a
+mano en la revisión", "Confirmar e insertar en el catálogo") + ADDED (disciplina de la importación, paso a la vista
 previa, pasos según la disciplina, aceptar, cancelar, paso que no se
-puede mostrar); `mapa` ADDED (vista previa en el grafo, leyenda con
+puede mostrar, aceptar tras un paso con error); `mapa` ADDED (vista previa en el grafo, leyenda con
 indicador de paso, movimiento reducido, disciplina y filtros, acciones
 bloqueadas, salir del mapa).
 
-**Puntos abiertos (pendientes del owner, en el `design.md` del change):**
-si "Aceptar" tras saltar un paso con error inserta todo; si los
-selectores de "+ Añadir" de la revisión se limitan también al catálogo
-de la disciplina.
+**Puntos abiertos:** ninguno.
 
 ---
 
@@ -171,11 +171,13 @@ de la disciplina.
   llamada extra); si la IA nunca respondió, primeras palabras del texto.
 - **Historial — acceso y forma:** icono en la barra del mapa; panel lateral
   (escritorio) o inferior (móvil), como las fichas; tarjetas desplegables,
-  más recientes primero; plegada = título + fecha + estado.
+  más recientes primero, una desplegada a la vez; plegada = título +
+  fecha + estado.
 - **Historial — detalle:** bloques Texto y Aceptado, cada uno con copiar
   ("Copiado ✓"); aceptado como lista legible; la fecha no se copia.
 - **Historial — acciones:** Reintentar (abre el importador con el texto
-  guardado precargado y editable, y reutiliza la misma entrada) y borrar con confirmación. Sin editar,
+  guardado precargado y editable, y reutiliza la misma entrada; si se
+  reconfirma una entrada "Importada", lo aceptado se acumula) y borrar con confirmación. Sin editar,
   sin búsqueda, sin revertir, sin enlace al calendario.
 - **Historial — copia de seguridad:** se incluye en exportar/importar
   datos para sobrevivir al cambio de dispositivo. En T-2 se arregla
@@ -198,7 +200,11 @@ de la disciplina.
   disciplina activa es Grappling.
 - **Vista previa — errores:** un paso que no se puede mostrar enseña "No
   se puede: <breve>" con "Retroceder" o "Seguir con la siguiente
-  disciplina" (solo si hay paso siguiente).
+  disciplina" (solo si hay paso siguiente). Aceptar después de seguir
+  crea todo salvo los elementos que causaron el error y avisa de cuáles
+  no se crearon (decisión del orquestador).
+- **"+ Añadir" en la revisión:** origen/destino solo del catálogo de la
+  disciplina de la importación (decisión del orquestador).
 - **Disciplinas aisladas:** la importación elige BJJ / Grappling / Ambos
   en el primer paso (por defecto la activa); todo lo creado la lleva.
 - **Comparación con el catálogo por disciplina:** BJJ o Grappling → esa +

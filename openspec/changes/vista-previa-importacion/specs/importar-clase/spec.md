@@ -50,6 +50,26 @@ la importación: BJJ o Grappling → esa disciplina y "Ambos"; "Ambos" → solo
 - **WHEN** en una importación de "Ambos" la IA propone "Kimura" y "Kimura" solo existe con disciplina BJJ
 - **THEN** "Kimura" aparece como sumisión nueva y, al aceptar, se crea con disciplina "Ambos"
 
+### Requirement: Añadir elementos a mano en la revisión
+En el paso de revisión el usuario SHALL poder añadir posiciones,
+sumisiones y técnicas manualmente con "+ Añadir". Una técnica manual
+MUST elegir tipo, origen y destino entre el catálogo de la disciplina de
+la importación (la misma regla que en "Reutilización de lo que ya existe
+en el catálogo") y los elementos nuevos marcados, y solo se puede marcar
+cuando origen y destino están resueltos.
+
+#### Scenario: Técnica manual completa
+- **WHEN** el usuario añade una técnica manual, le da nombre, tipo "Sumisión", origen y sumisión destino existentes y la marca
+- **THEN** la técnica se incluirá en la inserción
+
+#### Scenario: Técnica manual incompleta
+- **WHEN** a una técnica manual le falta origen o destino
+- **THEN** su casilla está deshabilitada
+
+#### Scenario: Orígenes de la otra disciplina
+- **WHEN** en una importación de Grappling el usuario elige el origen de una técnica manual y "Mount" solo existe con disciplina BJJ
+- **THEN** "Mount" no aparece entre los orígenes posibles; sí aparecen las posiciones de Grappling, las de "Ambos" y las nuevas marcadas
+
 ### Requirement: Confirmar e insertar en el catálogo
 "Aceptar" en la vista previa del mapa SHALL crear posiciones, sumisiones y
 técnicas marcadas, por ese orden, con la disciplina elegida en la
@@ -177,3 +197,13 @@ MUST NOT ofrecer "Aceptar" ni escribir nada en el catálogo.
 #### Scenario: Retroceder
 - **WHEN** el usuario pulsa "Retroceder" en un paso con error
 - **THEN** vuelve a "Revisar propuesta" con la selección, las ediciones, los detalles y la disciplina intactos, sin nada creado
+
+### Requirement: Aceptar tras un paso con error
+Si el usuario pulsó "Seguir con la siguiente disciplina" en un paso con
+error y después pulsa "Aceptar" en el último paso, la app SHALL crear todo
+lo marcado excepto los elementos que causaron el error, y el usuario MUST
+ver cuáles no se crearon y por qué.
+
+#### Scenario: Seguir y aceptar
+- **WHEN** en una importación de "Ambos" el paso de BJJ dio error por la técnica "Armbar", el usuario sigue a Grappling y pulsa "Aceptar"
+- **THEN** se crea todo lo marcado salvo "Armbar", y el usuario ve que "Armbar" no se creó y el motivo

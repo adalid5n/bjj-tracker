@@ -70,6 +70,11 @@ UPDATE schema_meta SET value = '10' WHERE key = 'version';
 - `aceptado_json`: JSON serializado (SQL crudo, sin ORM). Se guarda JSON
   (no texto legible) para poder re-formatear o, en el futuro, revertir;
   la conversión a lista legible es solo de UI.
+- **Fusión al reconfirmar** (Reintentar sobre una entrada "Importada"):
+  helper puro `mergeAceptado(previo, nuevo)` en el DAO que concatena las
+  listas de posiciones, sumisiones y técnicas, sin duplicar por `id`
+  (un mismo elemento no se puede crear dos veces, así que en la práctica
+  solo se añaden). La tarjeta muestra la lista fusionada.
 - `aceptado_json` incluye nombres **y** ids creados (`{posiciones:[{id,
   nombre, categoria}], sumisiones:[…], tecnicas:[{id, nombre, tipo,
   origen, destino}]}`). Coste cero hoy; deja la puerta abierta a
@@ -98,7 +103,7 @@ actualiza la misma entrada**:
 | normalización OK | `titulo` de la IA (`titulo_origen='ia'`), estado `sin_terminar` |
 | normalización / propuesta / refinado KO | estado `fallo`, `error` = mensaje de usuario |
 | propuesta OK (tras validación) y refinado OK | estado `sin_terminar`, `error = null` (la propuesta no se guarda) |
-| `handleConfirmar` al terminar | `aceptado_json` (lo creado de verdad, recogiendo ids de los `create*`), estado `importada` |
+| `handleConfirmar` al terminar | `aceptado_json` = lo aceptado ya guardado en la entrada (si había) + lo creado de verdad en este intento (ids de los `create*`), estado `importada` |
 | `resetState()` | `importacionId = null` (cerrar no borra nada). El `AlertDialog` de cierre usa el texto "¿Cerrar? Quedará en el historial como Sin terminar" cuando `importacionId` no es null |
 
 Las escrituras del historial van en `try/catch` propio: un fallo al
@@ -126,8 +131,9 @@ la IA omite el campo, se mantiene el título de respaldo.
   vista, pero un único patrón simplifica). Abrir el historial cierra
   antes el stack de fichas con `modalHost.attemptCloseAll` para no
   apilar dos paneles.
-- Lista: `Accordion` de bits-ui (`type="single"` o `"multiple"`, ver
-  Open Questions). Se puede añadir el wrapper shadcn-svelte `accordion`
+- Lista: `Accordion` de bits-ui `type="single"` (una tarjeta abierta a
+  la vez, aceptado por el owner: menos scroll en el panel inferior de
+  50 dvh). Se puede añadir el wrapper shadcn-svelte `accordion`
   en `ui/` (son ficheros fuente sobre bits-ui, no dependencia nueva).
 - Borrar: `AlertDialog` (`ui/alert-dialog`), patrón controlado
   `open` + `onOpenChange` como en `/mapa`.
@@ -166,9 +172,8 @@ título se regenera con la nueva respuesta de la IA; si la IA no responde,
 se conserva el título que ya tenía la entrada. `/mapa` mantiene
 `reintento = { id, texto }` y abre el diálogo tras cerrar el panel.
 
-Consecuencia: reintentar una entrada "Importada" y confirmar de nuevo
-sobrescribe su `aceptado_json` con lo creado en el nuevo intento (ver
-Open Questions).
+Reintentar una entrada "Importada" y confirmar de nuevo **acumula** (decisión
+del owner): ver la fila `handleConfirmar` de la Decisión 3.
 
 ### 8. Copia de seguridad (incluye arreglo de pérdida de datos)
 
@@ -243,14 +248,3 @@ Antes de pushear: `pnpm check`, `pnpm build`, `pnpm preview` + refresh
 (toca BD y `sync.ts`). Rollback: revert del código; la tabla extra no
 molesta a versiones anteriores del código (no la leen), pero una BD v10
 con código v9 no baja de versión — aceptable (mismo caso que v9).
-
-## Open Questions
-
-- Accordion `single` (una tarjeta abierta a la vez) vs `multiple`.
-  Propuesta: `single` (menos scroll en el panel inferior de 50 dvh).
-  No cambia specs ni tareas.
-- Reintentar una entrada ya "Importada" reutiliza la entrada y, si se
-  confirma otra vez, lo aceptado pasa a ser lo creado en el último
-  intento (lo de la primera vez deja de constar en el historial, aunque
-  sigue en el catálogo). Pendiente de que el owner lo confirme; no cambia
-  tareas.

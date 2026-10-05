@@ -34,7 +34,9 @@ palabras.
   técnicos. La fecha no se copia.
 - **Reintentar**: abre la importación con el texto guardado ya escrito y
   editable, y **reutiliza la misma entrada**: si se edita el texto y se
-  vuelve a analizar, el nuevo texto sustituye al guardado.
+  vuelve a analizar, el nuevo texto sustituye al guardado. Si una entrada
+  ya "Importada" se reintenta y se confirma otra vez, lo nuevo **se suma**
+  a lo aceptado: la tarjeta refleja todo lo que esa importación ha creado.
 - **Borrar** una entrada, con confirmación.
 - El historial viaja en la **copia de seguridad** (Exportar / Importar
   datos de Ajustes), así sobrevive a un cambio de dispositivo.
@@ -67,7 +69,8 @@ palabras.
 - "Reintentar" abre el importador con el texto guardado precargado y
   editable, y reutiliza la misma entrada (el texto editado sustituye al
   anterior). Volver a analizar en la misma ventana también mantiene la
-  entrada.
+  entrada. Reconfirmar una entrada "Importada" acumula lo aceptado.
+- Una sola tarjeta desplegada a la vez.
 - Borrar una entrada con confirmación.
 - El historial entra en la exportación/importación de datos existente.
 - En este mismo change se arregla la pérdida de datos de la copia de

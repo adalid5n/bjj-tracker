@@ -4,7 +4,7 @@
 
 - [ ] 1.1 Añadir `SCHEMA_V10_MIGRATION` + `migrate9To10` y la entrada `{ from: 9, to: 10 }` AL FINAL de `MIGRATIONS` en `src/lib/db/schema.ts`, sin tocar migraciones anteriores; verificar en `pnpm dev` que "Versión BD" en Ajustes muestra 10 y que `git diff` no toca `SCHEMA_V1`…`SCHEMA_V9`
 - [ ] 1.2 Crear `src/lib/importaciones.ts` (tipos + `createImportacion`, `updateImportacion`, `listImportaciones`, `deleteImportacion`, SQL crudo sobre `run`/`query`); verificar con `pnpm check`
-- [ ] 1.3 Añadir en el mismo fichero el helper puro `formatAceptadoLegible`; verificar con `pnpm check` y revisando a mano la salida de un ejemplo en consola de `pnpm dev` (sin JSON, una línea por elemento)
+- [ ] 1.3 Añadir en el mismo fichero los helpers puros `formatAceptadoLegible` y `mergeAceptado` (suma lo nuevo a lo aceptado previo sin duplicar por id); verificar con `pnpm check` y revisando a mano la salida de un ejemplo en consola de `pnpm dev` (sin JSON, una línea por elemento)
 
 ## 2. Título en la petición existente
 
@@ -14,14 +14,14 @@
 
 - [ ] 3.1 En `ImportarClaseDialog.svelte` crear la entrada al primer "Analizar clase" (antes de la IA) y, en los siguientes análisis de la misma ventana, actualizar su `texto`; guardar solo el título al responder la IA (ni texto interpretado ni propuesta); verificar que cerrar durante la carga deja una entrada "Sin terminar" con título de respaldo y que "Volver" + analizar otra vez deja una sola entrada con el último texto
 - [ ] 3.2 Marcar "Falló" en cualquier error de IA y volver a "Sin terminar" cuando un paso posterior sale bien; verificar sin clave de IA (quitar `VITE_GROQ_KEY` en local) que la entrada queda en "Falló"
-- [ ] 3.3 En `handleConfirmar` recoger lo realmente creado (ids + nombres) y guardar `aceptado` + estado "Importada"; verificar que lo aceptado coincide con lo que aparece en el mapa
+- [ ] 3.3 En `handleConfirmar` recoger lo realmente creado (ids + nombres), fusionarlo con el `aceptado` previo de la entrada (`mergeAceptado`) y guardar + estado "Importada"; verificar que lo aceptado coincide con lo que aparece en el mapa y que reintentar una entrada "Importada" y confirmar de nuevo deja en "Aceptado" lo de ambos intentos
 - [ ] 3.4 Proteger las escrituras de historial con `try/catch` propio para que un fallo de historial no bloquee la importación; verificar leyendo el código y con `pnpm check`
 - [ ] 3.5 Cambiar el aviso de cierre: si ya se pulsó "Analizar clase", "¿Cerrar? Quedará en el historial como Sin terminar"; si no, se mantiene "¿Descartar la importación?"; verificar ambos casos en `pnpm dev`
 
 ## 4. Panel del historial en /mapa
 
 - [ ] 4.1 Añadir el wrapper shadcn-svelte `accordion` en `src/lib/components/ui/` (sobre bits-ui ya instalado, sin dependencias nuevas); verificar que `package.json` no cambia
-- [ ] 4.2 Crear `HistorialImportacionesPanel.svelte` (Sheet lateral/inferior según `useMediaQuery`, tarjetas plegadas con título + fecha + estado, más recientes primero, aviso de vacío, tokens semánticos); verificar en `pnpm dev` en ancho de escritorio y de móvil
+- [ ] 4.2 Crear `HistorialImportacionesPanel.svelte` (Sheet lateral/inferior según `useMediaQuery`, `Accordion` `type="single"` (una tarjeta abierta a la vez), tarjetas plegadas con título + fecha + estado, más recientes primero, aviso de vacío, tokens semánticos); verificar en `pnpm dev` en ancho de escritorio y de móvil
 - [ ] 4.3 Bloques desplegados "Texto" y "Aceptado" (este solo en estado Importada) con botón copiar y "Copiado ✓"; verificar pegando en otra app que se copia solo el bloque, sin fecha y, en "Aceptado", en formato legible
 - [ ] 4.4 Borrar con `AlertDialog` de confirmación; verificar que el catálogo no cambia al borrar
 - [ ] 4.5 Icono `history` en la barra del mapa, visible también con catálogo vacío, que cierra las fichas abiertas antes de abrir el panel; verificar con un catálogo vacío en el Codespace

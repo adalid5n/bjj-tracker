@@ -26,12 +26,18 @@ el texto guardado pasa a ser el último analizado.
 ### Requirement: Contenido de cada entrada
 Cada entrada SHALL guardar solo el texto analizado y, si se confirmó la
 inserción, lo aceptado: los elementos que realmente se crearon en el
-catálogo. El texto interpretado y la propuesta de la IA MUST NOT
-guardarse.
+catálogo. Si una importación reintentada se confirma otra vez, lo nuevo
+MUST sumarse a lo aceptado anterior, de modo que la entrada refleja todo
+lo que esa importación ha creado. El texto interpretado y la propuesta de
+la IA MUST NOT guardarse.
 
 #### Scenario: Importación confirmada
 - **WHEN** el usuario confirma la inserción
 - **THEN** la entrada guarda como "aceptado" las posiciones, sumisiones y técnicas que se crearon
+
+#### Scenario: Reintentar una importación ya importada
+- **WHEN** una entrada "Importada" que creó "Mount" se reintenta y al confirmar se crea la técnica "Armbar"
+- **THEN** el bloque "Aceptado" de esa entrada incluye "Mount" y "Armbar"
 
 #### Scenario: Propuesta no guardada
 - **WHEN** el usuario genera una propuesta y cierra la ventana sin confirmar
@@ -86,12 +92,16 @@ vacío.
 ### Requirement: Lista del historial
 El panel SHALL listar las importaciones de la más reciente a la más
 antigua, como tarjetas plegadas que muestran título, fecha y estado. Tocar
-una tarjeta MUST desplegarla o plegarla. Sin importaciones, el panel
+una tarjeta MUST desplegarla o plegarla; solo hay una desplegada a la vez. Sin importaciones, el panel
 muestra un aviso de historial vacío.
 
 #### Scenario: Orden de las tarjetas
 - **WHEN** hay importaciones del lunes y del miércoles
 - **THEN** la del miércoles aparece primero
+
+#### Scenario: Una tarjeta abierta a la vez
+- **WHEN** hay una tarjeta desplegada y el usuario toca otra
+- **THEN** la nueva se despliega y la anterior se pliega
 
 #### Scenario: Historial vacío
 - **WHEN** nunca se ha analizado ninguna clase

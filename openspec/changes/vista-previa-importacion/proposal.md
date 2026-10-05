@@ -49,7 +49,11 @@ importación.
 - **Si un paso no se puede mostrar**, en lugar de la vista previa sale
   "No se puede: <breve descripción>" con **"Retroceder"** (vuelve a
   "Revisar propuesta") y, si hay paso siguiente, **"Seguir con la
-  siguiente disciplina"**. Ese paso no permite aceptar.
+  siguiente disciplina"**. Ese paso no permite aceptar. Si se sigue y se
+  acepta en el último paso, se crea todo **excepto** los elementos que
+  causaron el error, y el usuario ve cuáles no se crearon.
+- En la revisión, "+ Añadir" ofrece como origen/destino solo el catálogo
+  de la disciplina de la importación (misma regla que la comparación).
 - Mientras dura la vista previa, el mapa muestra la disciplina del paso,
   ignora los filtros de tipo/estado/categoría y bloquea las
   acciones que cambian datos u organización (mover nodos, guardar
@@ -82,7 +86,10 @@ importación.
   Siguiente / Atrás / Cancelar y "Aceptar" solo en la última; se inserta
   una sola vez; después la disciplina activa es Grappling.
 - Errores en un paso: "No se puede: <breve>" con "Retroceder" o "Seguir
-  con la siguiente disciplina".
+  con la siguiente disciplina"; aceptar después crea todo salvo lo que
+  causó el error y avisa de qué no se creó (decisión del orquestador).
+- "+ Añadir" en la revisión usa el mismo catálogo por disciplina
+  (decisión del orquestador).
 
 ## Fuera de alcance
 
@@ -112,9 +119,11 @@ importación.
   - "Generación de la propuesta" y "Reutilización de lo que ya existe en
     el catálogo": la IA recibe y la comparación usa solo el catálogo de la
     disciplina de la importación ("Ambos" → solo "Ambos").
+  - "Añadir elementos a mano en la revisión": origen y destino solo del
+    catálogo de la disciplina de la importación.
   - Nuevos: disciplina de la importación; paso a la vista previa en el
     mapa; pasos de la vista previa según la disciplina; aceptar (cambia la
-    disciplina activa); cancelar; paso que no se puede mostrar.
+    disciplina activa); cancelar; paso que no se puede mostrar; aceptar tras un paso con error.
 - `mapa`: nuevo modo "vista previa de importación" (resaltado de lo nuevo,
   barra con indicador de paso, movimiento reducido, disciplina y filtros
   durante cada paso, acciones bloqueadas, salir del mapa).

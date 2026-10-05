@@ -90,8 +90,9 @@ Codespace de la tablet).
 - Histórico completo de iteraciones en
   [`docs/iterations/`](docs/iterations/); resúmenes públicos por
   release en [CHANGELOG.md](CHANGELOG.md).
-- Pausa entre iteraciones — siguiente iteración por decidir entre
-  candidatos del [ROADMAP.md](ROADMAP.md).
+- **It.7 "Importar clase 2.0" abierta** (2026-10-05): primera iteración
+  con flujo SDD/OpenSpec. Plan en
+  [`docs/iterations/ITERACION_7.md`](docs/iterations/ITERACION_7.md).
 - Para el estado de detalle día a día, ver [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md).
 
 ## Entorno y herramientas

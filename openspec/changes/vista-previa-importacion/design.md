@@ -139,7 +139,15 @@ breve}" con:
   `pasoPreview + 1`.
 
 Un paso con error no ofrece "Aceptar" (en el último paso solo queda
-"Retroceder"). El motivo se redacta para el usuario (nombre del elemento
+"Retroceder"). Cada problema identifica, cuando puede, los elementos que lo
+causan; el borrador acumula esos elementos en `excluidosPorError` al
+pulsar "Seguir con la siguiente disciplina". Al **Aceptar** en el último
+paso, `confirmar()` crea todo lo marcado **excepto** `excluidosPorError`
+(y las técnicas que dependen de ellos) y los añade al aviso de "no se
+crearon" del requisito "Confirmar e insertar", con el motivo del paso. Si
+el error del paso no se puede atribuir a ningún elemento (p. ej. fallo al
+leer el catálogo), no se excluye nada. "← Atrás" hasta el paso con error
+y "Cancelar"/"Retroceder" vacían `excluidosPorError`. El motivo se redacta para el usuario (nombre del elemento
 y qué falta), nunca el error técnico en bruto.
 
 ### 3. Elementos fantasma en `GrafoMapa`
@@ -205,9 +213,9 @@ entero:
   `catalogoPosicionesBase` / `catalogoSumisionesBase` (comparación "ya
   existe" en la revisión) también. Efecto colateral: esas mismas listas
   alimentan los selectores de origen/destino de "+ Añadir" en la
-  revisión, que pasan a ofrecer solo el catálogo de la importación (el
-  spec de "Añadir elementos a mano" no se cambia; pendiente de confirmar
-  con el owner, ver Open Questions).
+  revisión, que pasan a ofrecer solo el catálogo de la importación
+  (decisión del orquestador; MODIFIED "Añadir elementos a mano en la
+  revisión").
 - `confirmar()`: los mapas nombre → id para resolver orígenes y destinos
   se construyen con el catálogo filtrado; lo que no está ahí se crea con
   `borrador.disciplina`, aunque exista con el mismo nombre en la otra
@@ -239,9 +247,9 @@ generar de nuevo la propuesta.
   toque] → decisión del owner para que vea lo recién creado; el selector
   de disciplina del mapa refleja el cambio en cuanto sale del modo.
 - [Importación "Ambos" con un paso que no se puede mostrar y "Seguir con
-  la siguiente disciplina"] → al aceptar en el último paso se inserta lo
-  marcado (todo "Ambos"), aunque el usuario no haya visto la vista previa
-  del paso con error. Ver Open Questions.
+  la siguiente disciplina"] → al aceptar se crea todo salvo los elementos
+  que causaron el error (Decisión 2b); el usuario ve cuáles no se
+  crearon.
 - [Técnica "idéntica a una existente" que no se creará] → la vista previa
   la pinta como nueva (bug de línea base); aceptado.
 - [Usuario con fichas/wizard sucio abierto al pasar a vista previa] →
@@ -256,13 +264,4 @@ escritorio, con y sin "reducir movimiento" (DevTools → Rendering).
 
 ## Open Questions
 
-- **Aceptar tras saltar un paso con error** (importación "Ambos"): la
-  propuesta de este diseño es que "Aceptar" en el último paso inserte
-  todo lo marcado, igual que sin error. Alternativa: exigir que todos los
-  pasos se hayan visto sin error. Pendiente de confirmar con el owner; no
-  cambia tareas salvo la 4.8.
-- **Selectores de "+ Añadir" en la revisión:** con la Decisión 5b solo
-  ofrecen el catálogo de la disciplina de la importación (más lo nuevo).
-  Parece lo coherente (evita técnicas que cruzan disciplinas), pero el
-  requisito "Añadir elementos a mano en la revisión" dice "el catálogo"
-  sin más. Si el owner lo confirma, conviene precisarlo en el spec.
+Ninguna.
