@@ -1,8 +1,31 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-06-25 (sesión 49 — auditoría de cambios IA/schema + selector de disciplina en Sumisión/Técnica + fixes menores IA)
+**Última actualización:** 2026-10-05 (sesión 50 — entorno Codespaces para tablet + config de agente versionada en el repo)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
+
+---
+
+## Sesión 50 (2026-10-05) — Codespaces para tablet + config de agente en el repo
+
+**Objetivo del owner:** continuar el proyecto desde una tablet (Xiaomi Pad 7) con Codespaces + Claude Code dentro, con la misma experiencia que en local.
+
+**Arranque:** `main` sincronizada con `origin/main` (`46616d0`) — confirmado tras cargar la clave SSH personal (`ssh-add ~/.ssh/id_ed25519_personal`; tiene passphrase y no estaba en el agente, por eso fallaba el fetch). Cambio suelto sin commitear en `mapa/+page.svelte` (`grafoEditing = false` tras `saveLayout`) **descartado** por decisión del owner. Rama remota `claude/continue-work-rVl5W` ya contenida en main (borrable).
+
+**Cambios entregados:**
+- **`.devcontainer/devcontainer.json`** (nuevo): imagen `typescript-node:1-22-bookworm`, features `github-cli` + `claude-code`, `postCreateCommand` con pnpm 11.0.9 + `pnpm install --frozen-lockfile` + Chromium de Playwright (`--with-deps`, lo necesita vitest-browser). Puertos 5173/4173. Extensiones = `.vscode/extensions.json` + Claude Code. `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.app.github.dev` para que Vite no bloquee el dominio de Codespaces sin tocar `vite.config.ts` (**no verificado aún en un Codespace real**).
+- **`.claude/skills/orchestrator-workflow/SKILL.md`** (nuevo): copia de la skill personal (`~/.claude-personal/skills/`) adaptada a la estructura actual (`CLAUDE.md` en vez de `CONTEXTO_AGENTE.md`, árbol de carpetas real). La copia del repo pasa a ser la de referencia para este proyecto.
+- **`.claude/settings.json`** (nuevo, compartido): permisos genéricos (pnpm, git, gh run, curl a localhost/Pages…) + marketplace `anthropics/skills` con plugin `example-skills` (trae `doc-coauthoring`, `webapp-testing`, `skill-creator`). `settings.local.json` sigue siendo por máquina.
+- **`CLAUDE.md`**: nueva sección "Modo de interacción con el owner" (sparring + orquestar primero, extraído de la config global **sin** las partes del trabajo — tickets/`~/Claude files/` — porque el repo es público); bullet de Codespaces en "Entorno y herramientas"; "Doble entorno" → "Triple entorno"; 3 reglas que solo vivían en memoria local: sin confirmaciones vacías, respetar alcance reservado, coherencia del modelo visual.
+- Corregido `PUBLIC_GROQ_KEY` → `VITE_GROQ_KEY` en la entrada de sesiones 46-48.
+
+**Decisiones:**
+- Config de agente en el repo (no en un repo de dotfiles privado) por decisión del owner. Consecuencia: es pública — no meter nada personal/laboral sensible.
+- Datos de prueba (`bjj-tracker-*.json`) siguen fuera del repo; se copian a la tablet a mano.
+
+**Pendiente del owner (fuera del repo):** secret `VITE_GROQ_KEY` en Codespaces (limitado al repo), idle timeout/retention, copiar JSON a la tablet, `/login` de Claude Code en el Codespace.
+
+**Próximo paso concreto:** crear el Codespace desde la tablet y verificar: (1) `postCreateCommand` termina sin errores, (2) `pnpm dev` abre en el puerto reenviado sin "Blocked request", (3) `pnpm build && pnpm preview` + refresh, (4) la skill `orchestrator-workflow` y el plugin aparecen en Claude Code, (5) la IA de importar clase funciona (secret). Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
 
 ---
 
@@ -88,7 +111,7 @@ Pipeline de 3 fases con Groq (llama-3.3-70b-versatile):
 - **Disciplina `'ambos'`** en el tipo pero los filtros de mapa solo muestran `bjj` o `grappling` según la activa, más los que tienen `'ambos'`.
 - **Validator silencioso**: el usuario no ve qué corrigió el validador — se eliminó el banner verde tras feedback. La validación mejora la propuesta sin ruido visual.
 - **`detalles` restaurados en código**, no vía prompt: más fiable que pedirle al modelo que propague un campo opcional.
-- **Groq key en `.env.local`** (`PUBLIC_GROQ_KEY`). NUNCA comitear. La app falla con error explícito si la key no está.
+- **Groq key en `.env.local`** (`VITE_GROQ_KEY`; *corrección sesión 50*: el nombre original `PUBLIC_GROQ_KEY` se cambió en `8f41361`). NUNCA comitear. En CI llega como secret del workflow; en Codespaces como Codespaces secret. La app falla con error explícito si la key no está.
 
 ### Archivos modificados/nuevos
 

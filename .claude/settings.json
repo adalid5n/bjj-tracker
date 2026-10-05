@@ -1,0 +1,34 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(pnpm *)",
+			"Bash(node *)",
+			"Bash(npx prettier *)",
+			"Bash(npx eslint *)",
+			"Bash(npx svelte-check *)",
+			"Bash(npx svelte-kit *)",
+			"Bash(git *)",
+			"Bash(gh run *)",
+			"Bash(gh repo *)",
+			"Bash(gh auth *)",
+			"Bash(curl -s *localhost*)",
+			"Bash(curl -sI *localhost*)",
+			"Bash(curl -s https://adalid5n.github.io/bjj-tracker/*)",
+			"Bash(curl -sI https://adalid5n.github.io/bjj-tracker/*)",
+			"Bash(grep *)",
+			"Bash(pkill -f 'vite preview')",
+			"Bash(pkill -f 'vite dev')",
+			"Skill(orchestrator-workflow)",
+			"Skill(doc-coauthoring)",
+			"Skill(webapp-testing)"
+		]
+	},
+	"extraKnownMarketplaces": {
+		"anthropic-agent-skills": {
+			"source": { "source": "github", "repo": "anthropics/skills" }
+		}
+	},
+	"enabledPlugins": {
+		"example-skills@anthropic-agent-skills": true
+	}
+}

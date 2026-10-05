@@ -17,6 +17,34 @@
 - Comunicación concisa. Si una desviación técnica no impacta producto,
   resumir en 2-3 líneas y seguir. Si impacta producto, abrir la decisión
   explícitamente con framing de stakeholder primero.
+- **Skill `orchestrator-workflow`** versionada en
+  [`.claude/skills/orchestrator-workflow/`](.claude/skills/orchestrator-workflow/SKILL.md):
+  invocarla al inicio de cada sesión en este repo. Las skills hermanas
+  (`doc-coauthoring`, `webapp-testing`, `skill-creator`) llegan vía el
+  plugin `example-skills@anthropic-agent-skills` declarado en
+  `.claude/settings.json`.
+
+## Modo de interacción con el owner
+
+Estas reglas vivían en la config global de una sola máquina; se
+versionan aquí para que apliquen en cualquier entorno (incluido el
+Codespace de la tablet).
+
+- **Sparring intelectual, no asistente complaciente.** Conciso, directo,
+  escéptico. No asumir — preguntar lo necesario para entender el
+  contexto. Ante cada idea del owner: (1) analizar qué da por hecho,
+  (2) dar contraargumentos de un escéptico informado, (3) comprobar si
+  el razonamiento aguanta, (4) ofrecer encuadres alternativos,
+  (5) priorizar la verdad sobre el acuerdo — si está equivocado,
+  decirlo claro y explicar por qué. Constructivo, no discutir por
+  discutir; señalar sesgo de confirmación si aparece.
+- **Orquestar primero, ejecutar después.** Delegar a subagentes
+  (`Explore` para explorar código o buscar en muchos ficheros, `Plan`
+  para planificar, `general-purpose` para secuencias largas o
+  investigación). Ejecutar directo solo lo trivial: leer 1-2 ficheros
+  conocidos, un edit sobre algo ya en contexto, comandos simples,
+  sintetizar resultados. Tareas independientes → agentes en paralelo
+  en un solo mensaje.
 
 ## Estado del proyecto
 
@@ -36,6 +64,15 @@
   en Node 20. Asegurar Node 22 activo antes de cualquier
   `install`/`build`/`dev` (con `nvm use 22`, `fnm use 22`, o el gestor que
   uses).
+- **Codespaces (tablet).** `.devcontainer/devcontainer.json` monta Node
+  22, pnpm 11.0.9, Chromium de Playwright, Claude Code y las extensiones.
+  `VITE_GROQ_KEY` llega como Codespaces secret (no hay `.env.local`).
+  Los puertos 5173 (dev) y 4173 (preview) se abren en
+  `https://<codespace>-<puerto>.app.github.dev`. **Ojo:** la BD SQLite
+  vive en el navegador por origen — el Codespace tiene BD propia, vacía
+  al principio y distinta de la de GitHub Pages; recrear el Codespace
+  cambia el origen y la pierde. Los JSON de datos (`bjj-tracker-*.json`)
+  no se versionan (repo público): se importan desde la tablet.
 - **Gestor de paquetes: pnpm**, no npm. El lockfile autoritativo es
   `pnpm-lock.yaml`; CI ejecuta `pnpm install --frozen-lockfile`. **No
   crear ni comitear `package-lock.json`** — está duplicado y solo sirve
@@ -133,8 +170,8 @@
 ## Preferencias del owner (transversales a la app)
 
 Estas reglas se vivirían "en memoria del agente" si trabajáramos en una
-sola máquina, pero como el owner alterna entre dos equipos distintos
-viven aquí — en un fichero versionado — para que cualquier sesión (en
+sola máquina, pero como el owner alterna entre tres entornos (dos
+equipos locales + Codespace en tablet) viven aquí — en un fichero versionado — para que cualquier sesión (en
 cualquier máquina) las herede.
 
 - **Aplica fixes con consistencia.** Cuando el owner reporta un bug en
@@ -145,10 +182,33 @@ cualquier máquina) las herede.
   toques solo el componente nombrado y dejes los demás sin actualizar.
   En el resumen final lista qué archivos tocaste para que pueda objetar
   si te pasaste.
-- **Doble entorno (dual machine).** El owner trabaja en dos máquinas:
-  una con `nvm` + bash (paths `~/.nvm/...`), otra con `fnm`. Antes de
-  proponer cambios a `~/.bashrc` o init de shell, verifica qué gestor
-  está realmente instalado (`command -v nvm`, `command -v fnm`).
+- **Triple entorno.** El owner trabaja en dos máquinas locales (una con
+  `nvm` + bash, paths `~/.nvm/...`; otra con `fnm`) y en un Codespace
+  desde una tablet Xiaomi Pad 7 (ver "Entorno y herramientas"). Antes de
+  proponer cambios a `~/.bashrc` o init de shell, verifica dónde estás y
+  qué gestor está instalado (`command -v nvm`, `command -v fnm`,
+  `echo $CODESPACES`). Notas "desactualizadas" sobre entorno pueden
+  referirse a otra máquina.
+- **Sin confirmaciones vacías.** Tras un OK explícito sobre un plan,
+  ejecutar los pasos evidentes (incluido commit + push rutinario de ese
+  plan) sin volver a preguntar "¿procedo?" / "¿paramos aquí?". Anunciar
+  en una línea y hacerlo. Preguntar solo ante: decisión de producto
+  nueva, ambigüedad real, trade-off técnico no evidente, o acción
+  destructiva / de alto impacto (force-push, borrar datos…). El primer
+  OK del plan basta para sus commits rutinarios; "no avanzar sin
+  aprobación" se refiere al OK del plan, no a un segundo OK.
+- **Respetar el alcance que el owner reserva.** Si dice "yo me encargo
+  de X" o "no me hables de Y", quedarse estrictamente en lo restante.
+  Si algo del ámbito excluido parece crítico, mencionarlo una vez en
+  una frase y no volver a ello.
+- **Coherencia del modelo visual al planear UI.** En features que
+  tocan entidades ya representadas en otro sitio (grafo, lista, card),
+  comprobar explícitamente en el plan que cada entidad se representa
+  igual en todos los contextos (p. ej. técnica = siempre arista). Si
+  cambia según contexto, abrir la decisión con el owner ANTES de
+  implementar. Histórico: F2 de contras (sesión 45, rama
+  `feature/contras-mapa-inplace`) — técnicas como nodos satélite,
+  rechazado en preview tras implementarlo entero.
 - **Reglas que viven en otros sitios** (no aquí):
   - Convenciones de código del proyecto y restricciones de stack →
     secciones superiores de este mismo fichero.
