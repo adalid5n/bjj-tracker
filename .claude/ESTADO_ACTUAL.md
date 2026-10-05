@@ -26,13 +26,13 @@
 **Verificación en el Codespace (mismo día, ya desde la tablet):**
 - Tras el pull, el Codespace había quedado en la rama vieja `claude/continue-work-rVl5W`; se volvió a `main`.
 - ✅ (1) `postCreateCommand` OK: Node 22.16, pnpm 11.0.9, `node_modules`, Chromium de Playwright. (2) `pnpm dev` sin "Blocked request". (3) `pnpm build && pnpm preview` OK. (4) Se carga la skill `orchestrator-workflow`.
-- ❌ El plugin `example-skills` no se instala solo con `settings.json`: hay que aceptar el marketplace o instalarlo con `/plugin` en una sesión interactiva.
+- Plugin `example-skills`: no se instala solo con `settings.json`, y `/plugin` no existe en la extensión de VS Code. Instalado desde la terminal con `claude plugin marketplace add anthropics/skills` + `claude plugin install example-skills@anthropic-agent-skills` (scope user, hay que repetirlo si se recrea el Codespace).
 - `VITE_GROQ_KEY` en el Codespace vía `.env.local` (no como secret). Aclaración: hay tres sitios independientes para la key: `.env.local` en local, el secret de Actions para prod (`deploy.yml`) y `.env.local` o un secret de Codespaces en el Codespace. Prueba explícita de la IA de importar clase: sin confirmar.
-- Borrado `.git/hooks/post-checkout` (hook de Git LFS heredado; el repo no usa LFS, no hay `.gitattributes`): hacía fallar cada checkout. Quedan `post-commit`, `post-merge` y `pre-push` sin revisar; posiblemente también sean de LFS.
+- Borrado `.git/hooks/post-checkout` (hook de Git LFS heredado; el repo no usa LFS, no hay `.gitattributes`): hacía fallar cada checkout. `post-commit`, `post-merge` y `pre-push` también eran de LFS (el pre-push bloqueaba el push); los borró el owner.
 
 **Pendiente del owner (fuera del repo):** secret `VITE_GROQ_KEY` en Codespaces (limitado al repo), idle timeout/retention, copiar JSON a la tablet, `/login` de Claude Code en el Codespace.
 
-**Próximo paso concreto:** instalar el plugin `example-skills` con `/plugin`, probar la IA de importar clase en el Codespace y, si se quiere que la key sobreviva a recrear el Codespace, crear el secret de Codespaces. Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
+**Próximo paso concreto:** comprobar que las skills del plugin aparecen en una sesión nueva, probar la IA de importar clase en el Codespace y, si se quiere que la key sobreviva a recrear el Codespace, crear el secret de Codespaces. Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
 
 ---
 
