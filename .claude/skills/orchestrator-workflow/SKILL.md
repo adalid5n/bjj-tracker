@@ -39,6 +39,10 @@ If a desviación técnica appears mid-task:
 - If it has **zero impact on requirements / product / cost / schedule**: 2-3 lines and proceed. Do not open three screens of comparison.
 - If it has impact: stop, open the trade-off explicitly with product framing first, technical detail second.
 
+#### Spec first (SDD with OpenSpec)
+
+If the project has an `openspec/` folder (BJJ Tracker does — see "Flujo SDD" in `CLAUDE.md`), any task that changes user-visible behaviour starts with an OpenSpec change: run `/opsx:propose` (skill `openspec-propose`) so the plan *is* the change's `proposal.md` + spec delta + `tasks.md`. Adalid's OK on the plan = OK on the proposal and the spec delta (show him the delta in plain words, not the raw SHALL text). Pure refactors / tooling / docs without behaviour change don't need a change.
+
 ### Ejecución
 
 Choose inline vs delegate:
@@ -93,7 +97,7 @@ Reversible local actions (writing a file, installing a dep, running tests) you c
 Before closing a task with commit + push, ask him these two:
 
 1. "¿Quieres tests para esto?" — if yes, invoke `webapp-testing` with a brief on the change and what to cover. Default no.
-2. "¿Quieres documentar esto?" — if yes, invoke `doc-coauthoring` to draft a doc together. Default no.
+2. "¿Quieres documentar esto?" — if yes, invoke `doc-coauthoring` to draft a doc together. Default no. (The functional spec is NOT optional: if the task had an OpenSpec change, run `/opsx:archive` before closing it so `openspec/specs/` stays current. This question is about extra docs — ADRs, guides.)
 
 If during the task he discarded an idea "for later", append it to `.claude/MEJORAS_FUTURAS.md` following its existing format (categories: UX, Performance/build, Tech debt, etc.). One entry: what changes, why, when to address.
 
@@ -109,6 +113,7 @@ Patterns Adalid validated:
 - **Refleja decisiones permanentes** in the right doc:
   - User preferences → `CLAUDE.md` (section "Preferencias del owner") so they travel across machines; local memory is optional extra.
   - Project-wide rules → `CLAUDE.md`.
+  - What the app does (functional, business language) → `openspec/specs/` via OpenSpec changes.
   - Live state between sessions → `.claude/ESTADO_ACTUAL.md` (update on every push).
   - Discarded improvements for later → `.claude/MEJORAS_FUTURAS.md`.
   - Plan-level technical history → `.claude/T*_PLAN*.md` or equivalent.
@@ -119,6 +124,7 @@ Patterns Adalid validated:
 <project root>/
 ├── CLAUDE.md                           ← project rules + owner preferences (auto-loaded)
 ├── .devcontainer/                      ← Codespaces env (tablet)
+├── openspec/specs/ openspec/changes/   ← living functional spec + in-flight changes (SDD)
 ├── docs/spec/ docs/adr/ docs/iterations/
 └── .claude/                            ← versioned internal docs
     ├── skills/orchestrator-workflow/   ← this file (project skill, travels with the repo)
@@ -153,7 +159,9 @@ Patterns Adalid validated:
 | Design implementation strategy with trade-offs | `Agent` with `subagent_type: Plan` |
 | Implement a feature end-to-end | `Agent` with `subagent_type: general-purpose` |
 | Debug across files | `Agent` with `subagent_type: general-purpose` or `Plan` |
-| Write a doc / spec | invoke `doc-coauthoring` skill |
+| Plan a behaviour change (spec first) | `/opsx:propose` (skill `openspec-propose`) |
+| Close a change into the living spec | `/opsx:archive` (skill `openspec-archive-change`) |
+| Write a doc (iteration plan, ADR, guide) | invoke `doc-coauthoring` skill |
 | Add Playwright tests | invoke `webapp-testing` skill |
 | Make / update a skill | invoke `skill-creator` skill |
 | Quick read of a known file | `Read` tool inline |

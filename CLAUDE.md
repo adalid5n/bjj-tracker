@@ -24,6 +24,36 @@
   plugin `example-skills@anthropic-agent-skills` declarado en
   `.claude/settings.json`.
 
+## Flujo SDD (piloto OpenSpec, desde 2026-10-05)
+
+SDD = *spec-driven development*: la especificación funcional se escribe
+o actualiza **antes** del código y es la referencia viva de qué hace la
+app. Piloto con [OpenSpec](https://openspec.dev) 1.14.0; se evalúa al
+cerrar la it.7 (si no compensa, los specs son markdown y se conservan).
+
+- **`openspec/specs/<capacidad>/spec.md`** = qué hace la app HOY, en
+  lenguaje de negocio (requisitos SHALL + escenarios WHEN/THEN). Es la
+  fuente de verdad funcional para las capacidades que ya cubre.
+  [`docs/spec/REQUISITOS.md`](docs/spec/REQUISITOS.md) queda como
+  histórico para lo que aún no se ha migrado; el vocabulario común vive
+  en [`docs/spec/GLOSARIO.md`](docs/spec/GLOSARIO.md).
+- **`openspec/changes/<cambio>/`** = propuesta + delta del spec + diseño
+  + tareas de un cambio. Flujo: `/opsx:propose` → revisión del owner →
+  `/opsx:apply` → validación del owner → `/opsx:archive` (fusiona el
+  delta en `openspec/specs/`).
+- **Encaje con iteraciones:** el `ITERACION_N.md` sigue siendo el plan de
+  producto; cada tarea `T-x.itN` referencia su change. Una tarea no se
+  cierra sin archivar su change. Esto aplica también al pulido entre
+  iteraciones: **ningún cambio de comportamiento visible sin spec**
+  (motivo: `REQUISITOS.md` se quedó desfasado 4 meses por saltarse esto).
+- Contexto y reglas para los agentes en
+  [`openspec/config.yaml`](openspec/config.yaml). Las skills
+  `openspec-*` y los comandos `/opsx:*` de `.claude/` los genera
+  `openspec init`/`openspec update`; no editarlos a mano.
+- **Instalación:** en el Codespace la monta el devcontainer. En las
+  máquinas locales: `npm i -g @fission-ai/openspec@1.14.0` y
+  `openspec config set telemetry.enabled false` (sin telemetría).
+
 ## Modo de interacción con el owner
 
 Estas reglas vivían en la config global de una sola máquina; se
@@ -220,7 +250,8 @@ cualquier máquina) las herede.
   - Planes de iteración → [`docs/iterations/`](docs/iterations/);
     resúmenes públicos por release → [CHANGELOG.md](CHANGELOG.md).
   - Estado vivo entre sesiones → [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md).
-  - Spec del producto → [`docs/spec/REQUISITOS.md`](docs/spec/REQUISITOS.md).
+  - Spec vivo del producto → [`openspec/specs/`](openspec/specs/) (ver
+    "Flujo SDD"); histórico no migrado → [`docs/spec/REQUISITOS.md`](docs/spec/REQUISITOS.md).
   - ADRs (decisiones con peso) → [`docs/adr/`](docs/adr/).
 
 ## Continuidad entre sesiones

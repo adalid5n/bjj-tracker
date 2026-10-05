@@ -362,6 +362,32 @@ it.6.
   expansión de scope, no la auditoría original.
 - **Cuándo:** cualquier sesión de pulido posterior. Sin urgencia.
 
+### Importar clase 2.0 — historial, reintentar, vista previa y revertir
+
+- **Origen:** Adalid, 2026-10-05 (sesión 50), tras el primer uso con `gpt-oss-120b` (origen = destino en movimientos defensivos/transitorios).
+- **Estado actual:** la importación no deja rastro: el texto dictado y la propuesta de la IA se pierden al cerrar el diálogo; no se sabe qué creó cada importación; no hay forma de deshacerla.
+- **Idea:**
+  - **Historial** de importaciones (fecha, texto, propuesta IA, lo aceptado) consultable — sirve también de **diario de entreno**.
+  - **Reintentar** desde un import guardado sin volver a escribir/dictar.
+  - **Vista previa en el grafo** antes de confirmar: lo nuevo en amarillo, misma representación (posición = nodo, técnica = arista).
+  - **Revertir** un import ya confirmado. Decisión abierta: qué pasa si algo creado ya se editó o se usó en un roll.
+- **Por qué:** la IA se equivoca; hoy un error obliga a corregir a mano y a redictar. La vista previa reduce errores; revertir cubre los que se ven días después (no se sustituyen).
+- **Cuándo:** candidata a **it.7**, primera iteración con flujo SDD (OpenSpec).
+
+### Panel de alertas en el grafo — calidad del catálogo
+
+- **Origen:** Adalid, 2026-10-05 (sesión 50).
+- **Idea:** apartado de alertas en `/mapa` que señale técnicas con origen = destino, nombres casi duplicados ("Guarda K" vs "Guardia K", ignorando tildes/mayúsculas) y otros huecos. Al importar, avisar de nombres parecidos en la revisión ("¿es la misma que Guardia K?") sin fusionar automáticamente.
+- **Por qué:** la regla "usa el mismo nombre" solo vive en el prompt de la IA; el código compara nombre exacto. Las alertas hacen visible lo que hoy se cuela.
+- **Cuándo:** candidata a **it.8** (tras Importar clase 2.0). Sin cambio de esquema.
+
+### Técnicas "sin acabar" (sin destino conocido) — APLAZADA
+
+- **Origen:** Adalid, 2026-10-05 (sesión 50).
+- **Idea:** permitir guardar una técnica sin saber aún a dónde lleva y listarla como pendiente en el panel de alertas.
+- **Decisión vigente:** **se mantiene la regla de que toda técnica lleva a algún sitio.** Implicaría migración nueva (hoy la BD obliga a destino) y decidir cómo dibujar una arista sin destino (p. ej. nodo fantasma "?").
+- **Cuándo:** revisar tras el panel de alertas (it.8), si el uso real lo pide.
+
 ### Visualización de contras en el grafo — F3 sub-grafo filtrado (F1 y F2 rechazadas)
 
 - **Origen:** Adalid, 2026-05-21 (brainstorming inicial). Iterado en
@@ -433,8 +459,8 @@ it.6.
     `../docs/adr/008-persistencia-layout-grafo.md`.
   - Vínculo top/bottom relacionado:
     `../docs/adr/002-vinculo-top-bottom.md`.
-  - Historia: planes [`T7_PLAN_contras_fase1.md`](T7_PLAN_contras_fase1.md)
-    (F1) y [`T8_PLAN_contras_mapa_inplace.md`](T8_PLAN_contras_mapa_inplace.md)
+  - Historia: planes [`T7_PLAN_contras_fase1.md`](../docs/iterations/archive/T7_PLAN_contras_fase1.md)
+    (F1) y [`T8_PLAN_contras_mapa_inplace.md`](../docs/iterations/archive/T8_PLAN_contras_mapa_inplace.md)
     (F2), ambos como referencia histórica de qué se descartó y por qué.
 
 ## Performance / build

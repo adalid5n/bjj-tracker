@@ -8,14 +8,17 @@ El proyecto está en pausa entre iteraciones tras `v0.6-it6`. La próxima iterac
 
 Trabajo identificado como prioridad alta para la próxima iteración o sub-tarea inmediata.
 
-### Visualización de contras en el grafo — 2 fases
+### Importar clase 2.0 (candidata a it.7)
 
-Hoy los contras (relación N:N entre técnicas) son invisibles en el grafo principal y solo aparecen como hipervínculos planos dentro del modal de técnica. La mejora se diseña en dos fases con el mismo objetivo:
+Historial de importaciones de clase (sirve de diario y permite reintentar sin volver a dictar), vista previa en el grafo antes de confirmar (lo nuevo resaltado) y revertir una importación ya confirmada. Primera iteración con flujo spec-driven ([OpenSpec](openspec/)).
 
-- **Fase 1 — Mini-grafo de contras en el modal de técnica.** Sub-grafo Cytoscape hub-spoke (técnica al centro, contras alrededor, coloreadas por tipo). Barata, aislada, valida la hipótesis.
-- **Fase 2 — Zoom semántico en el grafo principal ("edge promotion").** Al seleccionar una posición, las técnicas se promueven a nodos satélite con sus contras. Versión ambiciosa que reutiliza el componente de fase 1.
+### Panel de alertas en el grafo (candidata a it.8)
 
-Modo de trabajo: rama `feature/contras-visuales`, plan técnico antes de arrancar.
+Señalar técnicas con origen = destino y nombres casi duplicados; aviso de nombres parecidos al importar.
+
+### Visualización de contras — F3 sub-grafo filtrado
+
+Los contras siguen invisibles en el grafo principal. Dos approaches (mini-grafo en el modal; técnicas como nodos satélite) se probaron y se rechazaron; la siguiente propuesta es un sub-grafo filtrado con los contras como aristas.
 
 ## UX
 

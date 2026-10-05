@@ -7,13 +7,14 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 ## [Unreleased]
 
 ### Added
-- **Importación de clase vía IA** (Groq / llama-3.3-70b): pipeline de 3 fases — normalización de texto dictado por voz (corrige términos, resalta cambios), extracción de posiciones/técnicas/sumisiones, validación automática con rúbrica. Dialog paso a paso con revisión y edición de detalles de ejecución.
+- **Importación de clase vía IA** (Groq; modelo `openai/gpt-oss-120b` desde 2026-10-05): pipeline de 3 fases — normalización de texto dictado por voz (corrige términos, resalta cambios), extracción de posiciones/técnicas/sumisiones, validación automática con rúbrica. Dialog paso a paso con revisión y edición de detalles de ejecución.
 - **Tags para posiciones**: sistema de etiquetas con colores preset. Nuevo paso en `PosicionWizard`; gestión bulk (añadir/quitar) en modo edición del mapa.
 - **Filtro por disciplina** (BJJ / Grappling): campo `disciplina` en posiciones, técnicas y sumisiones. Toggle en `/ajustes` y en la barra del mapa. El grafo y la lista filtran según la disciplina activa.
 - Selected state en grafo + reorden de chips + Origen/Destino navegables en mapa.
 - "+ Crear nueva" en wizards standalone.
 
 ### Fixed
+- Importación de clase vía IA rota: Groq retiró `llama-3.3-70b-versatile`; sustituido por `openai/gpt-oss-120b`.
 - Toast de actualización PWA: feedback visual y fallback de reload al pulsar Recargar.
 - Bug z-index AlertDialog en mapa.
 - Bug de complementaria en flujos de roll.

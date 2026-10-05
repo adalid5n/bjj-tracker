@@ -1,0 +1,32 @@
+schema: spec-driven
+
+context: |
+  Language: es
+  All artifacts must be written in es.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Proyecto: BJJ Tracker, PWA personal (local-first, SQLite en el navegador)
+  para registrar entrenos de BJJ/grappling y mantener un mapa técnico
+  (grafo de posiciones, técnicas y sumisiones).
+
+  Lector de los specs: el owner (perfil PM/QA, no desarrollador). Los specs
+  describen QUÉ hace la app en lenguaje de negocio y del dominio (posición,
+  técnica, sumisión, contra, roll, sesión — ver docs/spec/GLOSARIO.md), no
+  cómo está hecha: sin nombres de componentes, funciones, tablas ni
+  librerías. Eso va en design.md o en docs/adr/.
+
+  Reglas del proyecto (detalle en CLAUDE.md):
+  - Una iteración (docs/iterations/ITERACION_N.md) agrupa uno o varios
+    changes de OpenSpec; cada tarea T-x.itN referencia su change.
+  - Un change se archiva (actualizando openspec/specs/) antes de cerrar
+    su tarea. Ningún cambio de comportamiento visible se cierra sin spec.
+  - Modelo visual coherente: una técnica es siempre una arista del grafo;
+    posiciones y sumisiones son nodos.
+  - Toda técnica lleva a algún sitio (posición o sumisión destino).
+
+rules:
+  proposal:
+    - Incluir siempre "Fuera de alcance".
+    - Enmarcar primero el impacto para el usuario, después lo técnico.
+  tasks:
+    - Ninguna tarea de tests automatizados (Playwright, vitest-browser) sin consentimiento explícito del owner.

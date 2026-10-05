@@ -8,14 +8,17 @@
 		"ghcr.io/devcontainers/features/github-cli:1": {},
 		"ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
 	},
-	// Misma versión de pnpm que en local (lockfile v9).
+	// Misma versión de pnpm que en local (lockfile v9). OpenSpec fijado a la
+	// versión con la que se generaron .claude/skills/openspec-* (ver CLAUDE.md).
 	// Chromium + deps del sistema: los necesita vitest-browser (pnpm test:unit)
 	// y los E2E de tests/e2e (estos solo con consentimiento del owner).
-	"postCreateCommand": "npm i -g pnpm@11.0.9 && pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium",
+	"postCreateCommand": "npm i -g pnpm@11.0.9 @fission-ai/openspec@1.14.0 && pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium",
 	"containerEnv": {
 		// Vite bloquea hosts desconocidos; permite el dominio de port-forwarding
 		// de Codespaces sin tocar vite.config.ts.
-		"__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS": ".app.github.dev"
+		"__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS": ".app.github.dev",
+		// OpenSpec (SDD, piloto it.7): sin telemetría.
+		"OPENSPEC_TELEMETRY": "0"
 	},
 	// VITE_GROQ_KEY llega como Codespaces secret (Settings → Codespaces →
 	// Secrets, limitado a este repo). Vite lo lee del entorno igual que de .env.local.

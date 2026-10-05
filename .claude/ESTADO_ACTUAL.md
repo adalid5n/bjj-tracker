@@ -1,6 +1,6 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-10-05 (sesión 50 — entorno Codespaces para tablet + config de agente versionada en el repo)
+**Última actualización:** 2026-10-05 (sesión 50 — Codespaces para tablet + config de agente + fix modelo IA + piloto SDD con OpenSpec)
 **Fase activa:** Pausa entre iteraciones (post-it.6). Cambios entregados como pulido continuo; sin tag de iteración.
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
 
@@ -32,9 +32,17 @@
 
 - **IA rota en prod y en el Codespace:** Groq retiró `llama-3.3-70b-versatile` (404 `model_not_found`). Se cambió a `openai/gpt-oss-120b` en `src/lib/ai.ts` (también se probó `qwen/qwen3.8-27b`, que funciona; se eligió gpt-oss por tamaño). El owner confirmó que la importación funciona. Primer problema de calidad: creó una posición "Guarda K" duplicada de "Guardia K". La regla "usa EXACTAMENTE el mismo nombre" solo está en el prompt; el código compara el nombre exacto en minúsculas, sin detectar nombres parecidos. No existe historial de importaciones: el texto y la propuesta no se guardan.
 
+**Piloto SDD con OpenSpec (B1, en curso):**
+- **Motivo:** el owner quiere documentación viva de "qué hace la app" en lenguaje de negocio. `docs/spec/REQUISITOS.md` se había quedado desfasado 4 meses porque el pulido entre iteraciones se saltaba el spec. Se descartó Spec Kit (orientado a proyectos nuevos, sin documento de estado actual). Se eligió OpenSpec (orientado a proyectos existentes: `openspec/specs/` = estado actual, `changes/` = deltas que se fusionan al archivar) como **piloto**; se evalúa al cerrar la it.7.
+- **Hecho:** `openspec init --tools claude --language es` (v1.14.0, telemetría desactivada). Genera las skills `openspec-*` y los comandos `/opsx:*` en `.claude/`. `openspec/config.yaml` con el contexto del proyecto (lector PM, lenguaje de negocio, reglas de modelo visual / destino obligatorio). Nueva sección "Flujo SDD" en CLAUDE.md. Skill orchestrator-workflow: el plan de un cambio de comportamiento es un change de OpenSpec, y se archiva antes de cerrar la tarea. Devcontainer instala OpenSpec y fija `OPENSPEC_TELEMETRY=0`.
+- **Limpieza:** ROADMAP actualizado (cola: Importar clase 2.0 → Panel de alertas → contras F3). CHANGELOG: cambio de modelo. Planes T7/T8 rechazados movidos a `docs/iterations/archive/`. MEJORAS_FUTURAS: entradas nuevas "Importar clase 2.0", "Panel de alertas" y "Técnicas sin acabar" (aplazada; **decisión del owner: se mantiene la regla de que toda técnica lleva a algún sitio**).
+- **En curso:** un subagente redacta el change `linea-base-importar-clase-y-mapa` (spec as-is de importar clase y mapa) y `docs/spec/GLOSARIO.md`. Lo revisa el owner antes de `/opsx:archive`.
+
+**Bloques acordados:** B1 base SDD (este) → B2 = it.7 "Importar clase 2.0" (historial/diario, reintentar, vista previa en amarillo, revertir) → B3 = it.8 "Panel de alertas" (origen = destino, nombres parecidos; sin cambio de esquema).
+
 **Pendiente del owner (fuera del repo):** secret `VITE_GROQ_KEY` en Codespaces (limitado al repo), idle timeout/retention, copiar JSON a la tablet, `/login` de Claude Code en el Codespace.
 
-**Próximo paso concreto:** decidir el alcance de (a) detectar duplicados por similitud al importar y (b) historial de importaciones; comprobar que las skills del plugin aparecen en una sesión nueva y, si se quiere que la key sobreviva a recrear el Codespace, crear el secret de Codespaces. Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
+**Próximo paso concreto:** revisión del owner de la línea base (`openspec/changes/linea-base-importar-clase-y-mapa/`) y del glosario → `/opsx:archive` → abrir it.7 con `/opsx:propose`. Además, si se quiere que la key sobreviva a recrear el Codespace, crear el secret de Codespaces. Luego, decidir próxima iteración (F3 de contras sigue siendo la más preparada).
 
 ---
 
