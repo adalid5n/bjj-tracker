@@ -30,6 +30,11 @@ body {
 	--success-foreground: oklch(0.985 0 0);
 	--warning: oklch(0.76 0.16 80);
 	--warning-foreground: oklch(0.205 0 0);
+	/* T-3.it7: resaltado de lo nuevo en la vista previa de importación.
+	   Magenta: distinto de primary (selección), warning/destructive
+	   (texto interpretado) y success. */
+	--highlight: oklch(0.6 0.25 330);
+	--highlight-foreground: oklch(0.985 0 0);
 	--cinturon-blanco: oklch(0.94 0 0);
 	--cinturon-azul: oklch(0.50 0.24 264);
 	--cinturon-morado: oklch(0.45 0.26 300);
@@ -75,6 +80,8 @@ body {
 	--success-foreground: oklch(0.145 0 0);
 	--warning: oklch(0.82 0.17 80);
 	--warning-foreground: oklch(0.145 0 0);
+	--highlight: oklch(0.74 0.21 330);
+	--highlight-foreground: oklch(0.145 0 0);
 	--cinturon-blanco: oklch(0.94 0 0);
 	--cinturon-azul: oklch(0.50 0.24 264);
 	--cinturon-morado: oklch(0.45 0.26 300);
@@ -117,6 +124,8 @@ body {
 	--color-ring: var(--ring);
 	--color-input: var(--input);
 	--color-border: var(--border);
+	--color-highlight-foreground: var(--highlight-foreground);
+	--color-highlight: var(--highlight);
 	--color-warning-foreground: var(--warning-foreground);
 	--color-warning: var(--warning);
 	--color-success-foreground: var(--success-foreground);

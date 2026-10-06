@@ -16,10 +16,10 @@
 
 ## 3. Token y elementos fantasma
 
-- [ ] 3.1 Añadir `--highlight` / `--highlight-foreground` en `:root` y `.dark` de `src/routes/layout.css` y en `@theme inline`; verificar en ambos temas y que no aparece Tailwind crudo nuevo (`grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|lime|gray)-[0-9]" src`)
-- [ ] 3.2 Crear `buildPreviewElements` en `src/lib/grafo.ts` (catálogo de la disciplina del paso, fantasma con `nuevo`, `degree` recalculado, recuento por tipo, lista de problemas del paso); verificar con `pnpm check` y en consola de `pnpm dev` con una importación de ejemplo
-- [ ] 3.3 Prop `preview` en `GrafoMapa.svelte`: sin taps a fichas, sin arrastre, fantasma fuera de `positionsCache`, de `saveLayout()` y de `dirty`; verificar que con organización sin guardar previa, tras cancelar la vista previa y guardar, `grafo_layout` no contiene ids `new-*`
-- [ ] 3.4 Estilos `node.nuevo` / `edge.nuevo` + pulso (`transition-property` + `setInterval` sobre `.pulso-on`) y `prefers-reduced-motion` → color fijo; verificar emulando la preferencia en DevTools y que el tamaño no cambia al latir
+- [x] 3.1 Añadir `--highlight` / `--highlight-foreground` en `:root` y `.dark` de `src/routes/layout.css` y en `@theme inline`; verificar en ambos temas y que no aparece Tailwind crudo nuevo (`grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|lime|gray)-[0-9]" src`)
+- [x] 3.2 Crear `buildPreviewElements` en `src/lib/grafo.ts` (catálogo de la disciplina del paso, fantasma con `nuevo`, `degree` recalculado, recuento por tipo, lista de problemas del paso); verificar con `pnpm check` y en consola de `pnpm dev` con una importación de ejemplo
+- [x] 3.3 Prop `preview` en `GrafoMapa.svelte`: sin taps a fichas, sin arrastre, fantasma fuera de `positionsCache`, de `saveLayout()` y de `dirty`; verificar que con organización sin guardar previa, tras cancelar la vista previa y guardar, `grafo_layout` no contiene ids `new-*`
+- [x] 3.4 Estilos `node.nuevo` / `edge.nuevo` + pulso (`transition-property` + `setInterval` sobre `.pulso-on`) y `prefers-reduced-motion` → color fijo; verificar emulando la preferencia en DevTools y que el tamaño no cambia al latir
 
 ## 4. Modo vista previa en /mapa
 

@@ -63,6 +63,11 @@
 		// destaca con la clase Cytoscape `.selected` (borde más grueso +
 		// color de acento). El padre lo deriva del top del `mapaModalStack`.
 		selectedGraphId?: string | null;
+		// T-3.it7: modo vista previa de importación. Los elementos con
+		// `data.nuevo` son "fantasma": laten con el color `--highlight`, no
+		// entran en `positionsCache`, ni en `saveLayout()`, ni marcan dirty.
+		// Taps y arrastre desactivados; pan y zoom siguen.
+		preview?: boolean;
 	};
 
 	let {
@@ -74,8 +79,17 @@
 		onAttemptPush,
 		dirty = $bindable(false),
 		editing = $bindable(false),
-		selectedGraphId = null
+		selectedGraphId = null,
+		preview = false
 	}: Props = $props();
+
+	// T-3.it7: estado del latido de los elementos nuevos. No es reactivo
+	// (se aplica imperativamente sobre Cytoscape).
+	let pulsoOn = false;
+	let reducirMovimiento = false;
+	let pulsoTimer: ReturnType<typeof setInterval> | null = null;
+	const PULSO_MS = 800;
+	let quitarListenerReduce: (() => void) | null = null;
 
 	let container: HTMLDivElement;
 	let cy: Core | null = null;
@@ -155,7 +169,8 @@
 			foreground: toRgb('--foreground'),
 			background: toRgb('--background'),
 			border: toRgb('--border'),
-			primaryForeground: toRgb('--primary-foreground')
+			primaryForeground: toRgb('--primary-foreground'),
+			highlight: toRgb('--highlight')
 		};
 		probe.remove();
 		return tokens;
@@ -270,6 +285,34 @@
 				selector: 'edge[estado = "descartada"]',
 				style: { width: 1, opacity: 0.4, 'line-style': 'dotted' }
 			},
+			// T-3.it7: elementos nuevos de la vista previa. Estado base =
+			// borde con el color de resaltado (nodos) o color normal
+			// (aristas); `.pulso-on` = relleno/línea en `--highlight`. El
+			// latido alterna `.pulso-on` → solo cambia COLOR, nunca tamaño.
+			// Con "reducir movimiento" `.pulso-on` queda fijo.
+			{
+				selector: 'node[?nuevo]',
+				style: {
+					'border-color': t.highlight,
+					'transition-property': 'background-color, border-color',
+					'transition-duration': 0.6
+				}
+			},
+			{
+				selector: 'node[?nuevo].pulso-on',
+				style: { 'background-color': t.highlight }
+			},
+			{
+				selector: 'edge[?nuevo]',
+				style: {
+					'transition-property': 'line-color, target-arrow-color',
+					'transition-duration': 0.6
+				}
+			},
+			{
+				selector: 'edge[?nuevo].pulso-on',
+				style: { 'line-color': t.highlight, 'target-arrow-color': t.highlight }
+			},
 			// Estado "selected" (sesión 39): indica el nodo o arista que
 			// corresponde a la entidad abierta en el modal/Sheet. Borde
 			// más grueso + color de acento (`--primary`). Va AL FINAL del
@@ -381,7 +424,8 @@
 	// registre la dependency en la primera evaluación (cuando aún
 	// no hay `cy` y haríamos early return sin tracking).
 	$effect(() => {
-		const isEditing = editing;
+		// En vista previa nunca se arrastra (aunque `editing` venga true).
+		const isEditing = editing && !preview;
 		if (!cy) return;
 		if (isEditing) {
 			cy.nodes().unpanify();
@@ -510,6 +554,8 @@
 		cy.nodes().forEach((n) => {
 			const kind = n.data('kind') as GrafoLayoutKind | undefined;
 			if (kind !== 'posicion' && kind !== 'sumision') return;
+			// T-3.it7: los fantasma de la vista previa nunca se persisten.
+			if (n.data('nuevo')) return;
 			const pos = n.position();
 			rows.push({
 				entidad_id: (n.id() as string).slice(4),
@@ -636,14 +682,75 @@
 	$effect(() => {
 		nodes;
 		edges;
+		const enPreview = preview;
 		if (!cy) return;
 		const instance = cy;
+		// T-3.it7: la barra de la vista previa cambia el alto del lienzo.
+		instance.resize();
 		instance.elements().remove();
 		instance.add([...nodes, ...edges]);
-		runLayoutAndCache(instance);
+		// En vista previa encuadramos todo para que lo nuevo se vea.
+		runLayoutAndCache(instance, false, enPreview);
 		// Tras remove/add el style base se reaplica; reactivar filtros.
 		applyFilters(instance);
+		aplicarPulso(instance);
 	});
+
+	/** Aplica el estado actual del latido a los elementos nuevos. */
+	function aplicarPulso(instance: Core) {
+		const nuevos = instance.elements('[?nuevo]');
+		if (nuevos.empty()) return;
+		if (pulsoOn || reducirMovimiento) nuevos.addClass('pulso-on');
+		else nuevos.removeClass('pulso-on');
+	}
+
+	function pararPulso() {
+		if (pulsoTimer) clearInterval(pulsoTimer);
+		pulsoTimer = null;
+	}
+
+	/**
+	 * T-3.it7: latido de color mientras dure la vista previa. Con
+	 * `prefers-reduced-motion: reduce` no hay intervalo: color fijo.
+	 */
+	function sincronizarPulso() {
+		pararPulso();
+		if (!cy) return;
+		if (!preview) {
+			pulsoOn = false;
+			cy.elements('.pulso-on').removeClass('pulso-on');
+			return;
+		}
+		pulsoOn = true;
+		aplicarPulso(cy);
+		if (reducirMovimiento) return;
+		pulsoTimer = setInterval(() => {
+			if (!cy) return;
+			pulsoOn = !pulsoOn;
+			aplicarPulso(cy);
+		}, PULSO_MS);
+	}
+
+	$effect(() => {
+		preview;
+		if (!cy) return;
+		sincronizarPulso();
+	});
+
+	/**
+	 * T-3.it7: tras aceptar la vista previa, copia la posición en pantalla
+	 * de cada fantasma al cache con el id real (`pos:<id>` / `sum:<id>`),
+	 * para que lo creado aparezca donde se vio. No toca `grafo_layout`.
+	 */
+	export function transferPreviewPositions(ghostToReal: Map<string, string>): void {
+		if (!cy) return;
+		for (const [ghostId, realId] of ghostToReal) {
+			const node = cy.getElementById(ghostId);
+			if (node.empty()) continue;
+			const p = node.position();
+			positionsCache.set(realId, { x: p.x, y: p.y });
+		}
+	}
 
 	onMount(() => {
 		let cancelled = false;
@@ -703,6 +810,8 @@
 				// posterior (cambio de catálogo, click en Reorganizar).
 				instance.on('layoutstop', () => {
 					instance.nodes().forEach((n) => {
+						// T-3.it7: los fantasma no entran en el cache.
+						if (n.data('nuevo')) return;
 						const p = n.position();
 						positionsCache.set(n.id(), { x: p.x, y: p.y });
 					});
@@ -720,6 +829,7 @@
 				instance.on('dragfree', 'node', (event) => {
 					if (!initialLoadComplete) return;
 					const node = event.target;
+					if (node.data('nuevo')) return;
 					const p = node.position();
 					positionsCache.set(node.id(), { x: p.x, y: p.y });
 					dirty = true;
@@ -730,7 +840,7 @@
 				// `unpanify` + `grabify` → drag mueve el nodo. Los dos
 				// flags son mutuamente excluyentes (pannable overridea
 				// grabbable a false en Cytoscape), por eso van en pareja.
-				if (editing) {
+				if (editing && !preview) {
 					instance.nodes().unpanify();
 					instance.nodes().grabify();
 				} else {
@@ -740,7 +850,7 @@
 				// Nodos añadidos posteriormente (cambio de catálogo, vía
 				// el $effect que reemplaza elements) heredan el modo actual.
 				instance.on('add', 'node', (event) => {
-					if (editing) {
+					if (editing && !preview) {
 						event.target.unpanify();
 						event.target.grabify();
 					} else {
@@ -757,7 +867,7 @@
 					// En modo edición ignoramos el tap: el usuario está
 					// moviendo nodos, no navegando. Para abrir modal hay
 					// que salir del modo edición primero.
-					if (editing) return;
+					if (editing || preview) return;
 					const node = event.target;
 					const kind = node.data('kind') as 'posicion' | 'sumision';
 					const realId = (node.id() as string).slice(4);
@@ -776,7 +886,7 @@
 				instance.on('tap', 'edge', (event) => {
 					// Mismo criterio que en nodos: en modo edición no
 					// abrimos modales.
-					if (editing) return;
+					if (editing || preview) return;
 					const edge = event.target;
 					const id = edge.id() as string;
 					const nombre = edge.data('nombre') as string;
@@ -793,7 +903,9 @@
 				// fcose con `fixedNodeConstraint` los acomodará alrededor
 				// de los fijados. Auto-dirty para alertar al usuario de
 				// que hay disposiciones nuevas no guardadas.
-				const nodesWithoutDbLayout = nodes.filter((n) => !positionsCache.has(n.data.id));
+				const nodesWithoutDbLayout = nodes.filter(
+					(n) => !n.data.nuevo && !positionsCache.has(n.data.id)
+				);
 				const autoDirty = nodes.length > 0 && nodesWithoutDbLayout.length > 0;
 
 				// Disparar el layout real ahora que el handler de
@@ -804,6 +916,16 @@
 				// Aplicar filtros iniciales en caso de que ya estuvieran activos
 				// antes del mount (el $effect podría haber corrido con cy null).
 				applyFilters(instance);
+				// T-3.it7: movimiento reducido → color fijo sin latido.
+				const mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+				reducirMovimiento = mqReduce.matches;
+				const onReduceChange = (ev: MediaQueryListEvent) => {
+					reducirMovimiento = ev.matches;
+					sincronizarPulso();
+				};
+				mqReduce.addEventListener('change', onReduceChange);
+				quitarListenerReduce = () => mqReduce.removeEventListener('change', onReduceChange);
+				sincronizarPulso();
 				loading = false;
 				if (autoDirty) dirty = true;
 				// Activar el dragfree handler. A partir de aquí, cualquier
@@ -821,6 +943,8 @@
 	});
 
 	onDestroy(() => {
+		pararPulso();
+		quitarListenerReduce?.();
 		cy?.destroy();
 		cy = null;
 	});
