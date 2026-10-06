@@ -255,6 +255,17 @@ cualquier máquina) las herede.
   → `kill <pid>`; `pkill -f "vite preview"` NO lo encuentra, el proceso
   es `vite.js preview`) y arrancar con `pnpm preview --host --port 4173
   --strictPort`, para que falle en vez de saltar al 4174.
+- **Iterar ajustes visuales en `pnpm dev` (5173)**, que se actualiza
+  solo al guardar (sin build, sin reiniciar el preview, sin borrar la
+  caché). El 4173 queda para la validación final de cada tarea.
+- **Agrupar commits.** Mientras se iteran detalles de una tarea, no
+  hacer commit + push + ESTADO tras cada cambio: una vez al cerrar la
+  tarea. Excepción: las decisiones del owner se apuntan en ESTADO y se
+  suben al momento (para que un reinicio del Codespace no las pierda).
+- **Cerrar cada respuesta con "Qué he hecho"** (2-3 líneas): qué se
+  cambió, qué se lanzó, si hay commit o push. Si se lanza trabajo que
+  el owner no pidió explícitamente (p. ej. planificar el siguiente
+  paso), decirlo ahí.
 - **Respetar el alcance que el owner reserva.** Si dice "yo me encargo
   de X" o "no me hables de Y", quedarse estrictamente en lo restante.
   Si algo del ámbito excluido parece crítico, mencionarlo una vez en

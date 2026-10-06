@@ -369,6 +369,12 @@ it.6.
 - **"Refinar con IA" pierde los detalles:** si en la revisión se refina la propuesta, la pantalla siguiente (Añadir detalles) llega sin los detalles de ejecución, aunque estaban en el texto original. Causa probable: los detalles se restauran en el código tras generar la propuesta, pero no tras refinar (relacionado con "Refinar descarta lo editado", en la entrada "Fallos catálogo e importación (baseline)"). **Esperado:** refinar conserva los detalles.
 - **Cuándo:** el owner decide cuándo ("los corregiremos luego"). Al arreglarlos, marcarlos o actualizar el spec `importar-clase` según la convención de bugs.
 
+### Duplicar un elemento en la otra disciplina
+
+- **Origen:** Adalid, 2026-10-06 (al decidir T-4.it7).
+- **Idea:** como la disciplina de un elemento no se puede cambiar una vez creado (decisión del owner), ofrecer "Duplicar en BJJ/Grappling" para crear una copia independiente en la otra disciplina.
+- **Cuándo:** implementación futura, después de la it.7.
+
 ### Fallos catálogo e importación (baseline)
 
 - **Origen:** línea base OpenSpec (sesión 50, 2026-10-05). El subagente los encontró al describir la app a partir del código. En el spec van marcados como "⚠️ Bug conocido", con el comportamiento esperado.
