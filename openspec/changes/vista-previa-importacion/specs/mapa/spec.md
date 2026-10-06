@@ -4,17 +4,18 @@
 Durante la vista previa de una importación, el grafo del mapa SHALL
 mostrar el catálogo existente junto con lo que se va a añadir: posiciones
 y sumisiones nuevas como nodos y técnicas nuevas como flechas. Lo nuevo
-MUST destacarse con un color que late, sin cambiar de tamaño. Una posición
-o sumisión existente que recibe una técnica nueva no late; solo late la
-flecha.
+MUST destacarse con un color que respira: pasa suavemente de su color
+normal al color de resaltado (amarillo) y vuelve, de forma continua y sin
+cambiar de tamaño. Una posición o sumisión existente que recibe una
+técnica nueva no se resalta; solo la flecha.
 
 #### Scenario: Técnica nueva entre posiciones existentes
 - **WHEN** la importación añade un sweep de "Guardia cerrada" a "Mount", que ya existen
-- **THEN** solo la flecha del sweep late; los nodos "Guardia cerrada" y "Mount" se ven como siempre
+- **THEN** solo la flecha del sweep se resalta; los nodos "Guardia cerrada" y "Mount" se ven como siempre
 
 #### Scenario: Posición nueva
 - **WHEN** la importación añade la posición nueva "Dogfight" y una técnica que llega a ella
-- **THEN** el nodo "Dogfight" y la flecha laten con el color de resaltado y no son más grandes por ello
+- **THEN** el nodo "Dogfight" y la flecha pasan suavemente de su color normal al de resaltado y vuelven, sin hacerse más grandes
 
 ### Requirement: Leyenda de la vista previa
 Durante la vista previa, el mapa SHALL mostrar una barra fija, siempre
@@ -44,7 +45,7 @@ animación.
 
 #### Scenario: Reducir movimiento activado
 - **WHEN** el dispositivo tiene activada la preferencia de reducir movimiento y empieza una vista previa
-- **THEN** lo nuevo se ve con el color de resaltado, sin latir
+- **THEN** lo nuevo se ve con el color de resaltado fijo, sin animación
 
 ### Requirement: Disciplina y filtros durante la vista previa
 Durante cada paso de la vista previa el grafo SHALL mostrar la disciplina

@@ -244,6 +244,17 @@ cualquier máquina) las herede.
   resto de la app); cuando afecta a datos/arquitectura, como dev
   (modelo, backup, migraciones, coste). Decir si no cuadra o si hay
   una best practice mejor, con recomendación — antes de implementar.
+- **Validaciones del owner siempre en el mismo puerto: 4173
+  (`pnpm preview`, build de producción con SW).** Darle siempre el
+  enlace completo (en Codespaces:
+  `https://$CODESPACE_NAME-4173.app.github.dev/bjj-tracker/`) y avisar
+  de que tras una versión nueva puede tener que recargar o borrar la
+  caché del sitio (el SW sirve la versión anterior). El 5173
+  (`pnpm dev`) es solo para desarrollo. Para reiniciar el preview tras
+  un build: matar el proceso que escucha en 4173 (`ss -ltnp | grep 4173`
+  → `kill <pid>`; `pkill -f "vite preview"` NO lo encuentra, el proceso
+  es `vite.js preview`) y arrancar con `pnpm preview --host --port 4173
+  --strictPort`, para que falle en vez de saltar al 4174.
 - **Respetar el alcance que el owner reserva.** Si dice "yo me encargo
   de X" o "no me hables de Y", quedarse estrictamente en lo restante.
   Si algo del ámbito excluido parece crítico, mencionarlo una vez en

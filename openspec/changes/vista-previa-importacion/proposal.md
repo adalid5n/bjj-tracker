@@ -28,10 +28,11 @@ importación.
 - **Vista previa en el mapa.** En el punto de confirmar, la ventana de
   importación (y cualquier ficha abierta) se cierra y el usuario queda en
   el mapa, vista Grafo, viendo el grafo real con lo que se va a añadir
-  **resaltado con un color que late** (no con el tamaño).
+  **resaltado con un color amarillo que respira** (pasa suavemente del color
+  normal al de resaltado y vuelve; no cambia el tamaño).
 - Mismo modelo visual que siempre: posiciones y sumisiones son nodos; las
   técnicas son flechas. Una posición existente que recibe una técnica
-  nueva **no** late; solo late la flecha nueva.
+  nueva **no** se resalta; solo la flecha nueva.
 - **Pasos de la vista previa.** Una importación de BJJ o de Grappling
   tiene una vista previa, en esa disciplina. Una de **"Ambos" tiene dos
   seguidas**: "Vista previa 1 de 2 · BJJ" y "Vista previa 2 de 2 ·
@@ -69,8 +70,9 @@ importación.
   versión del diseño): la ventana se cierra y el usuario ve el mapa.
 - "Aceptar" inserta y deja al usuario en el mapa; "Cancelar" vuelve a la
   revisión con el borrador intacto. Nada se escribe hasta "Aceptar".
-- Resaltado por color que late, no por tamaño; las posiciones existentes
-  que reciben técnica nueva no laten.
+- Resaltado por color que respira (transición suave, amarillo limón), no
+  por tamaño; las posiciones existentes que reciben técnica nueva no se
+  resaltan.
 - `prefers-reduced-motion` → color fijo sin animación.
 - Color mediante token semántico nuevo en `src/routes/layout.css`.
 - Las disciplinas no se mezclan: la importación elige BJJ / Grappling /

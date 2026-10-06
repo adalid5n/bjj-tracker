@@ -154,7 +154,7 @@ la importación; en una de "Ambos", la del último paso revisado
 
 #### Scenario: Aceptar
 - **WHEN** el usuario pulsa "Aceptar" en la vista previa
-- **THEN** sigue en el mapa, lo importado ya no late porque forma parte del catálogo y la ventana de importación no se abre
+- **THEN** sigue en el mapa, lo importado ya no se resalta porque forma parte del catálogo y la ventana de importación no se abre
 
 #### Scenario: Aceptar una importación de la otra disciplina
 - **WHEN** con BJJ activo el usuario acepta la vista previa de una importación de Grappling

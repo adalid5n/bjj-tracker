@@ -64,7 +64,7 @@
 		// color de acento). El padre lo deriva del top del `mapaModalStack`.
 		selectedGraphId?: string | null;
 		// T-3.it7: modo vista previa de importación. Los elementos con
-		// `data.nuevo` son "fantasma": laten con el color `--highlight`, no
+		// `data.nuevo` son "fantasma": respiran con el color `--highlight`, no
 		// entran en `positionsCache`, ni en `saveLayout()`, ni marcan dirty.
 		// Taps y arrastre desactivados; pan y zoom siguen.
 		preview?: boolean;
@@ -83,12 +83,13 @@
 		preview = false
 	}: Props = $props();
 
-	// T-3.it7: estado del latido de los elementos nuevos. No es reactivo
+	// T-3.it7: estado del resaltado de los elementos nuevos. No es reactivo
 	// (se aplica imperativamente sobre Cytoscape).
 	let pulsoOn = false;
 	let reducirMovimiento = false;
 	let pulsoTimer: ReturnType<typeof setInterval> | null = null;
-	const PULSO_MS = 800;
+	// Medio periodo del "respirar" (ida o vuelta): ciclo completo 1,8 s.
+	const PULSO_MS = 900;
 	let quitarListenerReduce: (() => void) | null = null;
 	let resizeObserver: ResizeObserver | null = null;
 
@@ -286,28 +287,31 @@
 				selector: 'edge[estado = "descartada"]',
 				style: { width: 1, opacity: 0.4, 'line-style': 'dotted' }
 			},
-			// T-3.it7: elementos nuevos de la vista previa. Estado base =
-			// borde con el color de resaltado (nodos) o color normal
-			// (aristas); `.pulso-on` = relleno/línea en `--highlight`. El
-			// latido alterna `.pulso-on` → solo cambia COLOR, nunca tamaño.
-			// Con "reducir movimiento" `.pulso-on` queda fijo.
+			// T-3.it7: elementos nuevos de la vista previa. "Respiran": pasan
+			// SUAVEMENTE de su color normal al de resaltado y vuelven
+			// (`.pulso-on` alterna cada medio periodo y la transición
+			// ease-in-out de igual duración interpola el color). Solo
+			// cambia COLOR, nunca tamaño. La transición solo existe con
+			// `.pulso-anim`; con "reducir movimiento" no se pone y
+			// `.pulso-on` queda fijo (color de resaltado estático).
 			{
-				selector: 'node[?nuevo]',
+				selector: 'node[?nuevo].pulso-anim',
 				style: {
-					'border-color': t.highlight,
 					'transition-property': 'background-color, border-color',
-					'transition-duration': 0.6
+					'transition-duration': PULSO_MS / 1000,
+					'transition-timing-function': 'ease-in-out'
 				}
 			},
 			{
 				selector: 'node[?nuevo].pulso-on',
-				style: { 'background-color': t.highlight }
+				style: { 'background-color': t.highlight, 'border-color': t.highlight }
 			},
 			{
-				selector: 'edge[?nuevo]',
+				selector: 'edge[?nuevo].pulso-anim',
 				style: {
 					'transition-property': 'line-color, target-arrow-color',
-					'transition-duration': 0.6
+					'transition-duration': PULSO_MS / 1000,
+					'transition-timing-function': 'ease-in-out'
 				}
 			},
 			{
@@ -697,10 +701,12 @@
 		aplicarPulso(instance);
 	});
 
-	/** Aplica el estado actual del latido a los elementos nuevos. */
+	/** Aplica el estado actual del resaltado a los elementos nuevos. */
 	function aplicarPulso(instance: Core) {
 		const nuevos = instance.elements('[?nuevo]');
 		if (nuevos.empty()) return;
+		if (reducirMovimiento) nuevos.removeClass('pulso-anim');
+		else nuevos.addClass('pulso-anim');
 		if (pulsoOn || reducirMovimiento) nuevos.addClass('pulso-on');
 		else nuevos.removeClass('pulso-on');
 	}
@@ -711,7 +717,7 @@
 	}
 
 	/**
-	 * T-3.it7: latido de color mientras dure la vista previa. Con
+	 * T-3.it7: color que respira mientras dure la vista previa. Con
 	 * `prefers-reduced-motion: reduce` no hay intervalo: color fijo.
 	 */
 	function sincronizarPulso() {
@@ -719,7 +725,7 @@
 		if (!cy) return;
 		if (!preview) {
 			pulsoOn = false;
-			cy.elements('.pulso-on').removeClass('pulso-on');
+			cy.elements('.pulso-on, .pulso-anim').removeClass('pulso-on pulso-anim');
 			return;
 		}
 		pulsoOn = true;
@@ -917,7 +923,7 @@
 				// Aplicar filtros iniciales en caso de que ya estuvieran activos
 				// antes del mount (el $effect podría haber corrido con cy null).
 				applyFilters(instance);
-				// T-3.it7: movimiento reducido → color fijo sin latido.
+				// T-3.it7: movimiento reducido → color fijo sin animación.
 				const mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 				reducirMovimiento = mqReduce.matches;
 				const onReduceChange = (ev: MediaQueryListEvent) => {

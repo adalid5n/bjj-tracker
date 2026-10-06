@@ -174,21 +174,27 @@ y qué falta), nunca el error técnico en bruto.
   aparece donde se vio; queda "Guardar organización" pendiente, como hoy
   con cualquier nodo nuevo. Nada de los fantasma toca `grafo_layout`.
 
-### 4. Resaltado que late
+### 4. Resaltado que respira
+
+> Revisado tras la validación del owner (2026-10-06): amarillo limón en
+> vez de magenta y transición suave en vez de encendido/apagado.
 
 - Token nuevo en `src/routes/layout.css`: `--highlight` y
   `--highlight-foreground` en `:root` y `.dark`, expuestos como
   `--color-highlight` / `--color-highlight-foreground` en `@theme inline`.
-  Tono distinguible de `--primary` (selección) y de los resaltados del
-  texto interpretado. El lienzo fuerza `.dark`, así que en el grafo se ve
+  Amarillo limón (hue ≈ 98; oscuro `oklch(0.88 0.17 98)`, claro
+  `oklch(0.80 0.16 98)`), distinguible de `--warning` (ámbar, hue 80), de
+  `--primary` (selección) y de los resaltados del texto interpretado. El lienzo fuerza `.dark`, así que en el grafo se ve
   el valor oscuro; el claro se usa en la leyenda (muestra de color).
 - `readTokens()` añade `highlight`. Estilos `node.nuevo` (borde y relleno
   hacia `highlight`) y `edge.nuevo` (`line-color`, `target-arrow-color`);
-  clase `.pulso-on` con `transition-property` de color (~600 ms). Un
-  `setInterval` alterna `.pulso-on` en `cy.$('.nuevo')`. Sin cambios de
-  tamaño.
+  `.pulso-on` pone relleno/borde/línea en `highlight`; `.pulso-anim`
+  añade `transition-property` de color con `ease-in-out` y duración igual
+  a medio periodo (900 ms). Un `setInterval` de 900 ms alterna
+  `.pulso-on`, así el color va y vuelve sin pausas (ciclo ≈ 1,8 s, efecto
+  "respirar" desde el color normal del elemento). Sin cambios de tamaño.
 - `matchMedia('(prefers-reduced-motion: reduce)')`: si coincide, sin
-  intervalo y `.pulso-on` fijo; se escucha `change`. Intervalo limpiado al
+  intervalo ni `.pulso-anim` y `.pulso-on` fijo; se escucha `change`. Intervalo limpiado al
   salir del modo y en `onDestroy`.
 
 ### 5. Selector de disciplina en el primer paso
