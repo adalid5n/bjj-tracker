@@ -14,6 +14,8 @@
  * array `MIGRATIONS` con `from: N` y `to: N+1`.
  */
 
+import { separarAmbos, verificarSeparacion, type DatosSeparables } from '../separar-ambos';
+
 export const SCHEMA_V1 = `
 CREATE TABLE schema_meta (
   key TEXT PRIMARY KEY,
@@ -497,8 +499,160 @@ function migrate10To11(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v12:
- *   { from: 11, to: 12, run: (db) => { ... } }
+ * Migración v11 → v12 (T-4.it7, change `ambos-como-copias`).
+ *
+ * "Ambos" deja de existir en el catálogo: cada posición, sumisión o técnica
+ * "Ambos" se separa en una de BJJ (conserva el id) y otra de Grappling, con
+ * técnicas, contras, complementarias, etiquetas, organización del grafo y
+ * enlaces de rolls repartidos por disciplina (lógica en el módulo puro
+ * `separar-ambos.ts`, compartido con la restauración de copias v6/v7).
+ * Además `sesiones` y `rolls` reciben `disciplina` (deducida) y el tipo de
+ * sesión bjj/grappling pasa a `clase`.
+ *
+ * Todo o nada: FK OFF (fuera de la transacción; no se puede cambiar
+ * dentro), una única transacción con comprobaciones antes del COMMIT
+ * (recuentos, cero "ambos", sin violaciones de FK nuevas) y ROLLBACK ante
+ * cualquier fallo, que deja la BD exactamente en v11 (el DDL de SQLite,
+ * incluidos los ALTER, es transaccional).
+ */
+const TABLAS_SEPARABLES = [
+	'posiciones',
+	'sumisiones_terminales',
+	'tecnicas',
+	'tecnica_contras',
+	'posicion_tags',
+	'grafo_layout',
+	'sesiones',
+	'rolls',
+	'roll_posicion',
+	'roll_tecnica'
+] as const;
+
+/** Tablas que se reescriben (DELETE + INSERT); sesiones y rolls van por UPDATE. */
+const TABLAS_REESCRITAS = [
+	'posiciones',
+	'sumisiones_terminales',
+	'tecnicas',
+	'tecnica_contras',
+	'posicion_tags',
+	'grafo_layout',
+	'roll_posicion',
+	'roll_tecnica'
+] as const;
+
+function selectFilas<T>(db: MigrationDb, sql: string): T[] {
+	return db.exec({ sql, returnValue: 'resultRows', rowMode: 'object' }) as T[];
+}
+
+/** Violaciones de FK agrupadas por "tabla→padre" (los rowid cambian al reescribir). */
+function violacionesFk(db: MigrationDb): Map<string, number> {
+	const filas = selectFilas<{ table: string; parent: string }>(db, 'PRAGMA foreign_key_check');
+	const m = new Map<string, number>();
+	for (const f of filas) {
+		const k = `${f.table}→${f.parent}`;
+		m.set(k, (m.get(k) ?? 0) + 1);
+	}
+	return m;
+}
+
+function reescribirTabla(db: MigrationDb, tabla: string, filas: Record<string, unknown>[]): void {
+	const columnas = selectFilas<{ name: string }>(db, `PRAGMA table_info(${tabla})`).map(
+		(c) => c.name
+	);
+	db.exec(`DELETE FROM ${tabla}`);
+	const sql = `INSERT INTO ${tabla} (${columnas.join(', ')}) VALUES (${columnas.map(() => '?').join(', ')})`;
+	for (const fila of filas) {
+		db.exec({ sql, bind: columnas.map((c) => (fila[c] === undefined ? null : fila[c])) });
+	}
+}
+
+function migrate11To12(db: MigrationDb): void {
+	db.exec('PRAGMA foreign_keys = OFF');
+	try {
+		db.exec('BEGIN');
+		try {
+			// Huérfanos heredados (imports antiguos): no deben bloquear, pero
+			// la migración no puede añadir ninguno nuevo.
+			const violacionesAntes = violacionesFk(db);
+
+			if (!hasColumn(db, 'sesiones', 'disciplina')) {
+				db.exec("ALTER TABLE sesiones ADD COLUMN disciplina TEXT NOT NULL DEFAULT 'bjj'");
+			}
+			if (!hasColumn(db, 'rolls', 'disciplina')) {
+				db.exec("ALTER TABLE rolls ADD COLUMN disciplina TEXT NOT NULL DEFAULT 'bjj'");
+			}
+
+			const datos = {} as DatosSeparables;
+			for (const tabla of TABLAS_SEPARABLES) {
+				(datos as unknown as Record<string, unknown[]>)[tabla] = selectFilas(
+					db,
+					`SELECT * FROM ${tabla}`
+				);
+			}
+			datos.tagIds = selectFilas<{ id: string }>(db, 'SELECT id FROM tags').map((t) => t.id);
+
+			const { datos: salida, resumen } = separarAmbos(datos, {
+				nuevoId: () => crypto.randomUUID(),
+				inferirEntrenos: true
+			});
+			verificarSeparacion(salida, resumen);
+
+			for (const tabla of TABLAS_REESCRITAS) {
+				reescribirTabla(db, tabla, salida[tabla] as Record<string, unknown>[]);
+			}
+			for (const s of salida.sesiones) {
+				db.exec({
+					sql: 'UPDATE sesiones SET disciplina = ?, tipo = ? WHERE id = ?',
+					bind: [s.disciplina ?? 'bjj', s.tipo, s.id]
+				});
+			}
+			for (const r of salida.rolls) {
+				db.exec({
+					sql: 'UPDATE rolls SET disciplina = ? WHERE id = ?',
+					bind: [r.disciplina ?? 'bjj', r.id]
+				});
+			}
+
+			// --- Comprobaciones antes del COMMIT (cualquier fallo → ROLLBACK) ---
+			for (const tabla of TABLAS_SEPARABLES) {
+				const [{ n }] = selectFilas<{ n: number }>(db, `SELECT COUNT(*) AS n FROM ${tabla}`);
+				if (n !== salida[tabla].length) {
+					throw new Error(
+						`[schema v12] ${tabla}: ${n} filas en BD, se esperaban ${salida[tabla].length}`
+					);
+				}
+			}
+			for (const tabla of ['posiciones', 'sumisiones_terminales', 'tecnicas', 'rolls']) {
+				const [{ n }] = selectFilas<{ n: number }>(
+					db,
+					`SELECT COUNT(*) AS n FROM ${tabla} WHERE disciplina = 'ambos'`
+				);
+				if (n !== 0) throw new Error(`[schema v12] ${tabla}: quedan ${n} filas "ambos"`);
+			}
+			const violacionesDespues = violacionesFk(db);
+			for (const [k, n] of violacionesDespues) {
+				if (n > (violacionesAntes.get(k) ?? 0)) {
+					throw new Error(
+						`[schema v12] violaciones de FK nuevas en ${k}: ${n} (antes ${violacionesAntes.get(k) ?? 0})`
+					);
+				}
+			}
+
+			db.exec("UPDATE schema_meta SET value = '12' WHERE key = 'version'");
+			db.exec('COMMIT');
+			console.info('[schema v12] "Ambos" separado en copias por disciplina', resumen);
+		} catch (err) {
+			db.exec('ROLLBACK');
+			throw err;
+		}
+	} finally {
+		db.exec('PRAGMA foreign_keys = ON');
+	}
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v13:
+ *   { from: 12, to: 13, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
@@ -510,7 +664,8 @@ export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => v
 	{ from: 7, to: 8, run: migrate7To8 },
 	{ from: 8, to: 9, run: migrate8To9 },
 	{ from: 9, to: 10, run: migrate9To10 },
-	{ from: 10, to: 11, run: migrate10To11 }
+	{ from: 10, to: 11, run: migrate10To11 },
+	{ from: 11, to: 12, run: migrate11To12 }
 ];
 
 /**
