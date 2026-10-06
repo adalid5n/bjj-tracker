@@ -707,8 +707,9 @@
 	/**
 	 * Pinta los elementos nuevos con el factor de resaltado `t`: mezcla del
 	 * color normal del BORDE en nodos (posición = muted-foreground; sumisión =
-	 * foreground) y de la línea en flechas (muted-foreground)
-	 * con `highlight`. Solo cambia COLOR, nunca tamaño.
+	 * foreground) y de la línea en flechas (muted-foreground) con
+	 * `highlight`, más un halo (underlay) en los nodos cuya opacidad sigue
+	 * el mismo ritmo. Solo cambia COLOR/halo, nunca el tamaño del nodo.
 	 */
 	function aplicarPulso(instance: Core, t = reducirMovimiento ? 1 : ultimoFactor) {
 		const tok = tokensActuales;
@@ -721,12 +722,21 @@
 			nuevos.forEach((el) => {
 				if (el.group() === 'edges') {
 					el.style({ 'line-color': flecha, 'target-arrow-color': flecha });
-				} else if (el.data('kind') === 'sumision') {
-					// Nodos: solo respira el BORDE (decisión owner); el relleno
-					// conserva su color para no perder la identidad del nodo.
-					el.style({ 'border-color': mezclar(tok.foreground, hl, t) });
 				} else {
-					el.style({ 'border-color': mezclar(tok.mutedForeground, hl, t) });
+					// Nodos: respiran el BORDE y un HALO exterior (decisión
+					// owner; el nombre no cambia). El relleno conserva su color para no
+					// perder la identidad del nodo; el halo (underlay) hace
+					// visible el resaltado también sobre la sumisión blanca,
+					// sin cambiar el tamaño del nodo.
+					const bordeBase =
+						el.data('kind') === 'sumision' ? tok.foreground : tok.mutedForeground;
+					el.style({
+						'border-color': mezclar(bordeBase, hl, t),
+						'underlay-color': hl,
+						'underlay-padding': 6,
+						'underlay-shape': 'ellipse',
+						'underlay-opacity': 0.55 * t
+					});
 				}
 			});
 		});

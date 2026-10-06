@@ -114,7 +114,7 @@ confirmación") y REMOVED ("Sin historial de importaciones").
 
 ### T-3.it7 — Vista previa en el mapa y disciplina de la importación
 
-**Estado:** 🟡 Pendiente. Tras T-1 (selector) y T-2 (comparten el diálogo).
+**Estado:** ✅ Cerrada 2026-10-06 — validada por el owner; change archivado (`openspec/changes/archive/2026-10-06-vista-previa-importacion`). Incluye sumisiones únicas por disciplina (migración v11) y resaltado amarillo con borde y halo que respiran.
 **Change OpenSpec:** [`openspec/changes/vista-previa-importacion/`](../../openspec/changes/vista-previa-importacion/proposal.md)
 
 **Qué entrega:**

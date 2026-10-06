@@ -1,7 +1,7 @@
 # Estado actual del proyecto
 
 **Última actualización:** 2026-10-05 (sesión 50 — Codespaces para tablet + config de agente + fix modelo IA + piloto SDD con OpenSpec)
-**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 ✅ (2026-10-06); T-2 (historial-importaciones) siguiente.
+**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 ✅, T-2 ✅, T-3 ✅ (2026-10-06). Siguiente: T-4 (`ambos-como-copias`).
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
 
 ---
@@ -66,7 +66,9 @@
 **Decisión del owner (2026-10-06): "Ambos" = DOS COPIAS INDEPENDIENTES** (atajo al crear: una de BJJ y otra de Grappling, cada una con su vida propia). Sustituye a la opción de organización por disciplina. Va como **T-4.it7** (owner: "está directamente relacionado"). **Sesiones y rolls pasan a tener disciplina:** la sesión puede ser BJJ, Grappling o Ambos (clase mixta); el roll, BJJ o Grappling (nunca Ambos), con la de su sesión por defecto (si la sesión es Ambos, la disciplina activa) y se puede cambiar al crearlo. **Datos existentes: disciplina deducida** (roll → Grappling si todo lo que apunta es de Grappling, si no BJJ; sesión → la de sus rolls, Ambos si están mezclados, BJJ si no tiene rolls). Plan (change `ambos-como-copias`) escrito; el subagente aplica las respuestas del owner: **tipo de sesión = Clase / Open mat** y la disciplina aparte; **"Ambos" = existe en las dos disciplinas siempre**, así que lo que falte (p. ej. la posición de origen) se crea en la otra, tanto al crear como en la migración; **la disciplina de un elemento no se puede cambiar al editar** ("Duplicar en la otra disciplina" queda para el futuro, en MEJORAS). Incluye la migración v12 que parte los Ambos existentes en dos copias.
 - **Formas de trabajar acordadas (2026-10-06, en CLAUDE.md):** ajustes visuales en `pnpm dev` (5173) y validación final en 4173; commits agrupados por tarea (las decisiones sí se suben al momento); cada respuesta cierra con "Qué he hecho".
 
-**Próximo paso concreto:** el owner valida T-3 en preview (color y fundido) (tablet y escritorio) → archive → fusionar en main → cierre de la it.7 (evaluación del piloto de OpenSpec, bump de versión, tag).
+**T-3.it7 cerrada (2026-10-06):** validada por el owner. Resaltado final: amarillo vivo oklch(0.87 0.18 95) en el borde de los nodos con un halo (underlay) que respira, y en la línea de las flechas; el nombre no cambia (el owner probó ponerlo en amarillo y lo descartó). Change archivado y fusionado en main → BD de prod en v11 (prod sin datos).
+
+**Próximo paso concreto:** T-4 (`ambos-como-copias`). Primer paso: arreglar el delta (tras archivar T-3, `validate --strict` pide conservar o reescribir los escenarios "Sumisiones existentes al actualizar la app" en catalogo-tecnico, y "Elemento de Ambos en una importación de BJJ" e "Importación de Ambos" en importar-clase). Después, `/opsx:apply` en una rama `it7/t4-ambos-copias`, empezando por la migración v12. Antes de actualizar la tablet, exportar un backup.
 
 ---
 

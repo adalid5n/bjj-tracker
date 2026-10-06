@@ -7,6 +7,8 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 ## [Unreleased]
 
 ### Added
+- **Vista previa de la importación en el mapa** (it.7, T-3): antes de insertar, el diálogo se cierra y el grafo real muestra lo nuevo resaltado (borde y halo amarillos que respiran; fijo con "reducir movimiento"), con una barra fija Aceptar/Cancelar. La importación tiene ahora disciplina propia (BJJ/Grappling/Ambos), compara solo con el catálogo de esa disciplina, y las de "Ambos" se revisan en dos pasos (BJJ y luego Grappling).
+- Sumisiones con el mismo nombre en BJJ y en Grappling (antes el nombre era único en todo el catálogo).
 - **Historial de importaciones de clase** (it.7, T-2): cada importación se guarda en cuanto se pulsa Analizar, con título, texto y lo aceptado, y estado Importada / Sin terminar / Falló. Se consulta desde un icono en el mapa, con tarjetas desplegables, bloques copiables, Reintentar (misma tarjeta, lo aceptado se acumula) y borrar.
 - **Importación de clase vía IA** (Groq; modelo `openai/gpt-oss-120b` desde 2026-10-05): pipeline de 3 fases — normalización de texto dictado por voz (corrige términos, resalta cambios), extracción de posiciones/técnicas/sumisiones, validación automática con rúbrica. Dialog paso a paso con revisión y edición de detalles de ejecución.
 - **Tags para posiciones**: sistema de etiquetas con colores preset. Nuevo paso en `PosicionWizard`; gestión bulk (añadir/quitar) en modo edición del mapa.
@@ -15,6 +17,7 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 - "+ Crear nueva" en wizards standalone.
 
 ### Fixed
+- "Reorganizar" el grafo ya no borra la organización guardada de la otra disciplina.
 - **Copia de seguridad**: ahora incluye etiquetas, sus asignaciones y el historial de importaciones, y al restaurar conserva la disciplina de posiciones, técnicas y sumisiones (antes se perdían). Formato de fichero v7; se siguen aceptando ficheros v6.
 - Selectores coherentes (it.7, T-1): tocar la opción ya activa no cambia nada (BJJ/Grappling del mapa, disciplina en los asistentes, tipo de sesión y resultado de roll). Antes, en los asistentes volvía a BJJ sin avisar.
 - Importación de clase vía IA rota: Groq retiró `llama-3.3-70b-versatile`; sustituido por `openai/gpt-oss-120b`.
