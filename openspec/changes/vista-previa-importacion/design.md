@@ -269,6 +269,32 @@ lo rechazaba y la sumisión (y sus técnicas) no se creaban.
 - Las posiciones no tienen UNIQUE en BD; su asistente sigue comprobando el
   nombre en todo el catálogo (fuera de alcance de este cambio).
 
+### 8. Bug "posiciones con el mismo nombre en el mismo sitio" (2026-10-06)
+
+Investigado leyendo el código (sin reproducción automatizada). Las
+posiciones se guardan y cachean por **id** (`pos:<id>`), nunca por nombre;
+la causa no es una colisión de claves. Hay dos mecanismos:
+
+1. **Fallo (arreglado):** "Reorganizar" vaciaba `positionsCache` entero,
+   también las posiciones de la otra disciplina sembradas desde
+   `grafo_layout`. Al cambiar de disciplina, sus nodos no tenían posición
+   y fcose los recolocaba desde cero, sin nodos fijos y centrados en el
+   mismo punto que el grafo anterior: con un catálogo de nombres y
+   técnicas casi iguales en BJJ y Grappling (la misma clase importada en
+   las dos), el resultado salía calcado y "se movían juntos". Ahora
+   Reorganizar solo olvida los nodos del grafo visible.
+2. **Limitación de diseño (no arreglada, decisión del owner):** las dos
+   disciplinas comparten un único espacio de coordenadas. Un nodo de
+   "Ambos" (o uno colocado mientras se veía la otra disciplina, p. ej. lo
+   creado al aceptar una importación de "Ambos", cuya posición sale del
+   último paso, Grappling) se ve en BJJ en las coordenadas calculadas para
+   Grappling, sin re-layout (todo está en cache → `preset`), y puede caer
+   encima de un nodo de BJJ. Además, los nodos de una disciplina que nunca
+   se guardó no marcan "Guardar organización" al cambiar a ella, así que
+   su colocación se recalcula en cada carga. Opciones: organización por
+   disciplina (`grafo_layout` con disciplina → migración), o re-layout
+   incremental de los nodos de "Ambos" al cambiar de disciplina.
+
 ## Risks / Trade-offs
 
 - [Rework del ciclo de vida en el fichero más grande] → se hace en una

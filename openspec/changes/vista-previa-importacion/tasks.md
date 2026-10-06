@@ -43,5 +43,5 @@
 - [x] 6.1 Resaltado amarillo limón (`--highlight` hue ≈ 98, claro y oscuro) y animación "respirar": transición suave ease-in-out del color normal al de resaltado y vuelta (ciclo ≈ 1,8 s), sin cambio de tamaño; reducir movimiento → color fijo; verificar en DevTools (Rendering → prefers-reduced-motion) y en tablet
 - [x] 6.2 Migración nueva (v11) que reconstruye `sumisiones_terminales` con `UNIQUE (nombre, disciplina)` conservando ids, columnas y datos (FK de `tecnicas.sumision_destino_id` intacta); verificar con una BD v10 con sumisiones y técnicas que tras migrar todo sigue igual y que se puede crear "Kimura" en Grappling existiendo "Kimura" en BJJ
 - [x] 6.3 Comprobación de nombre repetido del asistente de sumisión por disciplina (misma disciplina = repetido) y copia de seguridad: ficheros v6/v7 siguen importando sin cambio de formato; verificar exportar → importar
-- [ ] 6.4 Bug: dos posiciones con el mismo nombre en BJJ y en Grappling aparecen en el mismo sitio del grafo; investigar la causa y arreglarla si es un fallo claro
+- [x] 6.4 Bug: dos posiciones con el mismo nombre en BJJ y en Grappling aparecen en el mismo sitio del grafo; investigar la causa y arreglarla si es un fallo claro
 

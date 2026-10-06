@@ -528,7 +528,7 @@
 	}
 
 	/**
-	 * Limpia el cache de posiciones y corre fcose desde cero. Llamado
+	 * Olvida las posiciones de los nodos visibles y corre fcose desde cero. Llamado
 	 * desde el botón "Reorganizar" del padre vía `bind:this`. Marca
 	 * el grafo como dirty: el usuario debe pulsar "Guardar organización"
 	 * para persistir la nueva disposición (o descartar volviendo a
@@ -536,7 +536,16 @@
 	 */
 	export function reorganize() {
 		if (!cy) return;
-		positionsCache.clear();
+		// T-3.it7 (bug "mismo sitio"): solo se olvidan las posiciones de
+		// los nodos de ESTE grafo (la disciplina visible). Antes se vaciaba
+		// el cache entero y los nodos de la otra disciplina perdían también
+		// su posición guardada: al cambiar de disciplina se recolocaban
+		// desde cero (fcose sin nodos fijos, centrado en el mismo punto),
+		// así que "se movían juntos" y un catálogo con los mismos nombres
+		// quedaba calcado encima del de la otra disciplina.
+		cy.nodes().forEach((n) => {
+			positionsCache.delete(n.id());
+		});
 		runLayoutAndCache(cy, true, true);
 		dirty = true;
 	}
