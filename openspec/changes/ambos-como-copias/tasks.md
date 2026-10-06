@@ -53,7 +53,7 @@
 
 ## 6. Verificación y cierre
 
-- [ ] 6.1 `grep -rn "'ambos'" src` solo en sesiones, importación y opción de creación de asistentes; `grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|gray)-[0-9]" src` sin resultados nuevos
+- [x] 6.1 `grep -rn "'ambos'" src` solo en sesiones, importación y opción de creación de asistentes; `grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|gray)-[0-9]" src` sin resultados nuevos
 - [ ] 6.2 `pnpm check`, `pnpm test:unit` (suite existente), `pnpm build` y `pnpm preview` con refresh; sin errores en consola
 - [ ] 6.3 Ensayo con datos reales: importar en el Codespace el JSON de prod (v7) y revisar mapa BJJ/Grappling, sesiones y rolls con el owner
 - [ ] 6.4 Validación manual del owner en `pnpm preview` (tablet y escritorio) contra los escenarios de los cinco specs del change

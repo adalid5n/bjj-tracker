@@ -387,3 +387,28 @@ contras se limitan a la misma disciplina; sumisión Ambos que choca al
 separar → "(Ambos)" en el nombre; complementaria de una posición creada
 con Ambos (Decisión 5); conexiones cruzadas antiguas de técnicas de una
 sola disciplina se conservan sin tocar.
+
+## Notas de implementación (2026-10-06)
+
+Desviaciones menores respecto a lo planeado, sin cambio de comportamiento
+pedido por el owner:
+
+- **Transacciones:** `SAVEPOINT` no permite un `BEGIN` anidado, así que
+  `syncComplementaria` pasa de `BEGIN/COMMIT` a `SAVEPOINT` (helper
+  `conSavepoint` en `src/lib/transaccion.ts`); sola sigue siendo atómica.
+  La creación doble vive en `src/lib/catalogo-lados.ts`.
+- **Técnica "Ambos" con la copia idéntica ya existente en la otra
+  disciplina** (asistente): se bloquea con mensaje (no se crea ninguna) en
+  vez de crear solo un lado.
+- **Contra nueva:** solo la disciplina de la técnica contrarrestada (sin
+  opción "Ambos").
+- **Orígenes del asistente de técnica:** lista de la disciplina activa (o
+  la del origen precargado / la del roll).
+- **Importación:** una posición o sumisión marcada cuyo nombre ya existe en
+  un lado se enlaza en vez de duplicarse; si existe en todos, aparece en
+  "No se creó: ya existía". Fallos de creación y técnicas idénticas también
+  se listan ahí (por lado).
+- **Sesión "Ambos":** etiqueta "Clase · BJJ y Grappling". `SesionForm`
+  usa chips (antes un desplegable) para Tipo y Disciplina.
+- Los borradores de los asistentes de posición y técnica guardan la
+  disciplina / "Ambos" (sobreviven al sub-asistente "+ Crear nueva").
