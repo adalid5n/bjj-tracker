@@ -64,9 +64,17 @@ en un lado se crea solo en ese lado.
 - **WHEN** la IA propone "Media guardia" y en el catálogo existe "Media Guardia bottom"
 - **THEN** "Media guardia" aparece como posición nueva
 
+#### Scenario: Elemento de "Ambos" en una importación de BJJ
+- **WHEN** en una importación de BJJ la IA propone "Mount" y "Mount" era "Ambos" antes de actualizar la app (ahora existe una "Mount" de BJJ y otra de Grappling)
+- **THEN** "Mount" no aparece como nueva y las técnicas se enlazan a la "Mount" de BJJ; la de Grappling no se toca
+
 #### Scenario: Mismo nombre solo en la otra disciplina
 - **WHEN** en una importación de Grappling la IA propone "Mount" y "Mount" solo existe con disciplina BJJ
 - **THEN** "Mount" aparece como posición nueva y, al aceptar, se crea con disciplina Grappling aunque exista la de BJJ
+
+#### Scenario: Importación de "Ambos"
+- **WHEN** en una importación de "Ambos" la IA propone "Kimura" y no existe en ninguna disciplina
+- **THEN** "Kimura" aparece como sumisión nueva y, al aceptar, se crean dos "Kimura", una de BJJ y otra de Grappling; ninguna queda con disciplina "Ambos"
 
 #### Scenario: Importación de "Ambos" con el elemento en un solo lado
 - **WHEN** en una importación de "Ambos" la IA propone "Kimura" y "Kimura" solo existe en BJJ

@@ -39,6 +39,10 @@ las dos. Es un punto final: MUST NOT ser origen de ninguna técnica.
 - **WHEN** el usuario crea "Kimura" eligiendo "Ambos" y "Kimura" ya existe en BJJ
 - **THEN** el asistente indica que ya existe en BJJ y no avanza
 
+#### Scenario: Sumisiones existentes al actualizar la app
+- **WHEN** el usuario abre la app tras la actualización con sumisiones y técnicas ya guardadas
+- **THEN** todas las sumisiones siguen con su nombre y notas; las de BJJ o Grappling conservan su disciplina, cada sumisión "Ambos" pasa a ser una de BJJ y otra de Grappling (ver "Separación de lo que ya era Ambos"), y las técnicas que llevaban a ellas llevan a la copia de su disciplina
+
 ### Requirement: Disciplina de cada elemento
 Cada posición, técnica y sumisión SHALL tener disciplina BJJ o Grappling;
 ningún elemento del catálogo queda como "Ambos". Al crear, el asistente

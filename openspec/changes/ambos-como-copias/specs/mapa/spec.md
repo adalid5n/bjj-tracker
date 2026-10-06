@@ -27,9 +27,11 @@ elegir esa opción; tocar la que ya está activa no cambia nada.
 ### Requirement: Vista previa de importación en el grafo
 Durante la vista previa, el grafo SHALL mostrar el catálogo de la
 disciplina del paso con lo que se va a añadir en ella: posiciones y
-sumisiones nuevas como nodos y técnicas nuevas como flechas. Lo nuevo MUST destacarse con un color que respira:
-pasa suavemente de su color normal al de resaltado (amarillo dorado, más
-oscuro que el blanco de las sumisiones) y vuelve, sin cambiar de tamaño.
+sumisiones nuevas como nodos y técnicas nuevas como flechas. Lo nuevo
+MUST destacarse con un color que respira: pasa suavemente de su color
+normal al color de resaltado (amarillo vivo, en el borde de los nodos con
+un halo exterior, y en la línea de las flechas) y vuelve, de forma
+continua y sin cambiar de tamaño.
 Una posición o sumisión existente que recibe una técnica nueva no se
 resalta; solo la flecha.
 
