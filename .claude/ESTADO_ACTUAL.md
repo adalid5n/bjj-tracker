@@ -61,7 +61,9 @@
 
 **T-3 implementada en la rama `it7/t3-vista-previa` (2026-10-06), NO en main:** 4 commits wip (el borrador sale del diálogo como `ImportacionBorrador`; disciplina de la importación y catálogo por disciplina; token `--highlight` y elementos fantasma; modo vista previa en /mapa). Check y build en verde; sin probar en el navegador. **Conflicto abierto para el owner:** las sumisiones tienen el nombre único en todo el catálogo (`schema.ts:101`), así que una sumisión que existe en otra disciplina no se puede crear en esta (falla en silencio, junto con sus técnicas). Las posiciones sí admiten duplicados por disciplina.
 
-**Próximo paso concreto:** el owner decide el conflicto de sumisiones y valida T-3 en preview (tablet y escritorio) → archive → fusionar en main → cierre de la it.7 (evaluación del piloto de OpenSpec, bump de versión, tag).
+**Feedback del owner sobre T-3 aplicado (3 commits):** resaltado amarillo limón (hue 98) que respira (~1,8 s, transición suave; fijo con reducir movimiento); **sumisiones únicas por disciplina** (decisión A: migración v11, reconstruye la tabla conservando ids y datos); "Reorganizar" ya no borra la organización de la otra disciplina. **Abierto:** las dos disciplinas comparten coordenadas en `grafo_layout`, así que un nodo "Ambos" puede quedar encima de otro (opciones: organización por disciplina con migración, o recolocar los nodos Ambos al cambiar de disciplina).
+
+**Próximo paso concreto:** el owner valida T-3 en preview y decide lo de las coordenadas (tablet y escritorio) → archive → fusionar en main → cierre de la it.7 (evaluación del piloto de OpenSpec, bump de versión, tag).
 
 ---
 
