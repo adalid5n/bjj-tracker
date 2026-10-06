@@ -90,6 +90,7 @@
 	let pulsoTimer: ReturnType<typeof setInterval> | null = null;
 	const PULSO_MS = 800;
 	let quitarListenerReduce: (() => void) | null = null;
+	let resizeObserver: ResizeObserver | null = null;
 
 	let container: HTMLDivElement;
 	let cy: Core | null = null;
@@ -926,6 +927,16 @@
 				mqReduce.addEventListener('change', onReduceChange);
 				quitarListenerReduce = () => mqReduce.removeEventListener('change', onReduceChange);
 				sincronizarPulso();
+				// T-3.it7: la barra de la vista previa cambia el alto del
+				// contenedor después del layout (se mide de forma asíncrona).
+				// Cytoscape no detecta cambios de tamaño del contenedor por
+				// sí solo; en vista previa además re-encuadramos.
+				resizeObserver = new ResizeObserver(() => {
+					if (!cy) return;
+					cy.resize();
+					if (preview) cy.fit(undefined, 30);
+				});
+				resizeObserver.observe(container);
 				loading = false;
 				if (autoDirty) dirty = true;
 				// Activar el dragfree handler. A partir de aquí, cualquier
@@ -945,6 +956,7 @@
 	onDestroy(() => {
 		pararPulso();
 		quitarListenerReduce?.();
+		resizeObserver?.disconnect();
 		cy?.destroy();
 		cy = null;
 	});

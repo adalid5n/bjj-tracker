@@ -38,6 +38,7 @@ import {
 	type Aceptado,
 	type ImportacionPatch
 } from '$lib/importaciones';
+import { ghostIdPosicion, ghostIdSumision, normalizarNombre, type ClaveBorrador } from '$lib/grafo';
 
 export type PosicionItem = {
 	nombre: string;
@@ -70,7 +71,26 @@ export type TecnicaItem = {
 	detalles?: string;
 };
 
-export type PasoImportacion = 'input' | 'normalizado' | 'review' | 'detalles';
+export type PasoImportacion = 'input' | 'normalizado' | 'review' | 'detalles' | 'preview';
+
+/** Disciplina de cada paso de la vista previa en el mapa. */
+export type DisciplinaPaso = 'bjj' | 'grappling';
+
+/** Elemento que no se creará porque causó el error de un paso de la vista previa. */
+export type ExcluidoPorError = {
+	clave: ClaveBorrador;
+	nombre: string;
+	motivo: string;
+	/** Índice del paso de la vista previa en el que se excluyó. */
+	paso: number;
+};
+
+/** Algo que no se creó al aceptar, con el motivo para el usuario. */
+export type NoCreado = { nombre: string; motivo: string };
+
+export type ResultadoConfirmar =
+	| { ok: true; ghostToReal: Map<string, string>; noCreados: NoCreado[] }
+	| { ok: false };
 
 /**
  * Disciplinas del catálogo con las que se compara una importación (y que
@@ -118,6 +138,15 @@ export class ImportacionBorrador {
 	 * se cree la lleva; también decide el catálogo con el que se compara.
 	 */
 	disciplina = $state<Disciplina>(settings.disciplinaActiva);
+	/** Índice del paso actual de la vista previa (en `pasosPreview`). */
+	pasoPreview = $state(0);
+	/** Elementos que no se crearán por "Seguir con la siguiente disciplina". */
+	excluidosPorError = $state<ExcluidoPorError[]>([]);
+
+	/** Pasos de la vista previa: uno por disciplina; "Ambos" → BJJ y Grappling. */
+	get pasosPreview(): DisciplinaPaso[] {
+		return this.disciplina === 'ambos' ? ['bjj', 'grappling'] : [this.disciplina];
+	}
 	textoClase = $state('');
 	normalizacion = $state<NormalizacionResult | null>(null);
 	textoParaPropuesta = $state('');
@@ -172,6 +201,8 @@ export class ImportacionBorrador {
 	reset() {
 		this.paso = 'input';
 		this.disciplina = settings.disciplinaActiva;
+		this.pasoPreview = 0;
+		this.excluidosPorError = [];
 		this.textoClase = '';
 		this.normalizacion = null;
 		this.textoParaPropuesta = '';
@@ -192,6 +223,45 @@ export class ImportacionBorrador {
 		this.validacionBannerAbierto = true;
 		// Resetear no borra nada del historial; solo suelta la referencia.
 		this.importacionId = null;
+	}
+
+	/** Pasa a la vista previa en el mapa (nada se escribe). */
+	entrarPreview() {
+		this.errorInsert = null;
+		this.pasoPreview = 0;
+		this.excluidosPorError = [];
+		this.paso = 'preview';
+	}
+
+	/** Cancelar / Retroceder: vuelve a "Revisar propuesta" con todo intacto. */
+	salirPreview() {
+		this.pasoPreview = 0;
+		this.excluidosPorError = [];
+		this.paso = 'review';
+	}
+
+	/**
+	 * Avanza al siguiente paso. Si el paso actual tenía error ("Seguir con
+	 * la siguiente disciplina"), sus elementos causantes no se crearán.
+	 */
+	siguientePreview(error?: { motivo: string; elementos: { clave: ClaveBorrador; nombre: string }[] }) {
+		if (this.pasoPreview >= this.pasosPreview.length - 1) return;
+		if (error) {
+			const paso = this.pasoPreview;
+			this.excluidosPorError = [
+				...this.excluidosPorError,
+				...error.elementos.map((e) => ({ ...e, motivo: error.motivo, paso }))
+			];
+		}
+		this.pasoPreview += 1;
+	}
+
+	/** "← Atrás": vuelve al paso anterior y deshace sus exclusiones. */
+	atrasPreview() {
+		if (this.pasoPreview === 0) return;
+		this.pasoPreview -= 1;
+		const paso = this.pasoPreview;
+		this.excluidosPorError = this.excluidosPorError.filter((e) => e.paso < paso);
 	}
 
 	/** T-2.it7 "Reintentar": borrador limpio con el texto guardado precargado. */
@@ -450,18 +520,30 @@ export class ImportacionBorrador {
 
 	/**
 	 * Inserta en el catálogo lo marcado (posiciones → sumisiones →
-	 * técnicas). Devuelve `true` si terminó (aunque algún elemento suelto
-	 * no se haya creado) y `false` si hubo un fallo general (queda en
-	 * `errorInsert`). Registra lo creado en el historial.
+	 * técnicas) con la disciplina de la importación, excepto
+	 * `excluidosPorError` (y las técnicas que dependen de ellos).
+	 * `ok: false` = fallo general (queda en `errorInsert`). Registra lo
+	 * creado en el historial. `ghostToReal` mapea el id fantasma de la
+	 * vista previa al id real en el grafo, para conservar su posición.
 	 */
-	async confirmar(): Promise<boolean> {
-		if (this.inserting) return false;
+	async confirmar(): Promise<ResultadoConfirmar> {
+		if (this.inserting) return { ok: false };
 		this.inserting = true;
 		this.errorInsert = null;
 		const histId = this.importacionId;
 		const disciplina = this.disciplina;
 		// T-2.it7: lo realmente creado en este intento (ids + nombres).
 		const creado: Aceptado = { posiciones: [], sumisiones: [], tecnicas: [] };
+		const ghostToReal = new Map<string, string>();
+		const excluidos = new Map(this.excluidosPorError.map((e) => [e.clave as string, e]));
+		const noCreados: NoCreado[] = this.excluidosPorError.map((e) => ({
+			nombre: e.nombre,
+			motivo: e.motivo
+		}));
+		// Nombres (normalizados) de posiciones/sumisiones excluidas, para
+		// avisar de las técnicas que dependían de ellas.
+		const posExcluidas = new Map<string, string>();
+		const sumExcluidas = new Map<string, string>();
 		try {
 			// Catálogo fresco de la disciplina de la importación para
 			// resolver nombres → ids (misma regla que la comparación).
@@ -483,7 +565,12 @@ export class ImportacionBorrador {
 			]);
 
 			// Fase A: posiciones marcadas
-			for (const item of this.posicionesDraft.filter((p) => p.seleccionado)) {
+			for (const [i, item] of this.posicionesDraft.entries()) {
+				if (!item.seleccionado) continue;
+				if (excluidos.has(`pos:${i}`)) {
+					posExcluidas.set(normalizarNombre(item.nombreEditado), item.nombreEditado);
+					continue;
+				}
 				try {
 					const created = await createPosicion({
 						nombre: item.nombreEditado,
@@ -494,6 +581,7 @@ export class ImportacionBorrador {
 						disciplina
 					});
 					posNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
+					ghostToReal.set(ghostIdPosicion(item.nombreEditado), `pos:${created.id}`);
 					nombrePorId.set(created.id, created.nombre);
 					creado.posiciones.push({ id: created.id, nombre: created.nombre, categoria: created.categoria });
 				} catch (e) {
@@ -502,7 +590,12 @@ export class ImportacionBorrador {
 			}
 
 			// Fase B: sumisiones marcadas
-			for (const item of this.sumisionesDraft.filter((s) => s.seleccionado)) {
+			for (const [i, item] of this.sumisionesDraft.entries()) {
+				if (!item.seleccionado) continue;
+				if (excluidos.has(`sum:${i}`)) {
+					sumExcluidas.set(normalizarNombre(item.nombreEditado), item.nombreEditado);
+					continue;
+				}
 				try {
 					const created = await createSumision({
 						nombre: item.nombreEditado,
@@ -510,6 +603,7 @@ export class ImportacionBorrador {
 						disciplina
 					});
 					sumNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
+					ghostToReal.set(ghostIdSumision(item.nombreEditado), `sum:${created.id}`);
 					nombrePorId.set(created.id, created.nombre);
 					creado.sumisiones.push({ id: created.id, nombre: created.nombre });
 				} catch (e) {
@@ -518,8 +612,24 @@ export class ImportacionBorrador {
 			}
 
 			// Fase C: técnicas marcadas
-			for (const item of this.tecnicasDraft.filter((t) => t.seleccionado)) {
+			const dependeDeExcluido = (item: TecnicaItem): string | undefined => {
+				const dest =
+					item.tipo === 'sumision'
+						? sumExcluidas.get(normalizarNombre(item.sumisionDestinoNombre ?? ''))
+						: posExcluidas.get(normalizarNombre(item.posicionDestinoNombre ?? ''));
+				return posExcluidas.get(normalizarNombre(item.posicionOrigenNombre)) ?? dest;
+			};
+			for (const [i, item] of this.tecnicasDraft.entries()) {
+				if (!item.seleccionado || excluidos.has(`tec:${i}`)) continue;
 				const origenId = posNormMap.get(item.posicionOrigenNombre.toLowerCase().trim());
+				const excluidoDelQueDepende = dependeDeExcluido(item);
+				if (excluidoDelQueDepende && !origenId) {
+					noCreados.push({
+						nombre: item.nombre,
+						motivo: `depende de «${excluidoDelQueDepende}», que no se creó`
+					});
+					continue;
+				}
 				if (!origenId) {
 					console.warn('Origen no encontrado, saltando técnica:', item.nombre);
 					continue;
@@ -530,6 +640,12 @@ export class ImportacionBorrador {
 							? sumNormMap.get(item.sumisionDestinoNombre.toLowerCase().trim())
 							: undefined;
 						if (!sumId) {
+							if (excluidoDelQueDepende) {
+								noCreados.push({
+									nombre: item.nombre,
+									motivo: `depende de «${excluidoDelQueDepende}», que no se creó`
+								});
+							}
 							console.warn('Sumisión destino no encontrada, saltando:', item.nombre);
 							continue;
 						}
@@ -557,6 +673,12 @@ export class ImportacionBorrador {
 							? posNormMap.get(item.posicionDestinoNombre.toLowerCase().trim())
 							: undefined;
 						if (!destId) {
+							if (excluidoDelQueDepende) {
+								noCreados.push({
+									nombre: item.nombre,
+									motivo: `depende de «${excluidoDelQueDepende}», que no se creó`
+								});
+							}
 							console.warn('Destino no encontrado, saltando técnica:', item.nombre);
 							continue;
 						}
@@ -588,12 +710,12 @@ export class ImportacionBorrador {
 			// T-2.it7: lo aceptado se SUMA a lo que la entrada ya tuviera
 			// (reintento de una importación ya "Importada").
 			await this.guardarAceptado(histId, creado, { estado: 'importada', error: null });
-			return true;
+			return { ok: true, ghostToReal, noCreados };
 		} catch (err) {
 			this.errorInsert = err instanceof Error ? err.message : String(err);
 			// Lo que sí llegó a crearse no se pierde del historial.
 			await this.guardarAceptado(histId, creado, { estado: 'fallo', error: this.errorInsert });
-			return false;
+			return { ok: false };
 		} finally {
 			this.inserting = false;
 		}

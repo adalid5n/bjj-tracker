@@ -23,12 +23,16 @@
 		open = $bindable(false),
 		borrador: b,
 		onClose,
-		onCatalogChanged
+		onVerEnMapa
 	}: {
 		open?: boolean;
 		borrador: ImportacionBorrador;
 		onClose?: () => void;
-		onCatalogChanged?: () => void;
+		/**
+		 * T-3.it7: "Ver en el mapa" en "Añadir detalles". La página cierra
+		 * fichas y diálogo y entra en la vista previa (nada se escribe).
+		 */
+		onVerEnMapa?: () => void;
 	} = $props();
 
 	let confirmDescartarOpen = $state(false);
@@ -189,15 +193,6 @@
 		deberiaGrabar = true;
 		recognition.start();
 		grabando = true;
-	}
-
-	async function handleConfirmar() {
-		const ok = await b.confirmar();
-		if (!ok) return;
-		onCatalogChanged?.();
-		open = false;
-		onClose?.();
-		b.reset();
 	}
 </script>
 
@@ -719,13 +714,8 @@
 				<Button variant="outline" onclick={() => (b.paso = 'review')}>
 					← Volver
 				</Button>
-				<Button onclick={handleConfirmar} disabled={b.inserting}>
-					{#if b.inserting}
-						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
-						Insertando…
-					{:else}
-						Confirmar e insertar
-					{/if}
+				<Button onclick={() => onVerEnMapa?.()} disabled={b.inserting}>
+					Ver en el mapa
 				</Button>
 			</div>
 		{/if}

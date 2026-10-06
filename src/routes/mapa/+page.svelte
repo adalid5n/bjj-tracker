@@ -14,11 +14,16 @@
 	import MapaModalHost from '$lib/components/MapaModalHost.svelte';
 	import MultiChips from '$lib/components/MultiChips.svelte';
 	import { mapaModalStack, type MapaModalEntry } from '$lib/components/mapa-modal-stack.svelte';
-	import { buildGrafoElements } from '$lib/grafo';
+	import { buildGrafoElements, buildPreviewElements, type ClaveBorrador, type GrafoElements } from '$lib/grafo';
 	import { useMediaQuery } from '$lib/hooks/use-media.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import ImportarClaseDialog from '$lib/components/ImportarClaseDialog.svelte';
-	import { ImportacionBorrador } from '$lib/importacion-borrador.svelte';
+	import {
+		ImportacionBorrador,
+		filtrarPorDisciplinaImportacion,
+		type DisciplinaPaso,
+		type NoCreado
+	} from '$lib/importacion-borrador.svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
@@ -106,6 +111,11 @@
 		'escape'
 	];
 
+	// T-3.it7: el borrador de la importación vive en la página (no en el
+	// diálogo) para sobrevivir al cierre del diálogo durante la vista
+	// previa. Instancia por página: salir de /mapa lo pierde.
+	const borrador = new ImportacionBorrador();
+
 	let posiciones = $state<Posicion[]>([]);
 	let sumisiones = $state<SumisionTerminal[]>([]);
 	let tecnicas = $state<Tecnica[]>([]);
@@ -173,6 +183,7 @@
 		{
 			saveLayout: () => Promise<void>;
 			reorganize: () => void;
+			transferPreviewPositions: (ghostToReal: Map<string, string>) => void;
 			panToEntity: (
 				target: { kind: 'posicion' | 'sumision' | 'tecnica'; id: string },
 				presentation: 'dialog' | 'sheet-side' | 'sheet-bottom'
@@ -261,7 +272,12 @@
 		mostrarConfirmDescartarGrafo = true;
 	});
 
-	async function refresh() {
+	/**
+	 * `despues` (T-3.it7) se ejecuta en el mismo tick en que llega el
+	 * catálogo nuevo, para salir de la vista previa sin un frame
+	 * intermedio con el grafo viejo.
+	 */
+	async function refresh(despues?: () => void) {
 		try {
 			await settings.init();
 			const { listPosiciones } = await import('$lib/posiciones');
@@ -273,8 +289,10 @@
 				listTags(),
 				getAllTagsPerPosicion()
 			]);
+			despues?.();
 			status = 'ready';
 		} catch (err) {
+			despues?.();
 			errorMessage = err instanceof Error ? err.message : String(err);
 			status = 'error';
 			console.error('[mapa] refresh failed:', err);
@@ -337,21 +355,28 @@
 
 	const queryNormalized = $derived(query.trim().toLowerCase());
 
-	// Filtra por disciplina activa: muestra la disciplina seleccionada + ambos.
+	// T-3.it7: vista previa de importación. Un solo flag gobierna todos
+	// los bloqueos de la página. Cada paso muestra su disciplina como
+	// override de vista (sin tocar `settings`).
+	const previewActivo = $derived(borrador.paso === 'preview');
+	const pasosPreview = $derived(borrador.pasosPreview);
+	const ultimoPasoPreview = $derived(borrador.pasoPreview >= pasosPreview.length - 1);
+	const disciplinaPaso = $derived<DisciplinaPaso | null>(
+		previewActivo ? (pasosPreview[borrador.pasoPreview] ?? null) : null
+	);
+	const disciplinaVista = $derived(disciplinaPaso ?? settings.disciplinaActiva);
+	const DISCIPLINA_LABEL: Record<DisciplinaPaso, string> = { bjj: 'BJJ', grappling: 'Grappling' };
+
+	// Filtra por disciplina visible: la seleccionada (o la del paso de la
+	// vista previa) + ambos.
 	const posicionesPorDisciplina = $derived(
-		posiciones.filter(
-			(p) => p.disciplina === settings.disciplinaActiva || p.disciplina === 'ambos'
-		)
+		posiciones.filter((p) => p.disciplina === disciplinaVista || p.disciplina === 'ambos')
 	);
 	const sumisionesPorDisciplina = $derived(
-		sumisiones.filter(
-			(s) => s.disciplina === settings.disciplinaActiva || s.disciplina === 'ambos'
-		)
+		sumisiones.filter((s) => s.disciplina === disciplinaVista || s.disciplina === 'ambos')
 	);
 	const tecnicasPorDisciplina = $derived(
-		tecnicas.filter(
-			(t) => t.disciplina === settings.disciplinaActiva || t.disciplina === 'ambos'
-		)
+		tecnicas.filter((t) => t.disciplina === disciplinaVista || t.disciplina === 'ambos')
 	);
 
 	const posicionesFiltradas = $derived(
@@ -463,9 +488,145 @@
 
 	// Elementos del grafo (nodos + aristas) derivados del catálogo. Se
 	// recalculan solo cuando cambia el catálogo, no en cada render.
+	type PreviewPaso =
+		| {
+				ok: true;
+				elements: GrafoElements;
+				recuento: { posiciones: number; sumisiones: number; tecnicas: number };
+		  }
+		| { ok: false; motivo: string; elementos: { clave: ClaveBorrador; nombre: string }[] };
+
+	// T-3.it7: grafo del paso actual de la vista previa (catálogo de la
+	// disciplina del paso + lo nuevo). Si el paso no se puede preparar, se
+	// devuelve el motivo breve y el lienzo no pinta la vista previa.
+	const previewPaso = $derived.by<PreviewPaso | null>(() => {
+		if (!previewActivo || !disciplinaPaso) return null;
+		try {
+			const r = buildPreviewElements(
+				{
+					posiciones: posicionesPorDisciplina,
+					sumisiones: sumisionesPorDisciplina,
+					tecnicas: tecnicasPorDisciplina
+				},
+				{
+					posiciones: filtrarPorDisciplinaImportacion(posiciones, borrador.disciplina),
+					sumisiones: filtrarPorDisciplinaImportacion(sumisiones, borrador.disciplina)
+				},
+				{
+					posiciones: borrador.posicionesDraft,
+					sumisiones: borrador.sumisionesDraft,
+					tecnicas: borrador.tecnicasDraft
+				},
+				new Set(borrador.excluidosPorError.map((e) => e.clave))
+			);
+			if (r.problemas.length > 0) {
+				return {
+					ok: false,
+					motivo: r.problemas.map((p) => p.motivo).join('; '),
+					elementos: r.problemas.flatMap((p) => p.elementos)
+				};
+			}
+			return { ok: true, elements: { nodes: r.nodes, edges: r.edges }, recuento: r.recuento };
+		} catch (err) {
+			console.error('[mapa] vista previa no disponible:', err);
+			return {
+				ok: false,
+				motivo: `no se pudo preparar el mapa de ${DISCIPLINA_LABEL[disciplinaPaso]}`,
+				elementos: []
+			};
+		}
+	});
+
+	function textoRecuento(r: { posiciones: number; sumisiones: number; tecnicas: number }): string {
+		const partes: string[] = [];
+		if (r.posiciones) partes.push(`${r.posiciones} ${r.posiciones === 1 ? 'posición' : 'posiciones'}`);
+		if (r.sumisiones) partes.push(`${r.sumisiones} ${r.sumisiones === 1 ? 'sumisión' : 'sumisiones'}`);
+		if (r.tecnicas) partes.push(`${r.tecnicas} ${r.tecnicas === 1 ? 'técnica' : 'técnicas'}`);
+		if (partes.length === 0) return 'Nada nuevo en este mapa';
+		const total = r.posiciones + r.sumisiones + r.tecnicas;
+		const lista = partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}`;
+		return `${lista} ${total === 1 ? 'nueva' : 'nuevas'}`;
+	}
+
+	// Elementos del grafo (nodos + aristas) derivados del catálogo. Se
+	// recalculan solo cuando cambia el catálogo, no en cada render.
 	const grafoElements = $derived(
-		buildGrafoElements(posicionesPorDisciplina, sumisionesPorDisciplina, tecnicasPorDisciplina)
+		previewPaso?.ok
+			? previewPaso.elements
+			: buildGrafoElements(posicionesPorDisciplina, sumisionesPorDisciplina, tecnicasPorDisciplina)
 	);
+
+	// Durante la vista previa el grafo ignora los filtros de la página
+	// (sin tocarlos: al salir vuelven solos).
+	const SIN_FILTRO: string[] = [];
+
+	let alturaBarraPreview = $state(0);
+	let aceptandoPreview = $state(false);
+	let errorAceptarPreview = $state<string | null>(null);
+	// Tras aceptar: elementos que no se crearon (pasos con error saltados).
+	let avisoNoCreados = $state<NoCreado[]>([]);
+
+	/**
+	 * "Ver en el mapa" (paso "Añadir detalles"): cierra fichas (respetando
+	 * wizards sucios) y el diálogo, fuerza vista Grafo y entra en la vista
+	 * previa. Nada se escribe.
+	 */
+	function verEnMapa() {
+		const entrar = () => {
+			importarDialogOpen = false;
+			grafoEditing = false;
+			vistaPrincipal = 'grafo';
+			errorAceptarPreview = null;
+			avisoNoCreados = [];
+			borrador.entrarPreview();
+		};
+		if (modalHost) modalHost.attemptCloseAll(entrar);
+		else entrar();
+	}
+
+	/** Cancelar / Retroceder: vuelve al diálogo en "Revisar propuesta". */
+	function cancelarPreview() {
+		if (aceptandoPreview) return;
+		errorAceptarPreview = null;
+		borrador.salirPreview();
+		importarDialogOpen = true;
+	}
+
+	function siguientePreview() {
+		if (!previewPaso) return;
+		borrador.siguientePreview(
+			previewPaso.ok ? undefined : { motivo: previewPaso.motivo, elementos: previewPaso.elementos }
+		);
+	}
+
+	/**
+	 * Aceptar (solo último paso): inserta UNA vez, conserva la posición en
+	 * pantalla de lo nuevo, cambia la disciplina activa a la del último
+	 * paso y sale del modo quedándose en el mapa.
+	 */
+	async function aceptarPreview() {
+		if (aceptandoPreview || !ultimoPasoPreview || !previewPaso?.ok) return;
+		aceptandoPreview = true;
+		errorAceptarPreview = null;
+		try {
+			const disciplinaFinal = pasosPreview[pasosPreview.length - 1];
+			const res = await borrador.confirmar();
+			if (!res.ok) {
+				errorAceptarPreview = borrador.errorInsert ?? 'No se pudo completar la importación.';
+				return;
+			}
+			grafoComponent?.transferPreviewPositions(res.ghostToReal);
+			if (disciplinaFinal !== settings.disciplinaActiva) {
+				await settings.setDisciplinaActiva(disciplinaFinal);
+			}
+			await refresh(() => borrador.reset());
+			avisoNoCreados = res.noCreados;
+		} catch (err) {
+			errorAceptarPreview = err instanceof Error ? err.message : String(err);
+		} finally {
+			aceptandoPreview = false;
+		}
+	}
 
 	// Helper: cierra el modal actual respetando el dirty handler, y solo
 	// cuando el cierre se confirma (inmediato si limpio, tras "Descartar"
@@ -496,10 +657,6 @@
 	}
 
 	let importarDialogOpen = $state(false);
-	// T-3.it7: el borrador de la importación vive en la página (no en el
-	// diálogo) para sobrevivir al cierre del diálogo durante la vista
-	// previa. Instancia por página: salir de /mapa lo pierde.
-	const borrador = new ImportacionBorrador();
 
 	// T-2.it7: historial de importaciones.
 	let historialOpen = $state(false);
@@ -616,7 +773,7 @@
 			<p class="font-semibold text-destructive">Error</p>
 			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
-	{:else if catalogoVacio}
+	{:else if catalogoVacio && !previewActivo}
 		<!-- T-2.it7: con catálogo vacío no hay sub-header; solo el icono de historial. -->
 		<div class="flex justify-end">
 			<Button
@@ -665,7 +822,8 @@
 						type="button"
 						role="tab"
 						aria-selected={vistaPrincipal === 'grafo'}
-						class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
+						disabled={previewActivo}
+						class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
 						'grafo'
 							? 'bg-background text-foreground shadow-sm'
 							: 'text-muted-foreground hover:text-foreground'}"
@@ -677,7 +835,8 @@
 						type="button"
 						role="tab"
 						aria-selected={vistaPrincipal === 'lista'}
-						class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
+						disabled={previewActivo}
+						class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-ring focus-visible:outline-none {vistaPrincipal ===
 						'lista'
 							? 'bg-background text-foreground shadow-sm'
 							: 'text-muted-foreground hover:text-foreground'}"
@@ -696,9 +855,10 @@
 						{#each OPCIONES_DISCIPLINA as opt (opt.value)}
 							<button
 								type="button"
-								aria-pressed={settings.disciplinaActiva === opt.value}
+								aria-pressed={disciplinaVista === opt.value}
+								disabled={previewActivo}
 								onclick={() => elegirDisciplina(opt.value)}
-								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {settings.disciplinaActiva === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none {disciplinaVista === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'} {previewActivo && disciplinaVista !== opt.value ? 'opacity-50' : ''}"
 							>
 								{opt.label}
 							</button>
@@ -709,6 +869,7 @@
 					<Button
 						variant="ghost"
 						size="icon-sm"
+						disabled={previewActivo}
 						onclick={abrirHistorial}
 						aria-label="Historial de importaciones"
 						title="Historial de importaciones"
@@ -813,6 +974,11 @@
 						/>
 					{/if}
 				</div>
+			{:else if previewActivo}
+				<!-- T-3.it7: durante la vista previa no hay filtros ni organización. -->
+				<p class="flex min-h-9 items-center text-xs text-muted-foreground">
+					Filtros y organización desactivados durante la vista previa.
+				</p>
 			{:else}
 				<!--
 				  Filtros del grafo (T-4.it3) en una sola fila con dropdowns
@@ -899,8 +1065,13 @@
 			  100dvh − 13rem (header 14 + sub-header ~6 + nav 14 + padding).
 			  En desktop volvemos al wrapper acotado con altura `70vh`.
 			-->
+			<!--
+			  T-3.it7: en vista previa el lienzo se encoge por abajo lo que
+			  mide la barra fija, para que la barra no tape lo nuevo.
+			-->
 			<div
 				class="-mx-4 -mb-28 h-[calc(100dvh-13rem)] bg-muted/20 sm:mx-0 sm:mb-0 sm:h-[70vh]"
+				style:padding-bottom={previewActivo ? `${alturaBarraPreview}px` : undefined}
 			>
 				<GrafoMapa
 					bind:this={grafoComponent}
@@ -908,11 +1079,12 @@
 					bind:editing={grafoEditing}
 					nodes={grafoElements.nodes}
 					edges={grafoElements.edges}
-					tipos={tiposGrafo}
-					estados={estadosGrafo}
-					categorias={categoriasGrafo}
+					tipos={previewActivo ? SIN_FILTRO : tiposGrafo}
+					estados={previewActivo ? SIN_FILTRO : estadosGrafo}
+					categorias={previewActivo ? SIN_FILTRO : categoriasGrafo}
 					onAttemptPush={attemptPushModal}
 					{selectedGraphId}
+					preview={previewActivo}
 				/>
 			</div>
 		{:else if subVistaLista === 'posiciones'}
@@ -1076,7 +1248,7 @@
   encima del BottomNav, y el Content del DropdownMenu se monta vía Portal
   (bits-ui) por lo que se renderiza fuera de cualquier overflow.
 -->
-{#if status === 'ready'}
+{#if status === 'ready' && !previewActivo}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			{#snippet child({ props })}
@@ -1097,6 +1269,84 @@
 			<DropdownMenu.Item onSelect={abrirImportarNueva}>✨ Importar de clase</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
+{/if}
+
+<!--
+  T-3.it7: barra fija de la vista previa de importación, sobre la
+  BottomNav (mismo sitio que la barra de etiquetado masivo). Indicador
+  del paso siempre visible; recuento o "No se puede: …"; botones según
+  el paso. En móvil estrecho, texto en una fila y botones en otra.
+-->
+{#if previewActivo && disciplinaPaso}
+	<div
+		bind:clientHeight={alturaBarraPreview}
+		class="fixed right-0 bottom-14 left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg"
+		role="region"
+		aria-label="Vista previa de importación"
+	>
+		<div class="mx-auto flex max-w-2xl flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+			<div class="min-w-0 flex-1" aria-live="polite">
+				<p class="flex items-center gap-2 text-sm font-semibold">
+					<span class="inline-block size-2.5 shrink-0 rounded-full bg-highlight" aria-hidden="true"></span>
+					Vista previa {borrador.pasoPreview + 1} de {pasosPreview.length} · {DISCIPLINA_LABEL[disciplinaPaso]}
+				</p>
+				{#if previewPaso?.ok}
+					<p class="text-xs text-muted-foreground">{textoRecuento(previewPaso.recuento)}</p>
+				{:else if previewPaso}
+					<p class="text-xs text-destructive">No se puede: {previewPaso.motivo}</p>
+				{/if}
+				{#if errorAceptarPreview}
+					<p class="text-xs text-destructive">{errorAceptarPreview}</p>
+				{/if}
+			</div>
+			<div class="flex flex-wrap justify-end gap-2">
+				{#if previewPaso?.ok}
+					{#if borrador.pasoPreview > 0}
+						<Button variant="outline" size="sm" onclick={() => borrador.atrasPreview()} disabled={aceptandoPreview}>
+							← Atrás
+						</Button>
+					{/if}
+					<Button variant="outline" size="sm" onclick={cancelarPreview} disabled={aceptandoPreview}>
+						Cancelar
+					</Button>
+					{#if !ultimoPasoPreview}
+						<Button size="sm" onclick={siguientePreview}>
+							Siguiente: {DISCIPLINA_LABEL[pasosPreview[borrador.pasoPreview + 1]]} →
+						</Button>
+					{:else}
+						<Button size="sm" onclick={aceptarPreview} disabled={aceptandoPreview}>
+							{aceptandoPreview ? 'Creando…' : 'Aceptar'}
+						</Button>
+					{/if}
+				{:else}
+					<Button variant="outline" size="sm" onclick={cancelarPreview}>Retroceder</Button>
+					{#if !ultimoPasoPreview}
+						<Button size="sm" onclick={siguientePreview}>Seguir con la siguiente disciplina</Button>
+					{/if}
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- T-3.it7: aviso tras aceptar de lo que no se creó (pasos con error saltados). -->
+{#if avisoNoCreados.length > 0 && !previewActivo}
+	<div
+		class="fixed right-0 bottom-14 left-0 z-40 border-t border-warning/40 bg-card px-4 py-3 shadow-lg"
+		role="status"
+	>
+		<div class="mx-auto flex max-w-2xl items-start gap-3">
+			<div class="min-w-0 flex-1 text-sm">
+				<p class="font-medium text-warning">No se creó:</p>
+				<ul class="mt-1 space-y-0.5 text-xs text-muted-foreground">
+					{#each avisoNoCreados as nc, i (i)}
+						<li><span class="font-medium text-foreground">«{nc.nombre}»</span> — {nc.motivo}</li>
+					{/each}
+				</ul>
+			</div>
+			<Button variant="outline" size="sm" onclick={() => (avisoNoCreados = [])}>Entendido</Button>
+		</div>
+	</div>
 {/if}
 
 <!-- Panel bulk edit tags (visible cuando hay selección activa) -->
@@ -1151,7 +1401,7 @@
 	onClose={() => {
 		importarDialogOpen = false;
 	}}
-	onCatalogChanged={refresh}
+	onVerEnMapa={verEnMapa}
 />
 
 <HistorialImportacionesPanel bind:open={historialOpen} onReintentar={reintentarImportacion} />
