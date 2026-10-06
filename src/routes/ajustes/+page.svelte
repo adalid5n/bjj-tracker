@@ -47,8 +47,8 @@
 	// Acepta tanto el payload (arrays) como el resumen del importAll (números),
 	// gracias a que ambos exponen `.length` o número directo en las mismas keys.
 	type Countable =
-		| { companeros: unknown[]; sesiones: unknown[]; rolls: unknown[]; posiciones: unknown[]; sumisiones_terminales: unknown[]; tecnicas: unknown[]; tecnica_contras: unknown[] }
-		| { companeros: number; sesiones: number; rolls: number; posiciones: number; sumisiones_terminales: number; tecnicas: number; tecnica_contras: number };
+		| { companeros: unknown[]; sesiones: unknown[]; rolls: unknown[]; posiciones: unknown[]; sumisiones_terminales: unknown[]; tecnicas: unknown[]; tecnica_contras: unknown[]; tags: unknown[]; importaciones: unknown[] }
+		| { companeros: number; sesiones: number; rolls: number; posiciones: number; sumisiones_terminales: number; tecnicas: number; tecnica_contras: number; tags: number; importaciones: number };
 
 	function n(v: unknown[] | number): number {
 		return typeof v === 'number' ? v : v.length;
@@ -66,7 +66,9 @@
 			pl(n(x.posiciones), 'posición', 'posiciones'),
 			pl(n(x.sumisiones_terminales), 'sumisión', 'sumisiones'),
 			pl(n(x.tecnicas), 'técnica', 'técnicas'),
-			pl(n(x.tecnica_contras), 'contra', 'contras')
+			pl(n(x.tecnica_contras), 'contra', 'contras'),
+			pl(n(x.tags), 'etiqueta', 'etiquetas'),
+			pl(n(x.importaciones), 'importación', 'importaciones')
 		].join(' · ');
 	}
 

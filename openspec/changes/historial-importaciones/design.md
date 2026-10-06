@@ -104,7 +104,7 @@ actualiza la misma entrada**:
 | normalización / propuesta / refinado KO | estado `fallo`, `error` = mensaje de usuario |
 | propuesta OK (tras validación) y refinado OK | estado `sin_terminar`, `error = null` (la propuesta no se guarda) |
 | `handleConfirmar` al terminar | `aceptado_json` = lo aceptado ya guardado en la entrada (si había) + lo creado de verdad en este intento (ids de los `create*`), estado `importada` |
-| `resetState()` | `importacionId = null` (cerrar no borra nada). El `AlertDialog` de cierre usa el texto "¿Cerrar? Quedará en el historial como Sin terminar" cuando `importacionId` no es null |
+| `resetState()` | `importacionId = null` (cerrar no borra nada). El `AlertDialog` de cierre usa el texto "¿Cerrar? La importación queda guardada en el historial" cuando `importacionId` no es null |
 
 Las escrituras del historial van en `try/catch` propio: un fallo al
 guardar historial **no** bloquea la importación (se loguea).

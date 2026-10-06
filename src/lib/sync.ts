@@ -4,11 +4,22 @@
  *
  * Modelo de uso (REQUISITOS §10.3):
  * - Sin merge selectivo. Import = wipe + replace.
- * - schema_version validado strict; mismatch → error claro.
+ * - `schema_version` es la versión del FORMATO DEL FICHERO, no la de la
+ *   BD (que va por `LATEST_SCHEMA_VERSION` en `db/schema.ts`). Solo sube
+ *   cuando cambia lo que contiene el fichero; alinearla con la BD
+ *   obligaría a subirla en cada migración aunque el fichero no cambie.
+ *   Historial:
+ *     6 → catálogo + entrenos + grafo + ajustes (sin etiquetas).
+ *     7 → (T-2.it7) + `tags`, `posicion_tags`, `importaciones`; el
+ *         import restaura además la `disciplina` del catálogo.
+ * - Se aceptan la versión actual y la inmediatamente anterior
+ *   (`PREVIOUS_SCHEMA_VERSION`): a un fichero v6 le faltan las tablas
+ *   nuevas, que se tratan como vacías. Cualquier otra → error claro.
  * - Para sync entre dispositivos hasta que llegue mecanismo automático.
  */
 
 import { init, query, run } from '$lib/db';
+import type { ImportacionRow } from '$lib/importaciones';
 import type {
 	Companero,
 	Posicion,
@@ -16,10 +27,14 @@ import type {
 	Sesion,
 	SumisionTerminal,
 	Tecnica,
-	TecnicaContra
+	TecnicaContra,
+	Tag
 } from '$lib/types';
 
-export const CURRENT_SCHEMA_VERSION = 6;
+/** Versión del formato de fichero de copia (no la de la BD). */
+export const CURRENT_SCHEMA_VERSION = 7;
+/** Formato anterior aceptado al importar (sin etiquetas ni historial). */
+export const PREVIOUS_SCHEMA_VERSION = 6;
 
 // T-3.it2: filas de las tablas pivot `roll_tecnica` y `roll_posicion`.
 // `resultado` es 'fue_bien' | 'fallo' (CHECK en SQL). La PK compuesta
@@ -55,6 +70,12 @@ export type AppSettingRow = {
 	value: string;
 };
 
+// T-2.it7: pivot posición ↔ etiqueta (schema v7 de la BD).
+export type PosicionTagRow = {
+	posicion_id: string;
+	tag_id: string;
+};
+
 export type ExportPayload = {
 	schema_version: number;
 	exported_at: string;
@@ -69,6 +90,9 @@ export type ExportPayload = {
 	roll_tecnica: RollTecnicaRow[];
 	grafo_layout: GrafoLayoutDbRow[];
 	app_settings: AppSettingRow[];
+	tags: Tag[];
+	posicion_tags: PosicionTagRow[];
+	importaciones: ImportacionRow[];
 };
 
 export async function exportAll(): Promise<ExportPayload> {
@@ -84,7 +108,10 @@ export async function exportAll(): Promise<ExportPayload> {
 		rollPosicion,
 		rollTecnica,
 		grafoLayout,
-		appSettings
+		appSettings,
+		tags,
+		posicionTags,
+		importaciones
 	] = await Promise.all([
 		query<Companero>('SELECT * FROM companeros ORDER BY created_at'),
 		query<Sesion>('SELECT * FROM sesiones ORDER BY created_at'),
@@ -102,7 +129,12 @@ export async function exportAll(): Promise<ExportPayload> {
 		query<GrafoLayoutDbRow>(
 			'SELECT entidad_id, kind, x, y FROM grafo_layout ORDER BY entidad_id, kind'
 		),
-		query<AppSettingRow>('SELECT key, value FROM app_settings ORDER BY key')
+		query<AppSettingRow>('SELECT key, value FROM app_settings ORDER BY key'),
+		query<Tag>('SELECT id, nombre, color, created_at FROM tags ORDER BY created_at'),
+		query<PosicionTagRow>(
+			'SELECT posicion_id, tag_id FROM posicion_tags ORDER BY posicion_id, tag_id'
+		),
+		query<ImportacionRow>('SELECT * FROM importaciones ORDER BY created_at')
 	]);
 	return {
 		schema_version: CURRENT_SCHEMA_VERSION,
@@ -117,7 +149,10 @@ export async function exportAll(): Promise<ExportPayload> {
 		roll_posicion: rollPosicion,
 		roll_tecnica: rollTecnica,
 		grafo_layout: grafoLayout,
-		app_settings: appSettings
+		app_settings: appSettings,
+		tags,
+		posicion_tags: posicionTags,
+		importaciones
 	};
 }
 
@@ -150,6 +185,11 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 		'grafo_layout',
 		'app_settings'
 	];
+	// Tablas que solo exige el formato actual (v7). En ficheros v6 no
+	// existen y se tratan como vacías (ver `normalizarPayload`).
+	if (p.schema_version === CURRENT_SCHEMA_VERSION) {
+		requiredArrays.push('tags', 'posicion_tags', 'importaciones');
+	}
 	for (const key of requiredArrays) {
 		if (!Array.isArray(p[key])) {
 			throw new Error(`Falta la tabla "${key}" en el JSON (o no es un array).`);
@@ -157,10 +197,21 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 	}
 }
 
+/** Fichero v6 → forma v7: tablas ausentes como arrays vacíos. */
+function normalizarPayload(payload: ExportPayload): ExportPayload {
+	return {
+		...payload,
+		tags: Array.isArray(payload.tags) ? payload.tags : [],
+		posicion_tags: Array.isArray(payload.posicion_tags) ? payload.posicion_tags : [],
+		importaciones: Array.isArray(payload.importaciones) ? payload.importaciones : []
+	};
+}
+
 /**
  * Reemplaza TODA la BD con el contenido del payload.
  * Borra todas las tablas en orden de FK y luego inserta lo nuevo.
- * Si schema_version no coincide con CURRENT_SCHEMA_VERSION → throws.
+ * Acepta schema_version = CURRENT_SCHEMA_VERSION o PREVIOUS_SCHEMA_VERSION;
+ * cualquier otra → throws (sin tocar la BD).
  */
 export async function importAll(payload: unknown): Promise<{
 	companeros: number;
@@ -174,14 +225,24 @@ export async function importAll(payload: unknown): Promise<{
 	roll_tecnica: number;
 	grafo_layout: number;
 	app_settings: number;
+	tags: number;
+	posicion_tags: number;
+	importaciones: number;
 }> {
-	assertExportShape(payload);
-
-	if (payload.schema_version !== CURRENT_SCHEMA_VERSION) {
-		throw new Error(
-			`Versión incompatible. El fichero usa schema_version=${payload.schema_version}, esta app espera ${CURRENT_SCHEMA_VERSION}.`
-		);
+	if (
+		payload &&
+		typeof payload === 'object' &&
+		typeof (payload as Record<string, unknown>).schema_version === 'number'
+	) {
+		const v = (payload as Record<string, unknown>).schema_version as number;
+		if (v !== CURRENT_SCHEMA_VERSION && v !== PREVIOUS_SCHEMA_VERSION) {
+			throw new Error(
+				`Versión incompatible. El fichero usa schema_version=${v}, esta app acepta ${PREVIOUS_SCHEMA_VERSION} o ${CURRENT_SCHEMA_VERSION}.`
+			);
+		}
 	}
+	assertExportShape(payload);
+	const datos = normalizarPayload(payload);
 
 	await init();
 
@@ -199,6 +260,9 @@ export async function importAll(payload: unknown): Promise<{
 			// necesario con FK OFF, pero mantenemos el orden por claridad.
 			// `grafo_layout` y `app_settings` no tienen FK; orden
 			// indiferente, los borramos con los demás "hijos" del catálogo.
+			await run('DELETE FROM importaciones');
+			await run('DELETE FROM posicion_tags');
+			await run('DELETE FROM tags');
 			await run('DELETE FROM app_settings');
 			await run('DELETE FROM grafo_layout');
 			await run('DELETE FROM roll_tecnica');
@@ -211,7 +275,7 @@ export async function importAll(payload: unknown): Promise<{
 			await run('DELETE FROM posiciones');
 			await run('DELETE FROM companeros');
 
-			await insertAll(payload);
+			await insertAll(datos);
 
 			await run('COMMIT');
 		} catch (e) {
@@ -245,7 +309,10 @@ export async function importAll(payload: unknown): Promise<{
 		roll_posicion: payload.roll_posicion.length,
 		roll_tecnica: payload.roll_tecnica.length,
 		grafo_layout: payload.grafo_layout.length,
-		app_settings: payload.app_settings.length
+		app_settings: payload.app_settings.length,
+		tags: datos.tags.length,
+		posicion_tags: datos.posicion_tags.length,
+		importaciones: datos.importaciones.length
 	};
 }
 
@@ -271,8 +338,8 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 
 	for (const p of payload.posiciones) {
 		await run(
-			`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, posicion_complementaria_id, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO posiciones (id, nombre, categoria, tipo, notas, posicion_complementaria_id, disciplina, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				p.id,
 				p.nombre,
@@ -280,6 +347,7 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 				p.tipo ?? null,
 				p.notas,
 				p.posicion_complementaria_id ?? null,
+				p.disciplina ?? 'bjj',
 				p.created_at,
 				p.updated_at
 			]
@@ -288,9 +356,9 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 
 	for (const s of payload.sumisiones_terminales) {
 		await run(
-			`INSERT INTO sumisiones_terminales (id, nombre, notas, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?)`,
-			[s.id, s.nombre, s.notas, s.created_at, s.updated_at]
+			`INSERT INTO sumisiones_terminales (id, nombre, notas, disciplina, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			[s.id, s.nombre, s.notas, s.disciplina ?? 'bjj', s.created_at, s.updated_at]
 		);
 	}
 
@@ -316,8 +384,8 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 			`INSERT INTO tecnicas (
 				id, nombre, variante, posicion_origen_id, posicion_destino_id,
 				sumision_destino_id, tipo, estado, detalles, errores_comunes,
-				created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				disciplina, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				t.id,
 				t.nombre,
@@ -329,6 +397,7 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 				t.estado,
 				t.detalles,
 				t.errores_comunes,
+				t.disciplina ?? 'bjj',
 				t.created_at,
 				t.updated_at
 			]
@@ -393,5 +462,41 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 
 	for (const s of payload.app_settings) {
 		await run(`INSERT INTO app_settings (key, value) VALUES (?, ?)`, [s.key, s.value]);
+	}
+
+	// T-2.it7: etiquetas y su pivot con posiciones.
+	for (const t of payload.tags) {
+		await run(`INSERT INTO tags (id, nombre, color, created_at) VALUES (?, ?, ?, ?)`, [
+			t.id,
+			t.nombre,
+			t.color,
+			t.created_at
+		]);
+	}
+
+	for (const pt of payload.posicion_tags) {
+		await run(`INSERT INTO posicion_tags (posicion_id, tag_id) VALUES (?, ?)`, [
+			pt.posicion_id,
+			pt.tag_id
+		]);
+	}
+
+	// T-2.it7: historial de importaciones.
+	for (const im of payload.importaciones) {
+		await run(
+			`INSERT INTO importaciones (id, created_at, updated_at, titulo, titulo_origen, texto, aceptado_json, estado, error)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			[
+				im.id,
+				im.created_at,
+				im.updated_at,
+				im.titulo,
+				im.titulo_origen,
+				im.texto,
+				im.aceptado_json ?? null,
+				im.estado,
+				im.error ?? null
+			]
+		);
 	}
 }

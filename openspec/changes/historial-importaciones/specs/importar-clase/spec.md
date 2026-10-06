@@ -47,8 +47,7 @@ En esa misma petición la IA SHALL proponer un título corto para el historial.
 Cerrar la ventana (botón Cancelar, tecla Escape o pulsar fuera) SHALL
 pedir confirmación si hay texto escrito o se ha pasado del primer paso.
 Si no hay nada, MUST cerrarse directamente. Si ya se pulsó "Analizar
-clase", la confirmación SHALL ser "¿Cerrar? Quedará en el historial como
-Sin terminar" y cerrar MUST NOT borrar la entrada del historial. Si aún
+clase", la confirmación SHALL ser "¿Cerrar? La importación queda guardada en el historial" y cerrar MUST NOT borrar la entrada del historial. Si aún
 no se ha analizado, la confirmación sigue siendo "¿Descartar la importación?".
 
 #### Scenario: Cancelar con datos
@@ -61,7 +60,7 @@ no se ha analizado, la confirmación sigue siendo "¿Descartar la importación?"
 
 #### Scenario: Cancelar tras analizar
 - **WHEN** el usuario analizó la clase, está revisando la propuesta y pulsa "Cancelar"
-- **THEN** aparece "¿Cerrar? Quedará en el historial como Sin terminar"; si confirma, la ventana se cierra y la importación sigue en el historial en estado "Sin terminar"
+- **THEN** aparece "¿Cerrar? La importación queda guardada en el historial"; si confirma, la ventana se cierra y la importación sigue en el historial en estado "Sin terminar"
 
 ## REMOVED Requirements
 

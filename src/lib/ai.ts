@@ -281,6 +281,8 @@ Responde ÚNICAMENTE con JSON (sin markdown):
 export type NormalizacionResult = {
 	textoConMarcas: string;
 	correcciones: { original: string; corregido: string }[];
+	/** T-2.it7: título corto (≤60 caracteres) para el historial de importaciones. */
+	titulo?: string;
 };
 
 export async function normalizarDescripcion(texto: string): Promise<NormalizacionResult> {
@@ -307,7 +309,8 @@ Responde ÚNICAMENTE con JSON (sin markdown):
   "correcciones": [
     { "original": "término exacto en el texto original", "corregido": "término corregido" }
   ],
-  "inciertos": ["término1", "término2"]
+  "inciertos": ["término1", "término2"],
+  "titulo": "string de máximo 60 caracteres que resuma la clase"
 }
 
 TEXTO ORIGINAL:
@@ -338,7 +341,9 @@ ${texto}`;
 	const textoConMarcas = (raw.texto as string | undefined)?.trim() ?? '';
 	const correcciones = (raw.correcciones as { original: string; corregido: string }[] | undefined) ?? [];
 	if (!textoConMarcas) throw new Error('AI_RESPONSE_INVALID');
-	return { textoConMarcas, correcciones };
+	const tituloRaw = typeof raw.titulo === 'string' ? raw.titulo.trim() : '';
+	const titulo = tituloRaw ? tituloRaw.slice(0, 60) : undefined;
+	return { textoConMarcas, correcciones, titulo };
 }
 
 export async function refinarPropuesta(

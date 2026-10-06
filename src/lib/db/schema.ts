@@ -399,8 +399,35 @@ function migrate8To9(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v10:
- *   { from: 9, to: 10, run: (db) => { ... } }
+ * DDL incremental para subir de schema v9 a v10 (T-2.it7).
+ *
+ * Historial de importaciones de clase. Cada fila guarda solo el último
+ * texto analizado y lo aceptado (JSON con ids + nombres de lo creado),
+ * más metadatos (título, origen del título, estado, error, fechas).
+ */
+export const SCHEMA_V10_MIGRATION = `
+CREATE TABLE importaciones (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  titulo_origen TEXT NOT NULL CHECK (titulo_origen IN ('ia','texto')),
+  texto TEXT NOT NULL,
+  aceptado_json TEXT,
+  estado TEXT NOT NULL CHECK (estado IN ('importada','sin_terminar','fallo')),
+  error TEXT
+);
+CREATE INDEX idx_importaciones_created_at ON importaciones(created_at);
+UPDATE schema_meta SET value = '10' WHERE key = 'version';
+`;
+
+function migrate9To10(db: MigrationDb): void {
+	db.exec(SCHEMA_V10_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v11:
+ *   { from: 10, to: 11, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
@@ -410,7 +437,8 @@ export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => v
 	{ from: 5, to: 6, run: migrate5To6 },
 	{ from: 6, to: 7, run: migrate6To7 },
 	{ from: 7, to: 8, run: migrate7To8 },
-	{ from: 8, to: 9, run: migrate8To9 }
+	{ from: 8, to: 9, run: migrate8To9 },
+	{ from: 9, to: 10, run: migrate9To10 }
 ];
 
 /**

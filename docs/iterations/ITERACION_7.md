@@ -93,7 +93,7 @@ texto interpretado y la propuesta no se guardan. Título corto de la IA en
 la petición existente, icono en la barra del mapa que abre un panel
 (lateral/inferior) con tarjetas desplegables, copiar por bloque (Texto y
 Aceptado), Reintentar (reutiliza la misma entrada), borrar con confirmación, nuevo aviso al
-cerrar ("¿Cerrar? Quedará en el historial como Sin terminar") e inclusión
+cerrar ("¿Cerrar? La importación queda guardada en el historial") e inclusión
 en la copia de seguridad. **Arregla la copia de seguridad**: hoy no
 exporta etiquetas (`tags`, `posicion_tags`) y al restaurar pierde la
 disciplina de posiciones, sumisiones y técnicas; se siguen aceptando
@@ -183,8 +183,7 @@ bloqueadas, salir del mapa).
   datos para sobrevivir al cambio de dispositivo. En T-2 se arregla
   también la pérdida de etiquetas y disciplina de la copia; se siguen
   aceptando ficheros de la versión anterior (historial vacío).
-- **Aviso al cerrar tras analizar:** "¿Cerrar? Quedará en el historial
-  como Sin terminar".
+- **Aviso al cerrar tras analizar:** "¿Cerrar? La importación queda guardada en el historial".
 - **Vista previa:** sobre el grafo real de `/mapa` (la ventana se
   cierra); lo nuevo late en color (no tamaño); técnicas = flechas,
   posiciones/sumisiones = nodos; las posiciones existentes que reciben

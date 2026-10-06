@@ -6,6 +6,8 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import SaveIcon from '@lucide/svelte/icons/save';
 	import MoveIcon from '@lucide/svelte/icons/move';
+	import HistoryIcon from '@lucide/svelte/icons/history';
+	import HistorialImportacionesPanel from '$lib/components/HistorialImportacionesPanel.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
 	import GrafoMapa from '$lib/components/GrafoMapa.svelte';
@@ -494,6 +496,33 @@
 
 	let importarDialogOpen = $state(false);
 
+	// T-2.it7: historial de importaciones. `reintento` lleva la entrada a
+	// reutilizar cuando el diálogo se abre desde "Reintentar"; se limpia al
+	// cerrar el diálogo o al abrirlo desde "Nuevo" → "Importar de clase".
+	let historialOpen = $state(false);
+	let reintento = $state<{ id: string; texto: string } | null>(null);
+
+	function abrirHistorial() {
+		// Cerrar antes el stack de fichas para no apilar dos paneles
+		// (respeta el aviso de cambios sin guardar de los wizards).
+		if (modalHost) {
+			modalHost.attemptCloseAll(() => (historialOpen = true));
+		} else {
+			historialOpen = true;
+		}
+	}
+
+	function abrirImportarNueva() {
+		reintento = null;
+		importarDialogOpen = true;
+	}
+
+	function reintentarImportacion(entrada: { id: string; texto: string }) {
+		historialOpen = false;
+		reintento = entrada;
+		importarDialogOpen = true;
+	}
+
 	function openWizardCrearPosicion() {
 		attemptPushModal({ kind: 'wizard-posicion', modo: 'crear', nombre: 'Nueva posición' });
 	}
@@ -586,6 +615,18 @@
 			<pre class="mt-2 text-sm whitespace-pre-wrap text-destructive">{errorMessage}</pre>
 		</div>
 	{:else if catalogoVacio}
+		<!-- T-2.it7: con catálogo vacío no hay sub-header; solo el icono de historial. -->
+		<div class="flex justify-end">
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				onclick={abrirHistorial}
+				aria-label="Historial de importaciones"
+				title="Historial de importaciones"
+			>
+				<HistoryIcon />
+			</Button>
+		</div>
 		<div class="rounded border border-dashed border-border p-8 text-center">
 			<p class="text-muted-foreground">Catálogo vacío.</p>
 			<p class="mt-1 text-sm text-muted-foreground">
@@ -662,6 +703,17 @@
 						{/each}
 					</div>
 				{/if}
+				<div class={settings.initialized ? '' : 'ml-auto'}>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						onclick={abrirHistorial}
+						aria-label="Historial de importaciones"
+						title="Historial de importaciones"
+					>
+						<HistoryIcon />
+					</Button>
+				</div>
 			</div>
 
 			<!--
@@ -1040,7 +1092,7 @@
 		<DropdownMenu.Content align="end" side="top" sideOffset={8}>
 			<DropdownMenu.Item onSelect={openWizardCrearPosicion}>Nueva posición</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={openWizardCrearSumision}>Nueva sumisión</DropdownMenu.Item>
-			<DropdownMenu.Item onSelect={() => (importarDialogOpen = true)}>✨ Importar de clase</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={abrirImportarNueva}>✨ Importar de clase</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 {/if}
@@ -1093,9 +1145,16 @@
 
 <ImportarClaseDialog
 	bind:open={importarDialogOpen}
-	onClose={() => (importarDialogOpen = false)}
+	onClose={() => {
+		importarDialogOpen = false;
+		reintento = null;
+	}}
 	onCatalogChanged={refresh}
+	textoInicial={reintento?.texto}
+	importacionIdInicial={reintento?.id}
 />
+
+<HistorialImportacionesPanel bind:open={historialOpen} onReintentar={reintentarImportacion} />
 
 <!--
   AlertDialog "¿Descartar cambios del grafo?" (T-9.b.it3). Se abre

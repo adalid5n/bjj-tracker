@@ -17,15 +17,31 @@
 	import type { CategoriaPosicion, TipoRolPosicion, TipoTecnica } from '$lib/types';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
+	import {
+		createImportacion,
+		getImportacion,
+		updateImportacion,
+		mergeAceptado,
+		parseAceptado,
+		tituloDeRespaldo,
+		type Aceptado,
+		type ImportacionPatch
+	} from '$lib/importaciones';
 
 	let {
 		open = $bindable(false),
 		onClose,
-		onCatalogChanged
+		onCatalogChanged,
+		textoInicial,
+		importacionIdInicial
 	}: {
 		open?: boolean;
 		onClose?: () => void;
 		onCatalogChanged?: () => void;
+		/** T-2.it7 "Reintentar": texto guardado precargado en el primer paso. */
+		textoInicial?: string;
+		/** T-2.it7 "Reintentar": entrada del historial que se reutiliza. */
+		importacionIdInicial?: string;
 	} = $props();
 
 	type PosicionItem = {
@@ -74,6 +90,10 @@
 	let validacionCorrecciones = $state<string[]>([]);
 	let validacionBannerAbierto = $state(true);
 	let confirmDescartarOpen = $state(false);
+	// T-2.it7: entrada del historial de esta importación. Se fija al primer
+	// "Analizar clase" o al abrir desde "Reintentar"; mientras no sea null,
+	// los siguientes análisis actualizan la misma entrada.
+	let importacionId = $state<string | null>(null);
 
 	let posicionesDraft = $state<PosicionItem[]>([]);
 	let sumisionesDraft = $state<SumisionItem[]>([]);
@@ -125,6 +145,32 @@
 			typeof window !== 'undefined' &&
 			('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 	});
+
+	// T-2.it7 "Reintentar": al abrirse con una entrada del historial,
+	// precarga su texto (editable) y reutiliza esa entrada.
+	let prevOpen = false;
+	$effect(() => {
+		const abierto = open;
+		if (abierto && !prevOpen && importacionIdInicial) {
+			importacionId = importacionIdInicial;
+			textoClase = textoInicial ?? '';
+			step = 'input';
+		}
+		prevOpen = abierto;
+	});
+
+	/**
+	 * Escritura en el historial protegida: un fallo al guardar historial
+	 * nunca bloquea la importación (solo se loguea).
+	 */
+	async function guardarHistorial(id: string | null, patch: ImportacionPatch) {
+		if (!id) return;
+		try {
+			await updateImportacion(id, patch);
+		} catch (e) {
+			console.warn('[historial] no se pudo actualizar la importación', id, e);
+		}
+	}
 
 	$effect(() => {
 		if (!open) {
@@ -193,6 +239,8 @@
 		propuestaActual = null;
 		validacionCorrecciones = [];
 		validacionBannerAbierto = true;
+		// Cerrar no borra nada del historial; solo suelta la referencia.
+		importacionId = null;
 	}
 
 	const tieneDatos = $derived(
@@ -269,17 +317,46 @@
 		loadingAI = true;
 		loadingLabel = 'Interpretando descripción…';
 		errorAI = null;
+
+		// T-2.it7: registrar en el historial ANTES de esperar a la IA.
+		// Primera vez → crear entrada; siguientes (Volver + analizar o
+		// Reintentar) → el texto analizado sustituye al guardado.
+		const textoAnalizado = textoClase;
+		try {
+			if (!importacionId) {
+				const entrada = await createImportacion(textoAnalizado);
+				importacionId = entrada.id;
+			} else {
+				const previa = await getImportacion(importacionId);
+				const patch: ImportacionPatch = { texto: textoAnalizado, estado: 'sin_terminar', error: null };
+				if (previa && previa.titulo_origen === 'texto') patch.titulo = tituloDeRespaldo(textoAnalizado);
+				await updateImportacion(importacionId, patch);
+			}
+		} catch (e) {
+			console.warn('[historial] no se pudo registrar la importación', e);
+		}
+		// Id capturado: si el usuario cierra durante la carga, la entrada
+		// se sigue completando aunque `importacionId` se haya reseteado.
+		const histId = importacionId;
+
 		try {
 			const resultado = await normalizarDescripcion(textoClase);
 			normalizacion = resultado;
 			textoParaPropuesta = resultado.textoConMarcas.replace(/\*\*/g, '');
 			step = 'normalizado';
+			await guardarHistorial(
+				histId,
+				resultado.titulo
+					? { titulo: resultado.titulo, titulo_origen: 'ia', estado: 'sin_terminar', error: null }
+					: { estado: 'sin_terminar', error: null }
+			);
 		} catch (err) {
 			if (err instanceof Error && err.message === 'AI_TIMEOUT') {
 				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
 			} else {
 				errorAI = err instanceof Error ? err.message : String(err);
 			}
+			await guardarHistorial(histId, { estado: 'fallo', error: errorAI });
 		} finally {
 			loadingAI = false;
 			loadingLabel = '';
@@ -291,6 +368,7 @@
 		loadingAI = true;
 		loadingLabel = 'Generando propuesta…';
 		errorAI = null;
+		const histId = importacionId;
 		try {
 			const [posiciones, tecnicas, sumisiones] = await Promise.all([
 				listPosiciones(),
@@ -372,6 +450,8 @@
 			});
 
 			step = 'review';
+			// La propuesta no se guarda: solo el estado.
+			await guardarHistorial(histId, { estado: 'sin_terminar', error: null });
 		} catch (err) {
 			if (err instanceof Error && err.message === 'GROQ_KEY_MISSING') {
 				errorAI = 'No hay clave de Groq configurada.';
@@ -386,6 +466,7 @@
 			} else {
 				errorAI = err instanceof Error ? err.message : String(err);
 			}
+			await guardarHistorial(histId, { estado: 'fallo', error: errorAI });
 		} finally {
 			loadingAI = false;
 			loadingLabel = '';
@@ -396,6 +477,9 @@
 		if (inserting) return;
 		inserting = true;
 		errorInsert = null;
+		const histId = importacionId;
+		// T-2.it7: lo realmente creado en este intento (ids + nombres).
+		const creado: Aceptado = { posiciones: [], sumisiones: [], tecnicas: [] };
 		try {
 			// Load fresh catalog for FK resolution
 			const [posicionesExistentes, sumisionesExistentes] = await Promise.all([
@@ -409,6 +493,11 @@
 			const sumNormMap = new Map(
 				sumisionesExistentes.map((s) => [s.nombre.toLowerCase().trim(), s.id])
 			);
+			// id → nombre real del catálogo, para el bloque "Aceptado".
+			const nombrePorId = new Map<string, string>([
+				...posicionesExistentes.map((p) => [p.id, p.nombre] as [string, string]),
+				...sumisionesExistentes.map((s) => [s.id, s.nombre] as [string, string])
+			]);
 
 			// Phase A: crear posiciones seleccionadas
 			for (const item of posicionesDraft.filter((p) => p.seleccionado)) {
@@ -422,6 +511,8 @@
 						disciplina: settings.disciplinaActiva
 					});
 					posNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
+					nombrePorId.set(created.id, created.nombre);
+					creado.posiciones.push({ id: created.id, nombre: created.nombre, categoria: created.categoria });
 				} catch (e) {
 					console.warn('Error creando posición', item.nombreEditado, e);
 				}
@@ -432,6 +523,8 @@
 				try {
 					const created = await createSumision({ nombre: item.nombreEditado, notas: item.notas ?? '', disciplina: settings.disciplinaActiva });
 					sumNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
+					nombrePorId.set(created.id, created.nombre);
+					creado.sumisiones.push({ id: created.id, nombre: created.nombre });
 				} catch (e) {
 					console.warn('Error creando sumisión', item.nombreEditado, e);
 				}
@@ -453,7 +546,7 @@
 							console.warn('Sumisión destino no encontrada, saltando:', item.nombre);
 							continue;
 						}
-						await createTecnica({
+						const tec = await createTecnica({
 							nombre: item.nombre,
 							variante: item.variante,
 							posicion_origen_id: origenId,
@@ -465,6 +558,13 @@
 							errores_comunes: '',
 							disciplina: settings.disciplinaActiva
 						});
+						creado.tecnicas.push({
+							id: tec.id,
+							nombre: tec.nombre,
+							tipo: tec.tipo,
+							origen: nombrePorId.get(origenId) ?? item.posicionOrigenNombre,
+							destino: nombrePorId.get(sumId) ?? item.sumisionDestinoNombre ?? ''
+						});
 					} else {
 						const destId = item.posicionDestinoNombre
 							? posNormMap.get(item.posicionDestinoNombre.toLowerCase().trim())
@@ -473,7 +573,7 @@
 							console.warn('Destino no encontrado, saltando técnica:', item.nombre);
 							continue;
 						}
-						await createTecnica({
+						const tec = await createTecnica({
 							nombre: item.nombre,
 							variante: item.variante,
 							posicion_origen_id: origenId,
@@ -485,11 +585,22 @@
 							errores_comunes: '',
 							disciplina: settings.disciplinaActiva
 						});
+						creado.tecnicas.push({
+							id: tec.id,
+							nombre: tec.nombre,
+							tipo: tec.tipo,
+							origen: nombrePorId.get(origenId) ?? item.posicionOrigenNombre,
+							destino: nombrePorId.get(destId) ?? item.posicionDestinoNombre ?? ''
+						});
 					}
 				} catch (e) {
 					console.warn('Error creando técnica', item.nombre, e);
 				}
 			}
+
+			// T-2.it7: lo aceptado se SUMA a lo que la entrada ya tuviera
+			// (reintento de una importación ya "Importada").
+			await guardarAceptado(histId, creado, { estado: 'importada', error: null });
 
 			onCatalogChanged?.();
 			open = false;
@@ -497,8 +608,21 @@
 			resetState();
 		} catch (err) {
 			errorInsert = err instanceof Error ? err.message : String(err);
+			// Lo que sí llegó a crearse no se pierde del historial.
+			await guardarAceptado(histId, creado, { estado: 'fallo', error: errorInsert });
 		} finally {
 			inserting = false;
+		}
+	}
+
+	async function guardarAceptado(id: string | null, creado: Aceptado, patch: ImportacionPatch) {
+		if (!id) return;
+		try {
+			const previa = await getImportacion(id);
+			const aceptado = mergeAceptado(parseAceptado(previa?.aceptado_json), creado);
+			await updateImportacion(id, { ...patch, aceptado });
+		} catch (e) {
+			console.warn('[historial] no se pudo guardar lo aceptado', id, e);
 		}
 	}
 
@@ -506,6 +630,7 @@
 		if (!textoRefinamiento.trim() || !propuestaActual || loadingAI) return;
 		loadingAI = true;
 		errorAI = null;
+		const histId = importacionId;
 		try {
 			const catalogo: CatalogoSnapshot = {
 				posiciones: catalogoPosicionesBase,
@@ -557,6 +682,7 @@
 				const puedeCrearse = origenOk && destinoOk;
 				return { ...t, nombre: capitalizeFirst(t.nombre), seleccionado: puedeCrearse, puedeCrearse, detalles: t.detalles };
 			});
+			await guardarHistorial(histId, { estado: 'sin_terminar', error: null });
 		} catch (err) {
 			if (err instanceof Error && err.message === 'AI_TIMEOUT') {
 				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
@@ -565,6 +691,7 @@
 			} else {
 				errorAI = err instanceof Error ? err.message : String(err);
 			}
+			await guardarHistorial(histId, { estado: 'fallo', error: errorAI });
 		} finally {
 			loadingAI = false;
 		}
@@ -1135,19 +1262,30 @@
 >
 	<AlertDialog.Content>
 		<AlertDialog.Header>
-			<AlertDialog.Title>¿Descartar la importación?</AlertDialog.Title>
-			<AlertDialog.Description>
-				Perderás el texto introducido y la propuesta de la IA. Esta acción no se puede deshacer.
-			</AlertDialog.Description>
+			{#if importacionId}
+				<AlertDialog.Title>¿Cerrar? La importación queda guardada en el historial</AlertDialog.Title>
+				<AlertDialog.Description>
+					Podrás consultarla o reintentarla desde el historial de importaciones del mapa.
+				</AlertDialog.Description>
+			{:else}
+				<AlertDialog.Title>¿Descartar la importación?</AlertDialog.Title>
+				<AlertDialog.Description>
+					Perderás el texto introducido y la propuesta de la IA. Esta acción no se puede deshacer.
+				</AlertDialog.Description>
+			{/if}
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
-			<AlertDialog.Action
-				onclick={handleClose}
-				class={buttonVariants({ variant: 'destructive' })}
-			>
-				Descartar
-			</AlertDialog.Action>
+			{#if importacionId}
+				<AlertDialog.Action onclick={handleClose}>Cerrar</AlertDialog.Action>
+			{:else}
+				<AlertDialog.Action
+					onclick={handleClose}
+					class={buttonVariants({ variant: 'destructive' })}
+				>
+					Descartar
+				</AlertDialog.Action>
+			{/if}
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

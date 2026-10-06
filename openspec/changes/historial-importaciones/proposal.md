@@ -47,7 +47,7 @@ palabras.
   historial. Se siguen aceptando ficheros de la versión anterior (con
   historial vacío).
 - El aviso al cerrar una importación ya analizada pasa a ser "¿Cerrar?
-  Quedará en el historial como Sin terminar".
+  La importación queda guardada en el historial".
 - **BREAKING (spec):** desaparece la regla actual "Sin historial de
   importaciones" del spec `importar-clase`.
 
