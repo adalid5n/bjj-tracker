@@ -2,8 +2,9 @@
  * CRUD de Sumisiones terminales sobre la BD de SQLite-WASM.
  * Cliente only — depende de `$lib/db`, que requiere browser.
  *
- * Nota: `nombre` es UNIQUE en BD. Si el caller intenta crear/actualizar
- * con un nombre ya existente, SQLite levantará un error que se propaga
+ * Nota: `(nombre, disciplina)` es UNIQUE en BD (schema v11; antes era
+ * `nombre` en todo el catálogo). Si el caller intenta crear/actualizar
+ * con un nombre ya existente en esa disciplina, SQLite levantará un error que se propaga
  * sin envoltura; la UI decide cómo presentarlo al usuario.
  */
 

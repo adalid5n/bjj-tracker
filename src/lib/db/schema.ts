@@ -426,8 +426,79 @@ function migrate9To10(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v11:
- *   { from: 10, to: 11, run: (db) => { ... } }
+ * DDL incremental para subir de schema v10 a v11 (T-3.it7, decisión del
+ * owner: las disciplinas no se mezclan).
+ *
+ * `sumisiones_terminales.nombre` era UNIQUE en todo el catálogo (DDL de
+ * v2). Pasa a ser único por `(nombre, disciplina)`, de modo que "Kimura"
+ * puede existir a la vez en BJJ, en Grappling y en Ambos.
+ *
+ * SQLite no permite quitar un UNIQUE de columna → reconstrucción de la
+ * tabla (procedimiento oficial de SQLite "making other kinds of table
+ * schema changes"): crear tabla nueva, copiar filas con sus ids, borrar la
+ * vieja y renombrar la nueva. Se conservan todas las columnas (incluida
+ * `disciplina`, añadida en v9) y todos los datos. La FK
+ * `tecnicas.sumision_destino_id REFERENCES sumisiones_terminales(id)` se
+ * declara por NOMBRE de tabla, así que tras el rename sigue apuntando a la
+ * tabla nueva con los mismos ids. `grafo_layout` (entidad_id + kind) e
+ * `importaciones` (JSON) referencian por id sin FK: no les afecta.
+ *
+ * Las FK deben estar OFF durante la reconstrucción (si no, el DROP de la
+ * tabla vieja dispararía `ON DELETE SET NULL` sobre las técnicas). El
+ * PRAGMA no se puede cambiar dentro de una transacción: lo gestiona
+ * `migrate10To11` alrededor de este DDL, que va en su propia transacción.
+ */
+export const SCHEMA_V11_MIGRATION = `
+CREATE TABLE sumisiones_terminales_v11 (
+  id TEXT PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  notas TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  disciplina TEXT NOT NULL DEFAULT 'bjj',
+  UNIQUE (nombre, disciplina)
+);
+
+INSERT INTO sumisiones_terminales_v11 (id, nombre, notas, created_at, updated_at, disciplina)
+  SELECT id, nombre, notas, created_at, updated_at, disciplina FROM sumisiones_terminales;
+
+DROP TABLE sumisiones_terminales;
+
+ALTER TABLE sumisiones_terminales_v11 RENAME TO sumisiones_terminales;
+
+UPDATE schema_meta SET value = '11' WHERE key = 'version';
+`;
+
+function migrate10To11(db: MigrationDb): void {
+	db.exec('PRAGMA foreign_keys = OFF');
+	try {
+		db.exec('BEGIN');
+		try {
+			db.exec(SCHEMA_V11_MIGRATION);
+			// Comprobación defensiva: tras la reconstrucción, ninguna técnica
+			// debe apuntar a una sumisión inexistente (los ids se copian tal
+			// cual). Si las hubiera, se avisa sin bloquear el arranque.
+			const huerfanas = db.exec({
+				sql: 'PRAGMA foreign_key_check(tecnicas)',
+				returnValue: 'resultRows',
+				rowMode: 'object'
+			}) as { parent: string }[];
+			if (huerfanas.some((r) => r.parent === 'sumisiones_terminales')) {
+				console.warn('[schema v11] técnicas con sumisión destino inexistente tras migrar');
+			}
+			db.exec('COMMIT');
+		} catch (err) {
+			db.exec('ROLLBACK');
+			throw err;
+		}
+	} finally {
+		db.exec('PRAGMA foreign_keys = ON');
+	}
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v12:
+ *   { from: 11, to: 12, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
@@ -438,7 +509,8 @@ export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => v
 	{ from: 6, to: 7, run: migrate6To7 },
 	{ from: 7, to: 8, run: migrate7To8 },
 	{ from: 8, to: 9, run: migrate8To9 },
-	{ from: 9, to: 10, run: migrate9To10 }
+	{ from: 9, to: 10, run: migrate9To10 },
+	{ from: 10, to: 11, run: migrate10To11 }
 ];
 
 /**

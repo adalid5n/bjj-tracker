@@ -24,8 +24,9 @@
 	 *  - Dirty handler registrado en el stack → host muestra AlertDialog
 	 *    "¿Descartar cambios?" si el usuario intenta cerrar con cambios.
 	 *
-	 * UNIQUE: `sumisiones_terminales.nombre` tiene constraint UNIQUE.
-	 * Capturamos el error y lo presentamos en `errorMsg` sin cerrar.
+	 * UNIQUE: `(nombre, disciplina)` es UNIQUE en `sumisiones_terminales`
+	 * (schema v11; antes solo `nombre`). Capturamos el error y lo
+	 * presentamos en `errorMsg` sin cerrar.
 	 */
 	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -195,11 +196,17 @@
 		if (nombreError) nombreError = '';
 	}
 
+	// Schema v11 (T-3.it7): el nombre es único POR DISCIPLINA — "Kimura"
+	// de BJJ y "Kimura" de Grappling pueden convivir. Solo es repetido si
+	// coincide nombre (sin distinguir mayúsculas) y disciplina.
 	function nombreYaExiste(n: string): boolean {
 		const norm = n.trim().toLowerCase();
 		if (!norm) return false;
 		return existentes.some(
-			(s) => s.nombre.toLowerCase() === norm && (modo === 'crear' || s.id !== sumisionId)
+			(s) =>
+				s.nombre.toLowerCase() === norm &&
+				s.disciplina === disciplina &&
+				(modo === 'crear' || s.id !== sumisionId)
 		);
 	}
 

@@ -84,8 +84,12 @@ cuáles no se crearon y por qué.
 - **THEN** los elementos marcados se crean con disciplina Grappling, las técnicas en estado "Probando", y aparecen en el mapa como elementos normales
 
 #### Scenario: Sumisión con nombre ya existente
-- **WHEN** una sumisión marcada tiene exactamente el mismo nombre que una existente
+- **WHEN** una sumisión marcada tiene exactamente el mismo nombre que una existente de la misma disciplina que la importación
 - **THEN** no se crea y el usuario ve que esa sumisión no se creó y el motivo
+
+#### Scenario: Sumisión con el mismo nombre en otra disciplina
+- **WHEN** en una importación de Grappling una sumisión marcada se llama "Kimura" y "Kimura" solo existe con disciplina BJJ
+- **THEN** al aceptar se crea "Kimura" con disciplina Grappling y las técnicas marcadas que llevan a ella se crean enlazadas a la nueva
 
 #### Scenario: Técnica idéntica a una existente
 - **WHEN** una técnica marcada tiene el mismo nombre, origen y variante que una ya existente

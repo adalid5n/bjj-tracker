@@ -126,6 +126,11 @@ importación.
   - Nuevos: disciplina de la importación; paso a la vista previa en el
     mapa; pasos de la vista previa según la disciplina; aceptar (cambia la
     disciplina activa); cancelar; paso que no se puede mostrar; aceptar tras un paso con error.
+- `catalogo-tecnico`: "Sumisión terminal" — el nombre pasa a ser único
+  por disciplina (antes, en todo el catálogo). Decisión del owner tras la
+  validación (2026-10-06): sin esto, una importación no podía crear
+  "Kimura" de Grappling o de Ambos si ya existía la de BJJ. Requiere
+  migración de BD (v11).
 - `mapa`: nuevo modo "vista previa de importación" (resaltado de lo nuevo,
   barra con indicador de paso, movimiento reducido, disciplina y filtros
   durante cada paso, acciones bloqueadas, salir del mapa).
@@ -138,7 +143,9 @@ importación.
 - **Código:** `ImportarClaseDialog.svelte` (ciclo de vida del borrador),
   nuevo estado de borrador fuera del diálogo, `src/routes/mapa/+page.svelte`
   (modo vista previa), `GrafoMapa.svelte` (elementos fantasma),
-  `src/lib/grafo.ts`, `src/routes/layout.css` (token nuevo). Sin cambios
-  de BD ni dependencias nuevas.
+  `src/lib/grafo.ts`, `src/routes/layout.css` (token nuevo). Migración de
+  BD v11 (`sumisiones_terminales`: nombre único por disciplina) y
+  `SumisionWizard.svelte` (comprobación de repetido por disciplina). Sin
+  dependencias nuevas; el formato de la copia de seguridad no cambia.
 - **Depende de** `selector-coherente` (comportamiento del selector) y va
   después de `historial-importaciones` (comparten el diálogo).

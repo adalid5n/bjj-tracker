@@ -240,6 +240,35 @@ generar de nuevo la propuesta.
 "Confirmar e insertar" a "Ver en el mapa". El diálogo no pinta nada en
 `'preview'` (está cerrado).
 
+### 7. Sumisiones únicas por disciplina (schema v11)
+
+Añadido tras la validación del owner (2026-10-06). `sumisiones_terminales`
+tenía `nombre TEXT NOT NULL UNIQUE` (DDL de v2), así que la comparación
+por disciplina (5b) decidía crear "Kimura" de Grappling/Ambos pero la BD
+lo rechazaba y la sumisión (y sus técnicas) no se creaban.
+
+- **Migración nueva v10 → v11** al final de `MIGRATIONS` (las históricas
+  no se tocan). SQLite no puede quitar un UNIQUE de columna → se
+  reconstruye la tabla con el procedimiento oficial: `PRAGMA
+  foreign_keys = OFF` (fuera de transacción) → `BEGIN` → crear
+  `sumisiones_terminales_v11` con las mismas columnas y `UNIQUE (nombre,
+  disciplina)` → copiar todas las filas con sus ids → `DROP` de la vieja
+  → `RENAME` de la nueva → versión 11 → `PRAGMA foreign_key_check(tecnicas)`
+  (aviso, no bloquea) → `COMMIT` → `PRAGMA foreign_keys = ON`. Con las FK
+  apagadas el `DROP` no dispara `ON DELETE SET NULL` en `tecnicas`; la FK
+  `tecnicas.sumision_destino_id` está declarada por nombre de tabla y tras
+  el rename apunta a la nueva con los mismos ids. `grafo_layout` e
+  `importaciones` referencian por id sin FK: no cambian.
+- **Asistente de sumisión:** "Ya existe una sumisión con ese nombre." solo
+  si coincide nombre (sin mayúsculas) **y** disciplina.
+- **Importar:** sin cambios de código: `confirmar()` ya resolvía con el
+  catálogo de la disciplina de la importación; ahora la creación no falla.
+- **Copia de seguridad:** el fichero no cambia (mismas columnas), así que
+  el formato sigue en 7 y se siguen aceptando v6 y v7; el import inserta
+  ids tal cual y la restricción nueva es más laxa que la vieja.
+- Las posiciones no tienen UNIQUE en BD; su asistente sigue comprobando el
+  nombre en todo el catálogo (fuera de alcance de este cambio).
+
 ## Risks / Trade-offs
 
 - [Rework del ciclo de vida en el fichero más grande] → se hace en una
@@ -264,7 +293,11 @@ generar de nuevo la propuesta.
 
 ## Migration Plan
 
-Sin migración de BD. Toca `/mapa`, grafo y CSS: antes de pushear,
+Migración de BD v11 (Decisión 7), aplicada automáticamente al abrir la
+app; sin cambio de formato de la copia de seguridad. Probar con una BD
+v10 con sumisiones y técnicas (p. ej. importando un JSON de prod en el
+Codespace) que tras actualizar todo sigue igual. Toca `/mapa`, grafo y
+CSS: antes de pushear,
 `pnpm check`, `pnpm build`, `pnpm preview` + refresh, en ancho móvil y
 escritorio, con y sin "reducir movimiento" (DevTools → Rendering).
 
