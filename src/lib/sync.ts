@@ -12,13 +12,17 @@
  *     6 → catálogo + entrenos + grafo + ajustes (sin etiquetas).
  *     7 → (T-2.it7) + `tags`, `posicion_tags`, `importaciones`; el
  *         import restaura además la `disciplina` del catálogo.
- * - Se aceptan la versión actual y la inmediatamente anterior
- *   (`PREVIOUS_SCHEMA_VERSION`): a un fichero v6 le faltan las tablas
- *   nuevas, que se tratan como vacías. Cualquier otra → error claro.
+ *     8 → (T-4.it7) `disciplina` de sesiones y rolls; ningún elemento del
+ *         catálogo "ambos"; tipo de sesión `clase` | `open_mat`.
+ * - Se aceptan `ACCEPTED_VERSIONS` (6, 7, 8): a un fichero v6 le faltan las
+ *   tablas nuevas, que se tratan como vacías; v6 y v7 se convierten con
+ *   `separarAmbos` (las mismas reglas que la migración v12 de la BD).
+ *   Cualquier otra → error claro.
  * - Para sync entre dispositivos hasta que llegue mecanismo automático.
  */
 
 import { init, query, run } from '$lib/db';
+import { separarAmbos, verificarSeparacion, type DatosSeparables } from '$lib/separar-ambos';
 import type { ImportacionRow } from '$lib/importaciones';
 import type {
 	Companero,
@@ -32,9 +36,9 @@ import type {
 } from '$lib/types';
 
 /** Versión del formato de fichero de copia (no la de la BD). */
-export const CURRENT_SCHEMA_VERSION = 7;
-/** Formato anterior aceptado al importar (sin etiquetas ni historial). */
-export const PREVIOUS_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 8;
+/** Formatos aceptados al importar (6: sin etiquetas ni historial; 6–7: con "Ambos"). */
+export const ACCEPTED_VERSIONS = [6, 7, 8] as const;
 
 // T-3.it2: filas de las tablas pivot `roll_tecnica` y `roll_posicion`.
 // `resultado` es 'fue_bien' | 'fallo' (CHECK en SQL). La PK compuesta
@@ -185,9 +189,9 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 		'grafo_layout',
 		'app_settings'
 	];
-	// Tablas que solo exige el formato actual (v7). En ficheros v6 no
-	// existen y se tratan como vacías (ver `normalizarPayload`).
-	if (p.schema_version === CURRENT_SCHEMA_VERSION) {
+	// Tablas que exigen los formatos v7 y v8. En ficheros v6 no existen y
+	// se tratan como vacías (ver `normalizarPayload`).
+	if (p.schema_version >= 7) {
 		requiredArrays.push('tags', 'posicion_tags', 'importaciones');
 	}
 	for (const key of requiredArrays) {
@@ -197,7 +201,7 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 	}
 }
 
-/** Fichero v6 → forma v7: tablas ausentes como arrays vacíos. */
+/** Fichero v6 → forma v7/v8: tablas ausentes como arrays vacíos. */
 function normalizarPayload(payload: ExportPayload): ExportPayload {
 	return {
 		...payload,
@@ -208,10 +212,48 @@ function normalizarPayload(payload: ExportPayload): ExportPayload {
 }
 
 /**
+ * Separa los "Ambos" del catálogo y, en ficheros anteriores a v8, deduce la
+ * disciplina de sesiones y rolls (T-4.it7). Mismo módulo que la migración
+ * v12: restaurar un v7 da lo mismo que haber migrado esa BD. En v8 se llama
+ * igualmente (sin inferir entrenos): un v8 no debería traer "Ambos", pero si
+ * lo trae (editado a mano) se separa en vez de romper el modelo.
+ */
+function convertirPayload(payload: ExportPayload): ExportPayload {
+	const { datos, resumen } = separarAmbos(
+		{
+			posiciones: payload.posiciones,
+			sumisiones_terminales: payload.sumisiones_terminales,
+			tecnicas: payload.tecnicas,
+			tecnica_contras: payload.tecnica_contras,
+			posicion_tags: payload.posicion_tags,
+			grafo_layout: payload.grafo_layout,
+			sesiones: payload.sesiones,
+			rolls: payload.rolls,
+			roll_posicion: payload.roll_posicion,
+			roll_tecnica: payload.roll_tecnica,
+			tagIds: payload.tags.map((t) => t.id)
+		} as unknown as DatosSeparables,
+		{
+			nuevoId: () => crypto.randomUUID(),
+			inferirEntrenos: payload.schema_version < 8
+		}
+	);
+	verificarSeparacion(datos, resumen);
+	if (
+		resumen.creadasParaCompletar.length > 0 ||
+		resumen.renombradas.length > 0 ||
+		resumen.fusionadas.length > 0
+	) {
+		console.info('[import] "Ambos" separado en copias por disciplina', resumen);
+	}
+	return { ...payload, ...(datos as unknown as Partial<ExportPayload>) };
+}
+
+/**
  * Reemplaza TODA la BD con el contenido del payload.
  * Borra todas las tablas en orden de FK y luego inserta lo nuevo.
- * Acepta schema_version = CURRENT_SCHEMA_VERSION o PREVIOUS_SCHEMA_VERSION;
- * cualquier otra → throws (sin tocar la BD).
+ * Acepta las versiones de `ACCEPTED_VERSIONS`; cualquier otra → throws
+ * (sin tocar la BD).
  */
 export async function importAll(payload: unknown): Promise<{
 	companeros: number;
@@ -235,14 +277,14 @@ export async function importAll(payload: unknown): Promise<{
 		typeof (payload as Record<string, unknown>).schema_version === 'number'
 	) {
 		const v = (payload as Record<string, unknown>).schema_version as number;
-		if (v !== CURRENT_SCHEMA_VERSION && v !== PREVIOUS_SCHEMA_VERSION) {
+		if (!(ACCEPTED_VERSIONS as readonly number[]).includes(v)) {
 			throw new Error(
-				`Versión incompatible. El fichero usa schema_version=${v}, esta app acepta ${PREVIOUS_SCHEMA_VERSION} o ${CURRENT_SCHEMA_VERSION}.`
+				`Versión incompatible. El fichero usa schema_version=${v}, esta app acepta ${ACCEPTED_VERSIONS.join(', ')}.`
 			);
 		}
 	}
 	assertExportShape(payload);
-	const datos = normalizarPayload(payload);
+	const datos = convertirPayload(normalizarPayload(payload));
 
 	await init();
 
@@ -299,17 +341,17 @@ export async function importAll(payload: unknown): Promise<{
 	}
 
 	return {
-		companeros: payload.companeros.length,
-		sesiones: payload.sesiones.length,
-		rolls: payload.rolls.length,
-		posiciones: payload.posiciones.length,
-		sumisiones_terminales: payload.sumisiones_terminales.length,
-		tecnicas: payload.tecnicas.length,
-		tecnica_contras: payload.tecnica_contras.length,
-		roll_posicion: payload.roll_posicion.length,
-		roll_tecnica: payload.roll_tecnica.length,
-		grafo_layout: payload.grafo_layout.length,
-		app_settings: payload.app_settings.length,
+		companeros: datos.companeros.length,
+		sesiones: datos.sesiones.length,
+		rolls: datos.rolls.length,
+		posiciones: datos.posiciones.length,
+		sumisiones_terminales: datos.sumisiones_terminales.length,
+		tecnicas: datos.tecnicas.length,
+		tecnica_contras: datos.tecnica_contras.length,
+		roll_posicion: datos.roll_posicion.length,
+		roll_tecnica: datos.roll_tecnica.length,
+		grafo_layout: datos.grafo_layout.length,
+		app_settings: datos.app_settings.length,
 		tags: datos.tags.length,
 		posicion_tags: datos.posicion_tags.length,
 		importaciones: datos.importaciones.length
@@ -364,12 +406,13 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 
 	for (const s of payload.sesiones) {
 		await run(
-			`INSERT INTO sesiones (id, fecha, tipo, foco, tecnica_clase, obs_profesor, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO sesiones (id, fecha, tipo, disciplina, foco, tecnica_clase, obs_profesor, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				s.id,
 				s.fecha,
 				s.tipo,
+				s.disciplina ?? 'bjj',
 				s.foco ?? null,
 				s.tecnica_clase ?? null,
 				s.obs_profesor ?? null,
@@ -407,15 +450,16 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 	for (const r of payload.rolls) {
 		await run(
 			`INSERT INTO rolls (
-				id, sesion_id, companero_id, orden, tamano_relativo, duracion_min,
+				id, sesion_id, companero_id, orden, disciplina, tamano_relativo, duracion_min,
 				resultado, que_intente, que_fallo, posiciones_problema,
 				created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				r.id,
 				r.sesion_id,
 				r.companero_id ?? null,
 				r.orden,
+				r.disciplina ?? 'bjj',
 				r.tamano_relativo ?? null,
 				r.duracion_min ?? null,
 				r.resultado ?? null,

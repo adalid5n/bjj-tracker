@@ -24,7 +24,7 @@
 
 ## 2. Copia de seguridad v8
 
-- [ ] 2.1 `sync.ts`: `CURRENT_SCHEMA_VERSION = 8`, `ACCEPTED_VERSIONS = [6, 7, 8]`, mensaje de versión incompatible; `separarAmbos` tras `normalizarPayload` (`inferirEntrenos` si versión < 8); `disciplina` en los INSERT de sesiones y rolls; verificar con `pnpm check`
+- [x] 2.1 `sync.ts`: `CURRENT_SCHEMA_VERSION = 8`, `ACCEPTED_VERSIONS = [6, 7, 8]`, mensaje de versión incompatible; `separarAmbos` tras `normalizarPayload` (`inferirEntrenos` si versión < 8); `disciplina` en los INSERT de sesiones y rolls; verificar con `pnpm check`
 - [ ] 2.2 Verificar en `pnpm dev`: importar la copia v7 exportada en 1.4 sobre una BD vacía da el mismo catálogo, sesiones y rolls que la migración (mismos nombres, disciplinas, enlaces y sitios); exportar → importar un v8 deja todo igual; un v6 sigue importando; un fichero con `schema_version` 9 se rechaza sin tocar datos
 
 ## 3. Catálogo: crear en las dos disciplinas y conexiones
