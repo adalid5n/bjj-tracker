@@ -57,7 +57,9 @@
 
 **T-1.it7 cerrada (2026-10-06):** BJJ/Grappling del mapa pasa a dos botones; prop `required` en `Chips` para disciplina en los 3 asistentes (crear y editar) y, ampliado por decisión del owner, para "Tipo *" (SesionEditor) y "Resultado *" (RollEditor ×2). Nueva capacidad de spec transversal `selectores`. El owner validó en preview el alcance original; Tipo y Resultado solo se comprobaron con check y build. Primer ciclo SDD completo: propose → apply → validación → archive.
 
-**Próximo paso concreto:** T-2 (`historial-importaciones`, incluye arreglar el backup) con `/opsx:apply`. Es la tarea grande: nueva migración, panel de historial y backup. **Lección:** en el Codespace, subir a menudo; un reinicio mató a un subagente a mitad de trabajo y las decisiones solo estaban en el chat. Opcional: crear el secret de Codespaces para que la key sobreviva a recrear el Codespace.
+**T-2 implementada, SIN COMMIT (2026-10-06):** el código está en el disco del Codespace: migración v10 `importaciones`, `src/lib/importaciones.ts`, `HistorialImportacionesPanel.svelte`, accordion de shadcn, cambios en el importador, `/mapa`, `sync.ts` (formato de fichero v7, acepta v6) y el resumen en `/ajustes`. Check y build en verde. Falta la validación del owner en preview → archive → commit+push. Si la sesión se pierde, el trabajo sigue en el working tree (`git status`).
+
+**Próximo paso concreto:** el owner valida T-2 en preview (antes, backup de sus datos reales de prod) → `/opsx:archive historial-importaciones` → commit + push → T-3. **Lección:** en el Codespace, subir a menudo; un reinicio mató a un subagente a mitad de trabajo y las decisiones solo estaban en el chat. Opcional: crear el secret de Codespaces para que la key sobreviva a recrear el Codespace.
 
 ---
 
