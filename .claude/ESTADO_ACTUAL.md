@@ -68,7 +68,9 @@
 
 **T-3.it7 cerrada (2026-10-06):** validada por el owner. Resaltado final: amarillo vivo oklch(0.87 0.18 95) en el borde de los nodos con un halo (underlay) que respira, y en la línea de las flechas; el nombre no cambia (el owner probó ponerlo en amarillo y lo descartó). Change archivado y fusionado en main → BD de prod en v11 (prod sin datos).
 
-**Próximo paso concreto:** T-4 (`ambos-como-copias`). Primer paso: arreglar el delta (tras archivar T-3, `validate --strict` pide conservar o reescribir los escenarios "Sumisiones existentes al actualizar la app" en catalogo-tecnico, y "Elemento de Ambos en una importación de BJJ" e "Importación de Ambos" en importar-clase). Después, `/opsx:apply` en una rama `it7/t4-ambos-copias`, empezando por la migración v12. Antes de actualizar la tablet, exportar un backup.
+**T-4 EN CURSO (cierre de sesión 2026-10-06):** un subagente la está programando en la rama `it7/t4-ambos-copias`, con commits locales `wip(it-7/t-4.it7)` por grupo de tareas y progreso marcado en `openspec/changes/ambos-como-copias/tasks.md`. Si la sesión o el Codespace se cortaron, retomar desde ahí: `git checkout it7/t4-ambos-copias`, `git log`, revisar tasks.md, `pnpm check`. Nada de T-4 está en main ni en prod.
+
+**Próximo paso concreto:** T-4 (`ambos-como-copias`). Primer paso (si no lo hizo ya el subagente): arreglar el delta (tras archivar T-3, `validate --strict` pide conservar o reescribir los escenarios "Sumisiones existentes al actualizar la app" en catalogo-tecnico, y "Elemento de Ambos en una importación de BJJ" e "Importación de Ambos" en importar-clase). Después, `/opsx:apply` en una rama `it7/t4-ambos-copias`, empezando por la migración v12. Antes de actualizar la tablet, exportar un backup.
 
 ---
 
