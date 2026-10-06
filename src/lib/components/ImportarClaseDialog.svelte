@@ -9,7 +9,8 @@
 	import MicIcon from '@lucide/svelte/icons/mic';
 	import MicOffIcon from '@lucide/svelte/icons/mic-off';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import type { CategoriaPosicion, TipoRolPosicion, TipoTecnica } from '$lib/types';
+	import type { CategoriaPosicion, Disciplina, TipoRolPosicion, TipoTecnica } from '$lib/types';
+	import Chips from '$lib/components/Chips.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import type { ImportacionBorrador } from '$lib/importacion-borrador.svelte';
 
@@ -49,6 +50,12 @@
 		{ value: 'ofensiva', label: 'Ofensiva' },
 		{ value: 'defensiva', label: 'Defensiva' },
 		{ value: 'neutral', label: 'Neutral' }
+	];
+
+	const OPCIONES_DISCIPLINA: { value: Disciplina; label: string }[] = [
+		{ value: 'bjj', label: 'BJJ' },
+		{ value: 'grappling', label: 'Grappling' },
+		{ value: 'ambos', label: 'Ambos' }
 	];
 
 	const TIPOS_TECNICA: Record<TipoTecnica, string> = {
@@ -214,6 +221,18 @@
 		<!-- Step 1: Input -->
 		{#if b.paso === 'input'}
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-2">
+				<div class="flex flex-col gap-1.5">
+					<p class="text-xs font-medium text-muted-foreground">Disciplina</p>
+					<Chips
+						options={OPCIONES_DISCIPLINA}
+						value={b.disciplina}
+						onChange={(v) => {
+							if (v) b.disciplina = v as Disciplina;
+						}}
+						ariaLabel="Disciplina de la importación"
+						required
+					/>
+				</div>
 				<div class="relative">
 					<Textarea
 						bind:value={b.textoClase}

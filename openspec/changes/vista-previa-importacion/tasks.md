@@ -11,8 +11,8 @@
 
 ## 2. Disciplina de la importación
 
-- [ ] 2.1 Añadir en el paso `input` el selector BJJ / Grappling / Ambos (`Chips` con `required`, valor inicial = disciplina activa) y usar `borrador.disciplina` en todos los `create*`; verificar importando con BJJ activo y "Grappling" elegido que todo lo creado aparece con Grappling activo y no con BJJ
-- [ ] 2.2 Helper `disciplinasDeCatalogo` y filtrado del catálogo por la disciplina de la importación al generar la propuesta (snapshot enviado a la IA, validación, refinado, comparación "ya existe") y en `confirmar()` (resolución nombre → id), y en los selectores de origen/destino de "+ Añadir" en la revisión; verificar en la pestaña Red de `pnpm dev` que una importación de Grappling no envía posiciones de BJJ (ni las ofrece en "+ Añadir"), que una de "Ambos" solo envía las de "Ambos", y que un "Mount" que solo existe en BJJ se crea como nuevo en una importación de Grappling
+- [x] 2.1 Añadir en el paso `input` el selector BJJ / Grappling / Ambos (`Chips` con `required`, valor inicial = disciplina activa) y usar `borrador.disciplina` en todos los `create*`; verificar importando con BJJ activo y "Grappling" elegido que todo lo creado aparece con Grappling activo y no con BJJ
+- [x] 2.2 Helper `disciplinasDeCatalogo` y filtrado del catálogo por la disciplina de la importación al generar la propuesta (snapshot enviado a la IA, validación, refinado, comparación "ya existe") y en `confirmar()` (resolución nombre → id), y en los selectores de origen/destino de "+ Añadir" en la revisión; verificar en la pestaña Red de `pnpm dev` que una importación de Grappling no envía posiciones de BJJ (ni las ofrece en "+ Añadir"), que una de "Ambos" solo envía las de "Ambos", y que un "Mount" que solo existe en BJJ se crea como nuevo en una importación de Grappling
 
 ## 3. Token y elementos fantasma
 

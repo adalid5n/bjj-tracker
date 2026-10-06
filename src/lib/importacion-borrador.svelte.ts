@@ -25,7 +25,7 @@ import {
 	validarPropuesta
 } from '$lib/ai';
 import type { CatalogoSnapshot, AIPropuesta, NormalizacionResult } from '$lib/ai';
-import type { CategoriaPosicion, TipoRolPosicion, TipoTecnica } from '$lib/types';
+import type { CategoriaPosicion, Disciplina, TipoRolPosicion, TipoTecnica } from '$lib/types';
 import { settings } from '$lib/settings.svelte';
 import { capitalizeFirst } from '$lib/utils';
 import {
@@ -72,6 +72,26 @@ export type TecnicaItem = {
 
 export type PasoImportacion = 'input' | 'normalizado' | 'review' | 'detalles';
 
+/**
+ * Disciplinas del catálogo con las que se compara una importación (y que
+ * se envían a la IA): BJJ o Grappling → esa y "Ambos"; "Ambos" → solo
+ * "Ambos". Lo que no esté ahí se crea nuevo con la disciplina de la
+ * importación, aunque exista con el mismo nombre en la otra.
+ */
+export function disciplinasDeCatalogo(d: Disciplina): Disciplina[] {
+	if (d === 'ambos') return ['ambos'];
+	return [d, 'ambos'];
+}
+
+/** Filtra una lista del catálogo por la disciplina de la importación. */
+export function filtrarPorDisciplinaImportacion<T extends { disciplina: Disciplina }>(
+	items: T[],
+	d: Disciplina
+): T[] {
+	const permitidas = new Set(disciplinasDeCatalogo(d));
+	return items.filter((it) => permitidas.has(it.disciplina));
+}
+
 function mensajeErrorIA(err: unknown): string {
 	if (err instanceof Error && err.message === 'GROQ_KEY_MISSING') {
 		return 'No hay clave de Groq configurada.';
@@ -93,6 +113,11 @@ function mensajeErrorIA(err: unknown): string {
 
 export class ImportacionBorrador {
 	paso = $state<PasoImportacion>('input');
+	/**
+	 * Disciplina de la importación (selector del primer paso). Todo lo que
+	 * se cree la lleva; también decide el catálogo con el que se compara.
+	 */
+	disciplina = $state<Disciplina>(settings.disciplinaActiva);
 	textoClase = $state('');
 	normalizacion = $state<NormalizacionResult | null>(null);
 	textoParaPropuesta = $state('');
@@ -146,6 +171,7 @@ export class ImportacionBorrador {
 
 	reset() {
 		this.paso = 'input';
+		this.disciplina = settings.disciplinaActiva;
 		this.textoClase = '';
 		this.normalizacion = null;
 		this.textoParaPropuesta = '';
@@ -309,10 +335,13 @@ export class ImportacionBorrador {
 		this.errorAI = null;
 		const histId = this.importacionId;
 		try {
+			// Solo el catálogo de la disciplina de la importación: es lo que
+			// recibe la IA y con lo que se compara "ya existe".
+			const d = this.disciplina;
 			const [posiciones, tecnicas, sumisiones] = await Promise.all([
-				listPosiciones(),
-				listTecnicas(),
-				listSumisiones()
+				listPosiciones().then((l) => filtrarPorDisciplinaImportacion(l, d)),
+				listTecnicas().then((l) => filtrarPorDisciplinaImportacion(l, d)),
+				listSumisiones().then((l) => filtrarPorDisciplinaImportacion(l, d))
 			]);
 			const catalogo: CatalogoSnapshot = {
 				posiciones: posiciones.map((p) => ({ id: p.id, nombre: p.nombre })),
@@ -430,14 +459,15 @@ export class ImportacionBorrador {
 		this.inserting = true;
 		this.errorInsert = null;
 		const histId = this.importacionId;
-		const disciplina = settings.disciplinaActiva;
+		const disciplina = this.disciplina;
 		// T-2.it7: lo realmente creado en este intento (ids + nombres).
 		const creado: Aceptado = { posiciones: [], sumisiones: [], tecnicas: [] };
 		try {
-			// Catálogo fresco para resolver nombres → ids.
+			// Catálogo fresco de la disciplina de la importación para
+			// resolver nombres → ids (misma regla que la comparación).
 			const [posicionesExistentes, sumisionesExistentes] = await Promise.all([
-				listPosiciones(),
-				listSumisiones()
+				listPosiciones().then((l) => filtrarPorDisciplinaImportacion(l, disciplina)),
+				listSumisiones().then((l) => filtrarPorDisciplinaImportacion(l, disciplina))
 			]);
 
 			const posNormMap = new Map(
