@@ -24,6 +24,11 @@ Que importar una clase deje de ser un disparo a ciegas y de un solo uso:
    que ya existe se busca solo en el catálogo de esa disciplina; una
    importación de "Ambos" se revisa en dos vistas previas (BJJ y
    Grappling).
+4. **"Ambos" como copias y disciplina en los entrenos.** "Ambos" deja de
+   ser un elemento compartido: crea dos elementos independientes (uno de
+   BJJ y otro de Grappling) y los existentes se separan al actualizar.
+   Sesiones (BJJ / Grappling / Ambos) y rolls (BJJ / Grappling) pasan a
+   tener disciplina, y el roll solo ofrece el catálogo de la suya.
 
 **Por qué ahora:**
 - Tras el primer uso real con `gpt-oss-120b` (sesión 50) quedó claro que
@@ -52,8 +57,8 @@ Que importar una clase deje de ser un disparo a ciegas y de un solo uso:
   calendario.
 
 **Criterio de cierre:**
-1. T-1.it7 … T-3.it7 cerradas con commit en `main` y **sus tres changes
-   archivados** (`openspec/specs/` actualizado).
+1. T-1.it7 … T-4.it7 cerradas con commit en `main` y **sus cuatro
+   changes archivados** (`openspec/specs/` actualizado).
 2. Tag `v0.7-it7` aplicado y bump `0.6.x` → `0.7.0` (migración de schema +
    cambios funcionales visibles).
 3. `ESTADO_ACTUAL.md` y `CHANGELOG.md` actualizados.
@@ -156,6 +161,61 @@ bloqueadas, salir del mapa).
 
 ---
 
+### T-4.it7 — "Ambos" como copias y disciplina en sesiones y rolls
+
+**Estado:** 📝 Planificada (2026-10-06) — change propuesto; P1–P3
+resueltas por el owner. Se aplica después de archivar T-3.
+**Change OpenSpec:** [`openspec/changes/ambos-como-copias/`](../../openspec/changes/ambos-como-copias/proposal.md)
+
+**Qué entrega:**
+- "Ambos" en los asistentes de posición, sumisión y técnica y en la
+  importación = **atajo de creación**: crea dos elementos independientes,
+  uno de BJJ y otro de Grappling, con los mismos datos. Ningún elemento
+  del catálogo queda como "Ambos"; cada copia tiene su sitio en el grafo
+  (resuelve las coordenadas compartidas de T-3).
+- **Separación de lo existente** al actualizar (migración v12): cada
+  elemento "Ambos" → copia BJJ (conserva su identidad) + copia Grappling;
+  técnicas, contras, complementarias, etiquetas, sitio en el grafo y
+  enlaces de rolls repartidos por disciplina, sin perder datos.
+- **Conexiones dentro de la disciplina:** la técnica toma la disciplina
+  de su origen; destino, complementaria y contras solo ofrecen elementos
+  de la misma disciplina. Las conexiones cruzadas antiguas se conservan.
+- **"Ambos" = completo en las dos:** si a una técnica "Ambos" le falta
+  su origen o destino en una disciplina, se crea allí (asistentes,
+  importación y separación de lo existente) y se avisa de lo creado.
+- **Disciplina fija:** se elige al crear; al editar se muestra como solo
+  lectura.
+- **Sesiones** con tipo Clase / Open mat y disciplina BJJ / Grappling /
+  Ambos (por defecto la activa); las de tipo BJJ/Grappling pasan a Clase
+  con esa disciplina; **rolls** con BJJ / Grappling (por defecto la de la sesión, o
+  la activa si la sesión es Ambos). Los selectores del roll solo ofrecen
+  su disciplina; cambiarla con elementos elegidos pide confirmación y los
+  quita. Sesiones y rolls existentes reciben disciplina deducida.
+- **Importación de "Ambos"**: cada lado se compara con su disciplina; la
+  revisión indica dónde se creará cada elemento; cada vista previa
+  muestra lo nuevo de su lado.
+- **Copia de seguridad v8** (disciplina de sesiones y rolls); v6 y v7 se
+  siguen aceptando y se convierten con las mismas reglas que la
+  migración.
+
+**Specs:** nueva capacidad `sesiones-y-rolls` (ADDED); `catalogo-tecnico`
+MODIFIED ("Disciplina de cada elemento", "Nombre de posición sin
+duplicados en el asistente", "Sumisión terminal", "Posiciones
+complementarias", "Contras de una técnica") + ADDED (crear para las dos
+disciplinas, conexiones dentro de la misma disciplina, disciplina fija
+tras crear, elementos "Ambos" existentes al actualizar);
+`importar-clase` MODIFIED (disciplina de la importación, generación,
+reutilización, añadir a mano, confirmar e insertar, aceptar la vista
+previa) + ADDED (dónde se crea cada elemento en una importación de
+"Ambos"); `mapa` MODIFIED ("Disciplina activa", vista previa en el grafo,
+disciplina y filtros durante la vista previa); `copia-seguridad` MODIFIED
+(contenido, restauración fiel, ficheros anteriores).
+
+**Puntos abiertos:** ninguno (P1–P3 resueltas el 2026-10-06, ver
+decisiones).
+
+---
+
 ## DECISIONES DE PRODUCTO TOMADAS
 
 - **Selectores:** tocar una opción la elige; tocar la activa no hace nada.
@@ -210,7 +270,38 @@ bloqueadas, salir del mapa).
   "Ambos"; "Ambos" → solo "Ambos" (también para lo que se envía a la
   IA). Lo que falta se crea con la disciplina de la importación aunque
   exista con el mismo nombre en la otra; los duplicados entre
-  disciplinas los avisará el panel de alertas (it.8).
+  disciplinas los avisará el panel de alertas (it.8). **T-4 sustituye**
+  la regla de "Ambos": cada lado se compara con su disciplina.
+- **"Ambos" = atajo de creación (T-4):** crea dos elementos
+  independientes (BJJ y Grappling); editar uno no cambia el otro; no se
+  guarda "Ambos" en el catálogo; cada copia con su sitio en el grafo.
+- **Separación de los "Ambos" existentes (T-4):** migración nueva; la
+  copia BJJ conserva la identidad; todo se reparte por disciplina sin
+  perder datos.
+- **Disciplina de sesiones y rolls (T-4):** sesión BJJ / Grappling /
+  Ambos (clase mixta); roll BJJ / Grappling, por defecto el de su sesión
+  (o la activa si la sesión es Ambos), modificable al crear; los
+  selectores del roll filtran por su disciplina. Existentes: roll según
+  sus elementos (todos Grappling → Grappling; si no, BJJ); sesión según
+  sus rolls (iguales → esa; mezclados → Ambos; sin rolls → la de su tipo
+  antiguo, BJJ si era Open mat). Un roll sin elementos enlazados toma la
+  del tipo antiguo de su sesión.
+- **Tipo de sesión (T-4, P1):** Clase / Open mat; la disciplina va
+  aparte; las sesiones antiguas BJJ/Grappling pasan a Clase con esa
+  disciplina.
+- **"Ambos" existe completo en las dos disciplinas (T-4, P2):** lo que
+  falte en una (origen o destino de una técnica, sumisión) se crea allí,
+  al crear (asistentes e importación, avisando de lo creado) y al separar
+  lo existente o restaurar copias antiguas.
+- **Disciplina fija (T-4, P3):** no se cambia al editar, ni en elementos
+  sin conexiones; se muestra como solo lectura.
+- **Importación de "Ambos" (T-4):** crea las dos copias; vista previa de
+  dos pasos con lo de cada lado.
+- **Copia de seguridad v8 (T-4):** v6 y v7 siguen importando, convertidas
+  con las reglas de la migración.
+- **Fuera de T-4 (backlog):** paneles de análisis y estadísticas por
+  disciplina, filtro de rolls por disciplina, "duplicar en la otra
+  disciplina" un elemento ya creado (funcionalidad futura).
 
 ---
 
@@ -221,11 +312,15 @@ T-1.it7 (selector coherente, pequeño)
    └─→ T-2.it7 (historial: BD + flujo + panel + backup)
           └─→ T-3.it7 (disciplina + vista previa en el mapa: toca el mismo
                        diálogo y usa el selector de T-1)
+                 └─→ T-4.it7 ("Ambos" como copias + disciplina en sesiones
+                              y rolls: modifica requisitos de T-3 y
+                              numera su migración tras la v11)
 ```
 
 T-2 y T-3 modifican `ImportarClaseDialog.svelte` y el mismo spec
 `importar-clase` (requisitos distintos). Ir en serie evita conflictos y
-permite archivar los changes en orden.
+permite archivar los changes en orden. T-4 **no se aplica hasta archivar
+T-3**: sus deltas copian las versiones de T-3 de varios requisitos.
 
 ---
 
@@ -249,6 +344,17 @@ permite archivar los changes en orden.
 - **Diálogo de importación grande** (~1150 líneas) y tocado por T-2 y T-3:
   mantener la lógica nueva fuera (DAO, clase del borrador, helpers de
   `grafo.ts`).
+- **Migración de separación (T-4) sobre datos reales.** Reescribe el
+  catálogo y los enlaces de rolls en una sola transacción con
+  comprobaciones y vuelta atrás si algo falla; aun así, exportar copia en
+  la tablet antes de actualizar y ensayar antes con el JSON de prod en el
+  Codespace.
+- **Duplicados tras separar (T-4):** donde ya había, p. ej., "Mount" Ambos
+  y "Mount" BJJ quedarán dos "Mount" de BJJ (una sumisión que choque se
+  renombra "… (Ambos)"). Raro; lo avisará el panel de alertas (it.8).
+- **Alcance de T-4:** toca muchos sitios (asistentes, `RollEditor`,
+  sesiones, importación, copia). Grupos de tareas en orden: migración y
+  copia primero, sin cambio de UI.
 - **Toca BD, layout del grafo y CSS:** verificación obligatoria con
   `pnpm preview` + refresh antes de cada push (CLAUDE.md).
 
@@ -261,5 +367,5 @@ permite archivar los changes en orden.
 - `.claude/MEJORAS_FUTURAS.md` → "Fallos catálogo e importación
   (baseline)" (excluidos de esta iteración).
 - Specs vivos: `openspec/specs/importar-clase/`, `openspec/specs/mapa/`,
-  `openspec/specs/catalogo-tecnico/`.
+  `openspec/specs/catalogo-tecnico/`, `openspec/specs/copia-seguridad/`.
 - `CLAUDE.md` → "Flujo SDD", "Restricciones", "Criterios técnicos".
