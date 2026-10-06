@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -11,6 +12,9 @@
 	import CompaneroCombobox from '$lib/components/CompaneroCombobox.svelte';
 	import PosicionWizardDialog from '$lib/components/PosicionWizardDialog.svelte';
 	import TecnicaWizardDialog from '$lib/components/TecnicaWizardDialog.svelte';
+	import AvisoCatalogo from '$lib/components/AvisoCatalogo.svelte';
+	import { avisoCatalogo } from '$lib/aviso-catalogo.svelte';
+	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
 	import { listCompaneros, createCompanero, updateCompanero } from '$lib/companeros';
 	import { capitalizeFirst } from '$lib/utils';
 	import { settings } from '$lib/settings.svelte';
@@ -18,6 +22,8 @@
 		CategoriaPosicion,
 		Cinturon,
 		Companero,
+		Disciplina,
+		DisciplinaCatalogo,
 		PesoRelativo,
 		Posicion,
 		ResultadoRoll,
@@ -42,6 +48,8 @@
 	type SaveData = {
 		id: string;
 		sesion_id: string;
+		// T-4.it7: BJJ o Grappling (nunca Ambos).
+		disciplina: DisciplinaCatalogo;
 		companero_id?: string;
 		tamano_relativo?: PesoRelativo;
 		duracion_min?: number;
@@ -78,12 +86,16 @@
 	let {
 		open = $bindable(false),
 		sesionId,
+		sesionDisciplina,
 		roll,
 		onSave,
 		onDelete
 	}: {
 		open?: boolean;
 		sesionId: string;
+		// T-4.it7: disciplina de la sesión. El roll nuevo parte de ella; si
+		// la sesión es "Ambos" (o se desconoce), de la disciplina activa.
+		sesionDisciplina?: Disciplina;
 		roll?: Roll;
 		onSave: (data: SaveData) => void | Promise<void>;
 		onDelete?: () => void | Promise<void>;
@@ -109,6 +121,16 @@
 	let duracionStr = $state('');
 	let duracionMinOriginal = $state<number | undefined>(undefined);
 	let resultado = $state<ResultadoRoll | undefined>(undefined);
+
+	// T-4.it7: disciplina del roll (BJJ / Grappling). Filtra los selectores
+	// de posiciones y técnicas. Cambiarla con elementos elegidos pide
+	// confirmación y los quita (`disciplinaPendiente` + AlertDialog).
+	const DISCIPLINAS_ROLL: { value: DisciplinaCatalogo; label: string }[] = [
+		{ value: 'bjj', label: 'BJJ' },
+		{ value: 'grappling', label: 'Grappling' }
+	];
+	let disciplina = $state<DisciplinaCatalogo>('bjj');
+	let disciplinaPendiente = $state<DisciplinaCatalogo | null>(null);
 
 	// T-3.it2.b: catálogo completo de posiciones (recargable) y selecciones
 	// del roll separadas por resultado. Una misma posición puede aparecer en
@@ -171,6 +193,14 @@
 			duracionMinOriginal = roll?.duracion_min;
 			duracionStr = roll?.duracion_min != null ? String(roll.duracion_min) : '';
 			resultado = roll?.resultado;
+			disciplina = untrack(() =>
+				roll?.disciplina ??
+				(sesionDisciplina && sesionDisciplina !== 'ambos'
+					? sesionDisciplina
+					: settings.disciplinaActiva)
+			);
+			disciplinaPendiente = null;
+			avisoCatalogo.clear();
 			currentStep = 1;
 			visitedSteps = new Set([1]);
 			showExtraData = false;
@@ -247,10 +277,28 @@
 
 	// Agrupa el catálogo por categoría con el orden de /mapa. Solo se
 	// renderizan secciones con items para evitar headers vacíos.
+	// T-4.it7: solo posiciones de la disciplina del roll, más las ya
+	// elegidas de otra disciplina (rolls antiguos), que se marcan.
+	const posicionesDelRoll = $derived(
+		posicionesCatalog.filter(
+			(p) =>
+				p.disciplina === disciplina ||
+				posicionesFueBien.includes(p.id) ||
+				posicionesFallaron.includes(p.id)
+		)
+	);
+	function etiquetaPosicion(p: Posicion): string {
+		return p.disciplina === disciplina ? p.nombre : `${p.nombre} · ${DISCIPLINA_LABEL[p.disciplina]}`;
+	}
+	function etiquetaTecnica(t: Tecnica): string {
+		const base = t.variante ? `${t.nombre} (${t.variante})` : t.nombre;
+		return t.disciplina === disciplina ? base : `${base} · ${DISCIPLINA_LABEL[t.disciplina]}`;
+	}
+
 	const posicionesAgrupadas = $derived.by(() => {
 		const grupos: { categoria: CategoriaPosicion; items: Posicion[] }[] = [];
 		for (const cat of CATEGORIAS_ORDEN) {
-			const items = posicionesCatalog
+			const items = posicionesDelRoll
 				.filter((p) => p.categoria === cat)
 				.slice()
 				.sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -282,12 +330,55 @@
 
 	const tecnicasFiltradas = $derived.by(() => {
 		const q = tecnicaQuery.trim().toLocaleLowerCase();
-		const all = tecnicasCatalog.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+		const all = tecnicasCatalog
+			.filter(
+				(t) =>
+					t.disciplina === disciplina ||
+					tecnicasFueBien.includes(t.id) ||
+					tecnicasFallaron.includes(t.id)
+			)
+			.sort((a, b) => a.nombre.localeCompare(b.nombre));
 		if (!q) return all;
 		return all.filter((t) => {
 			const label = t.variante ? `${t.nombre} (${t.variante})` : t.nombre;
 			return label.toLocaleLowerCase().includes(q);
 		});
+	});
+
+	const haySeleccion = $derived(
+		posicionesFueBien.length +
+			posicionesFallaron.length +
+			tecnicasFueBien.length +
+			tecnicasFallaron.length >
+			0
+	);
+
+	function handleDisciplinaChange(v: string | null) {
+		const nueva = (v ?? disciplina) as DisciplinaCatalogo;
+		if (nueva === disciplina) return;
+		if (haySeleccion) {
+			disciplinaPendiente = nueva;
+			return;
+		}
+		disciplina = nueva;
+	}
+
+	function confirmarCambioDisciplina() {
+		if (!disciplinaPendiente) return;
+		disciplina = disciplinaPendiente;
+		posicionesFueBien = [];
+		posicionesFallaron = [];
+		tecnicasFueBien = [];
+		tecnicasFallaron = [];
+		disciplinaPendiente = null;
+	}
+
+	// Sub-asistentes de creación: la disciplina del roll o "Ambos" (crea las
+	// dos y el roll enlaza la copia de su disciplina).
+	const opcionesCrear = $derived({
+		preferido: disciplina,
+		porDefecto: disciplina,
+		permitidas: [disciplina, 'ambos'] as Disciplina[]
 	});
 
 	function handlePosicionesFueBienChange(ids: string[]) {
@@ -600,6 +691,7 @@
 			await onSave({
 				id: roll?.id ?? crypto.randomUUID(),
 				sesion_id: sesionId,
+				disciplina,
 				companero_id: companeroId ?? undefined,
 				tamano_relativo: tamanoRelativo,
 				duracion_min: duracionFinal,
@@ -645,7 +737,7 @@
 				e.preventDefault();
 				return;
 			}
-			if (crearPosicionOpen || crearTecnicaOpen) {
+			if (crearPosicionOpen || crearTecnicaOpen || disciplinaPendiente !== null) {
 				e.preventDefault();
 			}
 		}}
@@ -653,6 +745,8 @@
 		<Dialog.Header>
 			<Dialog.Title>{roll ? `Editar roll #${roll.orden}` : 'Nuevo roll'}</Dialog.Title>
 		</Dialog.Header>
+
+		<AvisoCatalogo />
 
 		{#if mode === 'wizard'}
 			<div class="flex items-center gap-1 pt-2">
@@ -692,6 +786,15 @@
 							value={companeroId}
 							onChange={handleCompaneroChange}
 							onCreate={handleCompaneroCreate}
+						/>
+						<!-- T-4.it7: disciplina del roll (parte de la de la sesión). -->
+						<h3 class="pt-1 text-sm font-semibold">Disciplina</h3>
+						<Chips
+							options={DISCIPLINAS_ROLL}
+							value={disciplina}
+							required
+							onChange={handleDisciplinaChange}
+							ariaLabel="Disciplina del roll"
 						/>
 
 						{#if showExtraData}
@@ -801,7 +904,7 @@
 								groups={posicionesAgrupadasFiltradas.map((g) => ({
 									key: g.categoria,
 									label: CATEGORIA_LABEL[g.categoria],
-									items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+									items: g.items.map((p) => ({ value: p.id, label: etiquetaPosicion(p) }))
 								}))}
 								value={posicionesFueBien}
 								onChange={handlePosicionesFueBienChange}
@@ -818,7 +921,7 @@
 								groups={posicionesAgrupadasFiltradas.map((g) => ({
 									key: g.categoria,
 									label: CATEGORIA_LABEL[g.categoria],
-									items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+									items: g.items.map((p) => ({ value: p.id, label: etiquetaPosicion(p) }))
 								}))}
 								value={posicionesFallaron}
 								onChange={handlePosicionesFallaronChange}
@@ -893,7 +996,7 @@
 								showSearch={false}
 								items={tecnicasFiltradas.map((t) => ({
 									value: t.id,
-									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+									label: etiquetaTecnica(t)
 								}))}
 								value={tecnicasFueBien}
 								onChange={handleTecnicasFueBienChange}
@@ -909,7 +1012,7 @@
 								showSearch={false}
 								items={tecnicasFiltradas.map((t) => ({
 									value: t.id,
-									label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+									label: etiquetaTecnica(t)
 								}))}
 								value={tecnicasFallaron}
 								onChange={handleTecnicasFallaronChange}
@@ -1015,6 +1118,17 @@
 						/>
 					</div>
 
+					<div class="space-y-1.5">
+						<Label>Disciplina</Label>
+						<Chips
+							options={DISCIPLINAS_ROLL}
+							value={disciplina}
+							required
+							onChange={handleDisciplinaChange}
+							ariaLabel="Disciplina del roll"
+						/>
+					</div>
+
 				<div class="space-y-1.5">
 					<Label>Tamaño relativo</Label>
 					<Chips
@@ -1082,7 +1196,7 @@
 							groups={posicionesAgrupadasFiltradas.map((g) => ({
 								key: g.categoria,
 								label: CATEGORIA_LABEL[g.categoria],
-								items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+								items: g.items.map((p) => ({ value: p.id, label: etiquetaPosicion(p) }))
 							}))}
 							value={posicionesFueBien}
 							onChange={handlePosicionesFueBienChange}
@@ -1099,7 +1213,7 @@
 							groups={posicionesAgrupadasFiltradas.map((g) => ({
 								key: g.categoria,
 								label: CATEGORIA_LABEL[g.categoria],
-								items: g.items.map((p) => ({ value: p.id, label: p.nombre }))
+								items: g.items.map((p) => ({ value: p.id, label: etiquetaPosicion(p) }))
 							}))}
 							value={posicionesFallaron}
 							onChange={handlePosicionesFallaronChange}
@@ -1169,7 +1283,7 @@
 							showSearch={false}
 							items={tecnicasFiltradas.map((t) => ({
 								value: t.id,
-								label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+								label: etiquetaTecnica(t)
 							}))}
 							value={tecnicasFueBien}
 							onChange={handleTecnicasFueBienChange}
@@ -1185,7 +1299,7 @@
 							showSearch={false}
 							items={tecnicasFiltradas.map((t) => ({
 								value: t.id,
-								label: t.variante ? `${t.nombre} (${t.variante})` : t.nombre
+								label: etiquetaTecnica(t)
 							}))}
 							value={tecnicasFallaron}
 							onChange={handleTecnicasFallaronChange}
@@ -1271,7 +1385,11 @@
   roll. Independiente del `mapaModalStack` para no acoplar el RollEditor
   a la infraestructura del mapa.
 -->
-<PosicionWizardDialog bind:open={crearPosicionOpen} onSaved={handlePosicionCreada} />
+<PosicionWizardDialog
+	bind:open={crearPosicionOpen}
+	onSaved={handlePosicionCreada}
+	opcionesDisciplina={opcionesCrear}
+/>
 
 <!--
   T-3.it2: Dialog wrapper para crear una técnica desde dentro del editor de
@@ -1279,4 +1397,32 @@
   La rama (`fue_bien` / `fallo`) se decide al pulsar "+ Crear nueva
   técnica" — la nueva técnica queda preseleccionada en esa rama.
 -->
-<TecnicaWizardDialog bind:open={crearTecnicaOpen} onSaved={handleTecnicaCreada} />
+<TecnicaWizardDialog
+	bind:open={crearTecnicaOpen}
+	onSaved={handleTecnicaCreada}
+	opcionesDisciplina={opcionesCrear}
+/>
+
+<!-- T-4.it7: cambiar la disciplina con posiciones/técnicas elegidas. -->
+<AlertDialog.Root
+	open={disciplinaPendiente !== null}
+	onOpenChange={(v) => {
+		if (!v) disciplinaPendiente = null;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>¿Cambiar la disciplina del roll?</AlertDialog.Title>
+			<AlertDialog.Description>
+				Se quitarán las posiciones y técnicas elegidas, porque son de
+				{DISCIPLINA_LABEL[disciplina]}.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmarCambioDisciplina}>
+				Cambiar a {disciplinaPendiente ? DISCIPLINA_LABEL[disciplinaPendiente] : ''}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

@@ -77,7 +77,7 @@
 	let tecnicasByRoll = $state<Map<string, { fueBien: string[]; fallaron: string[] }>>(new Map());
 
 	let editorOpen = $state(false);
-	let editingRoll: Roll | undefined = $state(undefined);
+	let editingRoll: RollWithContext | undefined = $state(undefined);
 	let editingRollSesionId: string | undefined = $state(undefined);
 
 	// T-5.it2: el panel de análisis se recarga cuando esta key cambia.

@@ -38,11 +38,11 @@
 
 ## 4. Sesiones y rolls
 
-- [ ] 4.1 `sesiones.ts` y `rolls.ts`: `disciplina` en crear/editar (tipo Clase / Open mat y filtro de tipo); verificar con `pnpm check`
-- [ ] 4.2 `SesionEditor` y `SesionForm`: Tipo Clase / Open mat + Disciplina BJJ / Grappling / Ambos (por defecto la activa, selector obligatorio); etiqueta "Clase · BJJ" en inicio, página de sesión y `/rolls`; filtro "Tipo sesión" de `/rolls`; verificar crear y editar sesiones y tocar la opción ya elegida
-- [ ] 4.3 `RollEditor`: prop `sesionDisciplina`, valor inicial (sesión, o activa si la sesión es Ambos), chips BJJ / Grappling en el paso 1 y en el formulario; pickers filtrados más elegidos antiguos marcados; verificar en una sesión de Grappling, en una Ambos con BJJ activo y editando un roll migrado con elementos de otra disciplina (se ven marcados y se conservan al guardar)
-- [ ] 4.4 Cambio de disciplina con selección → `AlertDialog` (confirmar vacía; cancelar no cambia); sin selección cambia directo; verificar los tres escenarios
-- [ ] 4.5 Sub-asistentes desde el roll: disciplina del roll o Ambos; el roll enlaza la copia de su disciplina; verificar creando "Dogfight" Ambos desde un roll de BJJ
+- [x] 4.1 `sesiones.ts` y `rolls.ts`: `disciplina` en crear/editar (tipo Clase / Open mat y filtro de tipo); verificar con `pnpm check`
+- [x] 4.2 `SesionEditor` y `SesionForm`: Tipo Clase / Open mat + Disciplina BJJ / Grappling / Ambos (por defecto la activa, selector obligatorio); etiqueta "Clase · BJJ" en inicio, página de sesión y `/rolls`; filtro "Tipo sesión" de `/rolls`; verificar crear y editar sesiones y tocar la opción ya elegida
+- [x] 4.3 `RollEditor`: prop `sesionDisciplina`, valor inicial (sesión, o activa si la sesión es Ambos), chips BJJ / Grappling en el paso 1 y en el formulario; pickers filtrados más elegidos antiguos marcados; verificar en una sesión de Grappling, en una Ambos con BJJ activo y editando un roll migrado con elementos de otra disciplina (se ven marcados y se conservan al guardar)
+- [x] 4.4 Cambio de disciplina con selección → `AlertDialog` (confirmar vacía; cancelar no cambia); sin selección cambia directo; verificar los tres escenarios
+- [x] 4.5 Sub-asistentes desde el roll: disciplina del roll o Ambos; el roll enlaza la copia de su disciplina; verificar creando "Dogfight" Ambos desde un roll de BJJ
 
 ## 5. Importación de "Ambos" como copias
 
