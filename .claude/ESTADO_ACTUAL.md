@@ -59,7 +59,9 @@
 
 **T-2.it7 cerrada (2026-10-06):** validada por el owner en preview (tras borrar la caché del sitio en la tablet: el SW servía la versión anterior y la BD mostraba la v9). Change `historial-importaciones` archivado: nuevas capacidades de spec `historial-importaciones` y `copia-seguridad`. Fusionada en main desde la rama `it7/t2-historial`. **Al desplegar, la BD de prod migra a v10.** Sin riesgo: el owner no tiene datos en prod (sus datos viven en los JSON de backup que importa donde los necesita). Bugs nuevos detectados en la validación (en MEJORAS_FUTURAS, se corregirán más adelante): el micrófono no se apaga solo, y "Refinar" pierde los detalles.
 
-**Próximo paso concreto:** T-3 (`vista-previa-importacion`): `/opsx:apply` con un subagente (primero el rework del ciclo de vida del borrador, después el modo vista previa en /mapa, los pasos por disciplina y los errores) → validación del owner en preview → archive → cierre de la it.7 (evaluar el piloto de OpenSpec, bump de versión, tag, CHANGELOG).
+**T-3 implementada en la rama `it7/t3-vista-previa` (2026-10-06), NO en main:** 4 commits wip (el borrador sale del diálogo como `ImportacionBorrador`; disciplina de la importación y catálogo por disciplina; token `--highlight` y elementos fantasma; modo vista previa en /mapa). Check y build en verde; sin probar en el navegador. **Conflicto abierto para el owner:** las sumisiones tienen el nombre único en todo el catálogo (`schema.ts:101`), así que una sumisión que existe en otra disciplina no se puede crear en esta (falla en silencio, junto con sus técnicas). Las posiciones sí admiten duplicados por disciplina.
+
+**Próximo paso concreto:** el owner decide el conflicto de sumisiones y valida T-3 en preview (tablet y escritorio) → archive → fusionar en main → cierre de la it.7 (evaluación del piloto de OpenSpec, bump de versión, tag).
 
 ---
 
