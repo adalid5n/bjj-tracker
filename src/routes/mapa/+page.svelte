@@ -278,9 +278,19 @@
 		}
 	}
 
-	async function toggleDisciplina() {
-		const siguiente = settings.disciplinaActiva === 'bjj' ? 'grappling' : 'bjj';
-		await settings.setDisciplinaActiva(siguiente);
+	/**
+	 * Selector BJJ / Grappling: tocar una opción la elige; tocar la activa
+	 * no hace nada (misma regla que Grafo / Lista). Early return para no
+	 * escribir en BD sin necesidad.
+	 */
+	const OPCIONES_DISCIPLINA: { value: 'bjj' | 'grappling'; label: string }[] = [
+		{ value: 'bjj', label: 'BJJ' },
+		{ value: 'grappling', label: 'Grappling' }
+	];
+
+	async function elegirDisciplina(valor: 'bjj' | 'grappling') {
+		if (valor === settings.disciplinaActiva) return;
+		await settings.setDisciplinaActiva(valor);
 	}
 
 	async function handleBulkAñadirTag() {
@@ -635,19 +645,22 @@
 				</div>
 
 				{#if settings.initialized}
-					<button
-						type="button"
-						onclick={toggleDisciplina}
+					<div
+						role="group"
+						aria-label="Disciplina activa"
 						class="ml-auto inline-flex rounded-md border border-border bg-muted p-0.5"
-						aria-label="Alternar disciplina entre BJJ y Grappling"
 					>
-						<span class="rounded px-3 py-1.5 text-sm font-medium transition-colors {settings.disciplinaActiva === 'bjj' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">
-							BJJ
-						</span>
-						<span class="rounded px-3 py-1.5 text-sm font-medium transition-colors {settings.disciplinaActiva === 'grappling' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">
-							Grappling
-						</span>
-					</button>
+						{#each OPCIONES_DISCIPLINA as opt (opt.value)}
+							<button
+								type="button"
+								aria-pressed={settings.disciplinaActiva === opt.value}
+								onclick={() => elegirDisciplina(opt.value)}
+								class="rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {settings.disciplinaActiva === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+							>
+								{opt.label}
+							</button>
+						{/each}
+					</div>
 				{/if}
 			</div>
 

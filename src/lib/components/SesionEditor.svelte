@@ -239,6 +239,7 @@
 							value={tipo}
 							onChange={handleTipoChange}
 							ariaLabel="Tipo de sesión"
+							required
 						/>
 					</div>
 				{/if}

@@ -931,6 +931,7 @@
 							value={resultado ?? null}
 							onChange={handleResultadoChange}
 							ariaLabel="Resultado del roll"
+							required
 						/>
 					</div>
 				{/if}
@@ -1204,6 +1205,7 @@
 						value={resultado ?? null}
 						onChange={(v) => (resultado = (v ?? undefined) as ResultadoRoll | undefined)}
 						ariaLabel="Resultado"
+						required
 					/>
 					{#if !resultado}
 						<p class="text-xs text-muted-foreground italic">El resultado es obligatorio.</p>

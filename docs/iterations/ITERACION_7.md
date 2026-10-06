@@ -66,7 +66,7 @@ Que importar una clase deje de ser un disparo a ciegas y de un solo uso:
 
 ### T-1.it7 — Selector coherente
 
-**Estado:** 🟡 Pendiente.
+**Estado:** ✅ Cerrada 2026-10-06 — change archivado (`openspec/changes/archive/2026-10-06-selector-coherente`). Ampliada por decisión del owner a "Tipo *" (sesión) y "Resultado *" (roll); nueva capacidad transversal `selectores`.
 **Change OpenSpec:** [`openspec/changes/selector-coherente/`](../../openspec/changes/selector-coherente/proposal.md)
 
 **Qué entrega:** regla única para selectores de "una opción obligatoria

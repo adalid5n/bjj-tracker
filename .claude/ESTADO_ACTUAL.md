@@ -1,7 +1,7 @@
 # Estado actual del proyecto
 
 **Última actualización:** 2026-10-05 (sesión 50 — Codespaces para tablet + config de agente + fix modelo IA + piloto SDD con OpenSpec)
-**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 (selector-coherente) en implementación.
+**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 ✅ (2026-10-06); T-2 (historial-importaciones) siguiente.
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
 
 ---
@@ -55,7 +55,9 @@
 
 **Pendiente del owner (fuera del repo):** secret `VITE_GROQ_KEY` en Codespaces (limitado al repo), idle timeout/retention, copiar JSON a la tablet, `/login` de Claude Code en el Codespace.
 
-**Próximo paso concreto:** plan de la it.7 cerrado y subido. T-1 (`selector-coherente`) lo está implementando un subagente → `pnpm check`/`build` → validación manual del owner → `/opsx:archive selector-coherente` → T-2. **Lección:** en el Codespace, subir a menudo; un reinicio mató a un subagente a mitad de trabajo y las decisiones solo estaban en el chat. Opcional: crear el secret de Codespaces para que la key sobreviva a recrear el Codespace.
+**T-1.it7 cerrada (2026-10-06):** BJJ/Grappling del mapa pasa a dos botones; prop `required` en `Chips` para disciplina en los 3 asistentes (crear y editar) y, ampliado por decisión del owner, para "Tipo *" (SesionEditor) y "Resultado *" (RollEditor ×2). Nueva capacidad de spec transversal `selectores`. El owner validó en preview el alcance original; Tipo y Resultado solo se comprobaron con check y build. Primer ciclo SDD completo: propose → apply → validación → archive.
+
+**Próximo paso concreto:** T-2 (`historial-importaciones`, incluye arreglar el backup) con `/opsx:apply`. Es la tarea grande: nueva migración, panel de historial y backup. **Lección:** en el Codespace, subir a menudo; un reinicio mató a un subagente a mitad de trabajo y las decisiones solo estaban en el chat. Opcional: crear el secret de Codespaces para que la key sobreviva a recrear el Codespace.
 
 ---
 

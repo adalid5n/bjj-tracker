@@ -45,7 +45,7 @@ activa.
 
 ### New Capabilities
 
-(ninguna)
+- `selectores`: regla transversal de selector de opción única obligatoria (incluye Tipo de sesión y Resultado de roll, añadidos tras la implementación por decisión del owner).
 
 ### Modified Capabilities
 

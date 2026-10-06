@@ -5,20 +5,28 @@
 		options,
 		value,
 		onChange,
-		ariaLabel
+		ariaLabel,
+		required = false
 	}: {
 		options: Option[];
 		value: string | null;
 		onChange: (v: string | null) => void;
 		ariaLabel?: string;
+		/**
+		 * Selector obligatorio de opción única (p. ej. disciplina): tocar la
+		 * opción activa no hace nada en vez de des-seleccionarla. Por defecto
+		 * `false` — los campos opcionales siguen pudiendo vaciarse re-tocando.
+		 */
+		required?: boolean;
 	} = $props();
 
 	function handleClick(optValue: string) {
+		if (required && value === optValue) return;
 		onChange(value === optValue ? null : optValue);
 	}
 </script>
 
-<div role="radiogroup" aria-label={ariaLabel} class="flex flex-wrap gap-2">
+<div role="radiogroup" aria-label={ariaLabel} aria-required={required || undefined} class="flex flex-wrap gap-2">
 	{#each options as opt (opt.value)}
 		{@const selected = value === opt.value}
 		<button

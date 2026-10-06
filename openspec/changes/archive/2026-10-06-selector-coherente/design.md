@@ -65,3 +65,7 @@ posible pulido).
 ## Migration Plan
 
 Sin migración. Despliegue normal; rollback = revert del commit.
+
+## Ampliación tras la implementación (decisión del owner, 2026-10-06)
+
+Durante la implementación aparecieron dos campos obligatorios (`*`) con el mismo problema: `SesionEditor.svelte` "Tipo" y `RollEditor.svelte` "Resultado" (asistente y editor). Al volver a tocar la opción, el campo se vaciaba y bloqueaba el avance. Se les añade `required` a `Chips`. Como sesiones y rolls aún no tienen spec propio, la regla se recoge como capacidad transversal `selectores`. El selector Fue bien/Fue mal de RollEditor ya cumplía la regla (son pestañas que fijan el valor).

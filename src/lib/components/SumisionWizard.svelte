@@ -471,6 +471,7 @@
 				<Chips
 					options={DISCIPLINAS}
 					value={disciplina}
+					required
 					onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
 					ariaLabel="Disciplina de la sumisión"
 				/>
@@ -540,6 +541,7 @@
 					<Chips
 						options={DISCIPLINAS}
 						value={disciplina}
+						required
 						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
 						ariaLabel="Disciplina de la sumisión"
 					/>
