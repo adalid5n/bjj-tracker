@@ -48,13 +48,20 @@
 	import Combobox from '$lib/components/Combobox.svelte';
 	import type {
 		Disciplina,
+		DisciplinaCatalogo,
 		EstadoTecnica,
 		Posicion,
 		SumisionTerminal,
 		Tecnica,
 		TipoTecnica
 	} from '$lib/types';
-	import { mapaModalStack, tecnicaWizardDraft } from './mapa-modal-stack.svelte';
+	import {
+		mapaModalStack,
+		tecnicaWizardDraft,
+		type OpcionesDisciplina
+	} from './mapa-modal-stack.svelte';
+	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
+	import { avisoCatalogo } from '$lib/aviso-catalogo.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
@@ -68,8 +75,13 @@
 		onDirtyChange,
 		onCreateNewPosicionOrigen,
 		onCreateNewPosicionDestino,
-		onCreateNewSumisionDestino
+		onCreateNewSumisionDestino,
+		opcionesDisciplina = {}
 	}: {
+		// T-4.it7: disciplina ofrecida al crear. `preferido` = disciplina de
+		// la lista de orígenes (por defecto, la activa); `permitidas` limita
+		// la opción "Ambos" (p. ej. contras: solo la de la técnica).
+		opcionesDisciplina?: OpcionesDisciplina;
 		modo: 'crear' | 'editar';
 		// T-3.it2: modo de integración con el padre.
 		//  - 'stack' (default): vivimos dentro de `MapaModalHost`. Usa
@@ -97,9 +109,19 @@
 		// sub-Dialog y llama `onResult(newId)` cuando el sub guarda; nosotros
 		// asignamos el id al state correspondiente. Si están undefined, los
 		// botones "+ Crear nueva" no aparecen en standalone.
-		onCreateNewPosicionOrigen?: (onResult: (newId: string) => void) => void;
-		onCreateNewPosicionDestino?: (onResult: (newId: string) => void) => void;
-		onCreateNewSumisionDestino?: (onResult: (newId: string) => void) => void;
+		// `opciones`: disciplina que hereda el elemento creado (T-4.it7).
+		onCreateNewPosicionOrigen?: (
+			onResult: (newId: string) => void,
+			opciones: OpcionesDisciplina
+		) => void;
+		onCreateNewPosicionDestino?: (
+			onResult: (newId: string) => void,
+			opciones: OpcionesDisciplina
+		) => void;
+		onCreateNewSumisionDestino?: (
+			onResult: (newId: string) => void,
+			opciones: OpcionesDisciplina
+		) => void;
 	} = $props();
 
 	const TIPOS: { value: TipoTecnica; label: string }[] = [
@@ -116,11 +138,6 @@
 		{ value: 'descartada', label: 'Descartada' }
 	];
 
-	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
-		{ value: 'bjj', label: 'BJJ' },
-		{ value: 'grappling', label: 'Grappling' },
-		{ value: 'ambos', label: 'Ambos' }
-	];
 
 	// Pasos semánticos: 1=Nombre, 2=Variante, 3=Posición origen, 4=Tipo,
 	// 5=Destino, 6=Estado, 7=Detalles, 8=Errores comunes.
@@ -157,7 +174,11 @@
 	let detallesOriginal = $state('');
 	let erroresComunes = $state('');
 	let erroresComunesOriginal = $state('');
-	let disciplina = $state<Disciplina>('bjj');
+	// T-4.it7: la técnica toma la disciplina de su posición de origen. Al
+	// crear solo se elige si además se crea en la otra ("Ambos"). Al editar
+	// la disciplina es la guardada y no se puede cambiar (P3).
+	let ambos = $state(false);
+	let disciplinaGuardada = $state<DisciplinaCatalogo | null>(null);
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -230,7 +251,7 @@
 		// `settings.modoAvanzado` sincrónicamente desde el render.
 		await settings.init();
 		if (modo !== 'editar') {
-			disciplina = settings.disciplinaActiva;
+			ambos = opcionesDisciplina.porDefecto === 'ambos';
 		}
 		if (mode === 'stack') {
 			mapaModalStack.setDirtyHandler(() => isDirty);
@@ -276,6 +297,7 @@
 			estado = draft.estado;
 			detalles = draft.detalles;
 			erroresComunes = draft.erroresComunes;
+			if (draft.ambos !== undefined) ambos = draft.ambos;
 			currentStep = draft.currentStep;
 			visitedSteps = new Set(draft.visitedSteps);
 			// El snapshot se sigue cargando desde BD (modo editar) o
@@ -326,12 +348,12 @@
 				estado = t.estado;
 				detalles = t.detalles;
 				erroresComunes = t.errores_comunes;
-				disciplina = t.disciplina;
 			}
 			// Preserva los textos existentes en BD. En hobbyist los pasos no
 			// se renderizan, pero al guardar usamos `*Original` para no pisar
 			// el dato. En avanzado, `detalles` y `erroresComunes` son
 			// editables y arrancan con estos valores.
+			disciplinaGuardada = t.disciplina;
 			detallesOriginal = t.detalles;
 			erroresComunesOriginal = t.errores_comunes;
 			snapshot = {
@@ -389,6 +411,7 @@
 			estado,
 			detalles,
 			erroresComunes,
+			ambos,
 			currentStep,
 			visitedSteps: [...visitedSteps]
 		});
@@ -428,11 +451,66 @@
 
 	// Items de los Comboboxes: precomputados para evitar reordenar/re-derive
 	// dentro del template.
+	// T-4.it7: disciplina de la lista de orígenes. Al editar, la de la
+	// técnica; al crear, la del origen precargado o la preferida (activa).
+	const ladoOrigenLista = $derived.by<DisciplinaCatalogo>(() => {
+		if (disciplinaGuardada) return disciplinaGuardada;
+		// Disciplina impuesta por el llamador (p. ej. contra: la de la técnica).
+		if (opcionesDisciplina.preferido && opcionesDisciplina.permitidas?.length === 1) {
+			return opcionesDisciplina.preferido;
+		}
+		const pre = posicionOrigenIdProp
+			? posiciones.find((p) => p.id === posicionOrigenIdProp)
+			: undefined;
+		return pre?.disciplina ?? opcionesDisciplina.preferido ?? settings.disciplinaActiva;
+	});
+	// Disciplina de la técnica = la de su origen.
+	const ladoTecnica = $derived.by<DisciplinaCatalogo>(() => {
+		if (disciplinaGuardada) return disciplinaGuardada;
+		const o = posicionOrigenId ? posiciones.find((p) => p.id === posicionOrigenId) : undefined;
+		return o?.disciplina ?? ladoOrigenLista;
+	});
+	// Selector de disciplina al crear: la del origen y, si se permite, "Ambos".
+	const DISCIPLINAS = $derived<{ value: Disciplina; label: string }[]>(
+		([ladoTecnica, 'ambos'] as Disciplina[])
+			.filter((d) => d !== 'ambos' || (opcionesDisciplina.permitidas ?? ['ambos']).includes('ambos'))
+			.map((d) => ({ value: d, label: DISCIPLINA_LABEL[d] }))
+	);
+	const disciplinaElegida = $derived<Disciplina>(ambos ? 'ambos' : ladoTecnica);
+	function handleDisciplinaChange(v: string | null) {
+		if (v) ambos = v === 'ambos';
+	}
+	// Disciplina que hereda una posición/sumisión creada al vuelo: la de la
+	// técnica, o "Ambos" si la técnica es "Ambos".
+	const opcionesDestinoNuevo = $derived<OpcionesDisciplina>({
+		preferido: ladoTecnica,
+		porDefecto: disciplinaElegida,
+		permitidas: DISCIPLINAS.map((d) => d.value)
+	});
+	const opcionesOrigenNuevo = $derived<OpcionesDisciplina>({
+		preferido: ladoOrigenLista,
+		porDefecto: ambos ? 'ambos' : ladoOrigenLista,
+		permitidas: ([ladoOrigenLista, 'ambos'] as Disciplina[]).filter(
+			(d) => d !== 'ambos' || (opcionesDisciplina.permitidas ?? ['ambos']).includes('ambos')
+		)
+	});
+
+	// Orígenes y destinos: solo de la misma disciplina (los ya elegidos se
+	// conservan aunque sean de otra, p. ej. técnicas antiguas cruzadas).
+	const origenItems = $derived(
+		posiciones
+			.filter((p) => p.disciplina === ladoOrigenLista || p.id === posicionOrigenId)
+			.map((p) => ({ id: p.id, label: p.nombre, sublabel: undefined }))
+	);
 	const posicionItems = $derived(
-		posiciones.map((p) => ({ id: p.id, label: p.nombre, sublabel: undefined }))
+		posiciones
+			.filter((p) => p.disciplina === ladoTecnica || p.id === posicionDestinoId)
+			.map((p) => ({ id: p.id, label: p.nombre, sublabel: undefined }))
 	);
 	const sumisionItems = $derived(
-		sumisiones.map((s) => ({ id: s.id, label: s.nombre, sublabel: undefined }))
+		sumisiones
+			.filter((s) => s.disciplina === ladoTecnica || s.id === sumisionDestinoId)
+			.map((s) => ({ id: s.id, label: s.nombre, sublabel: undefined }))
 	);
 
 	function nombreYaExiste(): boolean {
@@ -591,7 +669,8 @@
 		mapaModalStack.push({
 			kind: 'wizard-posicion',
 			modo: 'crear',
-			nombre: 'Nueva posición (origen)'
+			nombre: 'Nueva posición (origen)',
+			disciplina: opcionesOrigenNuevo
 		});
 	}
 
@@ -629,7 +708,8 @@
 		mapaModalStack.push({
 			kind: 'wizard-posicion',
 			modo: 'crear',
-			nombre: 'Nueva posición (destino)'
+			nombre: 'Nueva posición (destino)',
+			disciplina: opcionesDestinoNuevo
 		});
 	}
 
@@ -643,7 +723,7 @@
 				posiciones = await listPosiciones();
 			});
 			posicionOrigenId = newId;
-		});
+		}, opcionesOrigenNuevo);
 	}
 
 	function handleStandaloneCreateNuevaPosicion() {
@@ -652,7 +732,7 @@
 				posiciones = await listPosiciones();
 			});
 			posicionDestinoId = newId;
-		});
+		}, opcionesDestinoNuevo);
 	}
 
 	function handleStandaloneCreateNuevaSumision() {
@@ -661,7 +741,7 @@
 				sumisiones = await listSumisiones();
 			});
 			sumisionDestinoId = newId;
-		});
+		}, opcionesDestinoNuevo);
 	}
 
 	// Idem para sumisión (rama tipo=sumision).
@@ -682,7 +762,8 @@
 		mapaModalStack.push({
 			kind: 'wizard-sumision',
 			modo: 'crear',
-			nombre: 'Nueva sumisión (destino)'
+			nombre: 'Nueva sumisión (destino)',
+			disciplina: opcionesDestinoNuevo
 		});
 	}
 
@@ -814,25 +895,33 @@
 			const sumisionDestinoFinal = tipo === 'sumision' ? (sumisionDestinoId ?? undefined) : undefined;
 
 			if (modo === 'crear') {
-				const { createTecnica } = await import('$lib/tecnicas');
+				const { crearTecnicaEnLados, textoAvisoCreados } = await import('$lib/catalogo-lados');
 				// Detalles + errores comunes (T-3.it6): editables solo en modo
 				// avanzado. En hobbyist persistimos cadena vacía.
 				const detallesFinal = settings.modoAvanzado ? detalles.trim() : '';
 				const erroresComunesFinal = settings.modoAvanzado
 					? erroresComunes.trim()
 					: '';
-				const nueva = await createTecnica({
-					nombre: nombreFinal,
-					variante: varianteFinal,
-					posicion_origen_id: posicionOrigenId,
-					posicion_destino_id: posicionDestinoFinal,
-					sumision_destino_id: sumisionDestinoFinal,
-					tipo,
-					estado: estadoFinal,
-					detalles: detallesFinal,
-					errores_comunes: erroresComunesFinal,
-					disciplina
-				});
+				// T-4.it7: disciplina = la del origen; con "Ambos" se crea
+				// también en la otra, entre las posiciones/sumisiones del
+				// mismo nombre de esa disciplina (creando las que falten).
+				const { tecnicas: creadas, creados } = await crearTecnicaEnLados(
+					{
+						nombre: nombreFinal,
+						variante: varianteFinal,
+						posicion_origen_id: posicionOrigenId,
+						posicion_destino_id: posicionDestinoFinal,
+						sumision_destino_id: sumisionDestinoFinal,
+						tipo,
+						estado: estadoFinal,
+						detalles: detallesFinal,
+						errores_comunes: erroresComunesFinal
+					},
+					ladoTecnica,
+					ambos
+				);
+				const nueva = creadas[ladoTecnica]!;
+				if (creados.length > 0) avisoCatalogo.set(textoAvisoCreados(creados));
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
 					mapaModalStack.setDirtyHandler(null);
@@ -883,8 +972,7 @@
 					tipo,
 					estado: estadoFinal,
 					detalles: detallesFinal,
-					errores_comunes: erroresComunesFinal,
-					disciplina
+					errores_comunes: erroresComunesFinal
 				});
 				if (mode === 'stack') {
 					onSaved?.(tecnicaId, 'editar');
@@ -897,7 +985,12 @@
 				}
 			}
 		} catch (err) {
-			if (isUniqueError(err)) {
+			if (err instanceof Error && err.name === 'TecnicaDuplicadaError') {
+				// T-4.it7: con "Ambos", la copia de la otra disciplina ya existe.
+				nombreError = `${err.message} Cambia el nombre o la variante, o créala solo en ${DISCIPLINA_LABEL[ladoTecnica]}.`;
+				errorMsg = '';
+				currentStep = 1;
+			} else if (isUniqueError(err)) {
 				nombreError =
 					'Ya existe una técnica con ese mismo nombre, origen y variante. Cambia el nombre o la variante.';
 				errorMsg = '';
@@ -1014,7 +1107,7 @@
 					posicionOrigenId = id;
 					clearNombreError();
 				}}
-				items={posicionItems}
+				items={origenItems}
 				placeholder="Selecciona una posición…"
 				searchPlaceholder="Buscar posición…"
 				emptyMessage="Sin posiciones en el catálogo."
@@ -1049,11 +1142,16 @@
 			<h3 class="text-sm font-semibold pt-1">Disciplina</h3>
 			<Chips
 				options={DISCIPLINAS}
-				value={disciplina}
+				value={disciplinaElegida}
 				required
-				onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+				onChange={handleDisciplinaChange}
 				ariaLabel="Disciplina de la técnica"
 			/>
+			<p class="text-xs text-muted-foreground">
+				La de la posición de origen. "Ambos" la crea también en
+				{DISCIPLINA_LABEL[ladoTecnica === 'bjj' ? 'grappling' : 'bjj']}, entre las posiciones del
+				mismo nombre (si falta alguna, se crea y se avisa). No se puede cambiar después.
+			</p>
 		</div>
 
 		<!-- Paso 5: Destino (rama por tipo) -->
@@ -1249,7 +1347,7 @@
 							posicionOrigenId = id;
 							clearNombreError();
 						}}
-						items={posicionItems}
+						items={origenItems}
 						placeholder="Selecciona una posición…"
 						searchPlaceholder="Buscar posición…"
 						emptyMessage="Sin posiciones en el catálogo."
@@ -1275,13 +1373,9 @@
 
 				<div class="space-y-1.5">
 					<Label>Disciplina</Label>
-					<Chips
-						options={DISCIPLINAS}
-						value={disciplina}
-						required
-						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
-						ariaLabel="Disciplina de la técnica"
-					/>
+					<!-- T-4.it7 (P3): fija tras crear, solo lectura. -->
+					<p class="text-sm text-foreground">{DISCIPLINA_LABEL[ladoTecnica]}</p>
+					<p class="text-xs text-muted-foreground">No se puede cambiar después de crear.</p>
 				</div>
 
 				<div class="space-y-1.5">

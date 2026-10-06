@@ -267,7 +267,13 @@
 	const contrasYaPorId = $derived(new Set(contras.map((c) => c.id)));
 	const tecnicasComboItems = $derived(
 		todasTecnicas
-			.filter((t) => t.id !== tecnica.id && !contrasYaPorId.has(t.id))
+			// T-4.it7: solo técnicas de la misma disciplina.
+			.filter(
+				(t) =>
+					t.id !== tecnica.id &&
+					!contrasYaPorId.has(t.id) &&
+					t.disciplina === tecnica.disciplina
+			)
 			.map((t) => {
 				const label = t.variante ? `${t.nombre} (${t.variante})` : t.nombre;
 				const sublabel = `desde ${posicionesById[t.posicion_origen_id] ?? '¿?'}`;
@@ -338,7 +344,10 @@
 			kind: 'wizard-tecnica',
 			modo: 'crear',
 			nombre: 'Nueva técnica (contra)',
-			posicionOrigenId: origen?.posicion_complementaria_id ?? undefined
+			posicionOrigenId: origen?.posicion_complementaria_id ?? undefined,
+			// T-4.it7: la contra es de la misma disciplina que esta técnica
+			// (orígenes de esa disciplina, sin opción "Ambos").
+			disciplina: { preferido: tecnica.disciplina, permitidas: [tecnica.disciplina] }
 		});
 	}
 

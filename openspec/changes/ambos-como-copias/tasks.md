@@ -29,12 +29,12 @@
 
 ## 3. Catálogo: crear en las dos disciplinas y conexiones
 
-- [ ] 3.1 DAO: envoltorio de creación doble con `SAVEPOINT` (posición con etiquetas, sumisión, técnica con extremos que falten) y búsqueda de contraparte por nombre en la otra disciplina; `update*` sin cambiar la disciplina; verificar con `pnpm check`
-- [ ] 3.2 `PosicionWizard` y `SumisionWizard`: chips BJJ / Grappling / Ambos al crear; nombre repetido por disciplina (con Ambos, en las dos, nombrando dónde); Ambos crea dos y abre la ficha de la disciplina activa; complementaria limitada a la misma disciplina y regla de Ambos (design §5); verificar en `pnpm dev` crear "Dogfight" Ambos con etiqueta y complementaria, y que renombrar una copia no cambia la otra
-- [ ] 3.3 `TecnicaWizard`: disciplina = la del origen (chips: esa + Ambos), destinos de esa disciplina, crear destino al vuelo con esa disciplina; Ambos con contrapartes por nombre y creación de las que falten en la otra disciplina con aviso de lo creado; duplicado exacto comprobado en las dos copias; verificar los tres escenarios de "Conexiones dentro de la misma disciplina"
-- [ ] 3.4 Contras (`TecnicaModalContent` y creación de contra): solo técnicas/orígenes de la misma disciplina; verificar con una técnica de Grappling
-- [ ] 3.5 Editar (los tres asistentes en modo formulario): sin selector de disciplina, se muestra como dato de solo lectura y se guarda la que tenía; verificar editando una sumisión aislada y una posición con técnicas (en ninguna se puede cambiar)
-- [ ] 3.6 `/mapa`: filtro por `=== disciplinaVista` (sin Ambos) en grafo y listas; verificar que cambiar de disciplina no muestra elementos de la otra y que las fichas siguen mostrando técnicas cruzadas antiguas
+- [x] 3.1 DAO: envoltorio de creación doble con `SAVEPOINT` (posición con etiquetas, sumisión, técnica con extremos que falten) y búsqueda de contraparte por nombre en la otra disciplina; `update*` sin cambiar la disciplina; verificar con `pnpm check`
+- [x] 3.2 `PosicionWizard` y `SumisionWizard`: chips BJJ / Grappling / Ambos al crear; nombre repetido por disciplina (con Ambos, en las dos, nombrando dónde); Ambos crea dos y abre la ficha de la disciplina activa; complementaria limitada a la misma disciplina y regla de Ambos (design §5); verificar en `pnpm dev` crear "Dogfight" Ambos con etiqueta y complementaria, y que renombrar una copia no cambia la otra
+- [x] 3.3 `TecnicaWizard`: disciplina = la del origen (chips: esa + Ambos), destinos de esa disciplina, crear destino al vuelo con esa disciplina; Ambos con contrapartes por nombre y creación de las que falten en la otra disciplina con aviso de lo creado; duplicado exacto comprobado en las dos copias; verificar los tres escenarios de "Conexiones dentro de la misma disciplina"
+- [x] 3.4 Contras (`TecnicaModalContent` y creación de contra): solo técnicas/orígenes de la misma disciplina; verificar con una técnica de Grappling
+- [x] 3.5 Editar (los tres asistentes en modo formulario): sin selector de disciplina, se muestra como dato de solo lectura y se guarda la que tenía; verificar editando una sumisión aislada y una posición con técnicas (en ninguna se puede cambiar)
+- [x] 3.6 `/mapa`: filtro por `=== disciplinaVista` (sin Ambos) en grafo y listas; verificar que cambiar de disciplina no muestra elementos de la otra y que las fichas siguen mostrando técnicas cruzadas antiguas
 
 ## 4. Sesiones y rolls
 

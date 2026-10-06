@@ -368,15 +368,16 @@
 	const DISCIPLINA_LABEL: Record<DisciplinaPaso, string> = { bjj: 'BJJ', grappling: 'Grappling' };
 
 	// Filtra por disciplina visible: la seleccionada (o la del paso de la
-	// vista previa) + ambos.
+	// vista previa). T-4.it7: ningún elemento es ya "Ambos" — cada
+	// disciplina tiene su propio grafo.
 	const posicionesPorDisciplina = $derived(
-		posiciones.filter((p) => p.disciplina === disciplinaVista || p.disciplina === 'ambos')
+		posiciones.filter((p) => p.disciplina === disciplinaVista)
 	);
 	const sumisionesPorDisciplina = $derived(
-		sumisiones.filter((s) => s.disciplina === disciplinaVista || s.disciplina === 'ambos')
+		sumisiones.filter((s) => s.disciplina === disciplinaVista)
 	);
 	const tecnicasPorDisciplina = $derived(
-		tecnicas.filter((t) => t.disciplina === disciplinaVista || t.disciplina === 'ambos')
+		tecnicas.filter((t) => t.disciplina === disciplinaVista)
 	);
 
 	const posicionesFiltradas = $derived(

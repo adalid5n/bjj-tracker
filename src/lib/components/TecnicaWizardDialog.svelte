@@ -33,13 +33,17 @@
 	import PosicionWizardDialog from './PosicionWizardDialog.svelte';
 	import SumisionWizardDialog from './SumisionWizardDialog.svelte';
 	import type { Tecnica, Posicion, SumisionTerminal } from '$lib/types';
+	import type { OpcionesDisciplina } from './mapa-modal-stack.svelte';
 
 	let {
 		open = $bindable(false),
 		onSaved,
-		onCancel
+		onCancel,
+		opcionesDisciplina = {}
 	}: {
 		open?: boolean;
+		// T-4.it7: disciplina ofrecida (desde un roll: la del roll o "Ambos").
+		opcionesDisciplina?: OpcionesDisciplina;
 		// Se invoca cuando el wizard guarda con éxito. El padre puede usar
 		// la técnica completa (recargada de BD) para añadirla a su estado.
 		// El wrapper cierra el Dialog automáticamente después.
@@ -139,18 +143,24 @@
 	let onPosicionDestinoResult: ((id: string) => void) | null = null;
 	let onSumisionDestinoResult: ((id: string) => void) | null = null;
 
-	function requestCreatePosicionOrigen(onResult: (id: string) => void) {
+	// Disciplina que hereda el elemento creado al vuelo (T-4.it7).
+	let opcionesSub = $state<OpcionesDisciplina>({});
+
+	function requestCreatePosicionOrigen(onResult: (id: string) => void, opciones: OpcionesDisciplina) {
 		onPosicionOrigenResult = onResult;
+		opcionesSub = opciones;
 		subPosicionOrigenOpen = true;
 	}
 
-	function requestCreatePosicionDestino(onResult: (id: string) => void) {
+	function requestCreatePosicionDestino(onResult: (id: string) => void, opciones: OpcionesDisciplina) {
 		onPosicionDestinoResult = onResult;
+		opcionesSub = opciones;
 		subPosicionDestinoOpen = true;
 	}
 
-	function requestCreateSumisionDestino(onResult: (id: string) => void) {
+	function requestCreateSumisionDestino(onResult: (id: string) => void, opciones: OpcionesDisciplina) {
 		onSumisionDestinoResult = onResult;
+		opcionesSub = opciones;
 		subSumisionDestinoOpen = true;
 	}
 
@@ -204,6 +214,7 @@
 			<TecnicaWizard
 				modo="crear"
 				mode="standalone"
+				{opcionesDisciplina}
 				onSaved={handleWizardSaved}
 				onRequestClose={handleWizardRequestClose}
 				onDirtyChange={handleDirtyChange}
@@ -229,6 +240,7 @@
 		onSaved={handleSubPosicionOrigenSaved}
 		onCancel={handleSubPosicionOrigenCancel}
 		allowCreateNewComplementaria={false}
+		opcionesDisciplina={opcionesSub}
 	/>
 {/if}
 
@@ -238,6 +250,7 @@
 		onSaved={handleSubPosicionDestinoSaved}
 		onCancel={handleSubPosicionDestinoCancel}
 		allowCreateNewComplementaria={false}
+		opcionesDisciplina={opcionesSub}
 	/>
 {/if}
 
@@ -246,6 +259,7 @@
 		bind:open={subSumisionDestinoOpen}
 		onSaved={handleSubSumisionDestinoSaved}
 		onCancel={handleSubSumisionDestinoCancel}
+		opcionesDisciplina={opcionesSub}
 	/>
 {/if}
 
