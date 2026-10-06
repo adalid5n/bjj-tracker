@@ -706,8 +706,8 @@
 
 	/**
 	 * Pinta los elementos nuevos con el factor de resaltado `t`: mezcla del
-	 * color normal (mismo que el stylesheet: posición = muted / borde
-	 * muted-foreground; sumisión = foreground; flecha = muted-foreground)
+	 * color normal del BORDE en nodos (posición = muted-foreground; sumisión =
+	 * foreground) y de la línea en flechas (muted-foreground)
 	 * con `highlight`. Solo cambia COLOR, nunca tamaño.
 	 */
 	function aplicarPulso(instance: Core, t = reducirMovimiento ? 1 : ultimoFactor) {
@@ -722,13 +722,11 @@
 				if (el.group() === 'edges') {
 					el.style({ 'line-color': flecha, 'target-arrow-color': flecha });
 				} else if (el.data('kind') === 'sumision') {
-					const c = mezclar(tok.foreground, hl, t);
-					el.style({ 'background-color': c, 'border-color': c });
+					// Nodos: solo respira el BORDE (decisión owner); el relleno
+					// conserva su color para no perder la identidad del nodo.
+					el.style({ 'border-color': mezclar(tok.foreground, hl, t) });
 				} else {
-					el.style({
-						'background-color': mezclar(tok.muted, hl, t),
-						'border-color': mezclar(tok.mutedForeground, hl, t)
-					});
+					el.style({ 'border-color': mezclar(tok.mutedForeground, hl, t) });
 				}
 			});
 		});

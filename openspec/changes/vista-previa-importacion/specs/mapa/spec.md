@@ -5,7 +5,7 @@ Durante la vista previa de una importación, el grafo del mapa SHALL
 mostrar el catálogo existente junto con lo que se va a añadir: posiciones
 y sumisiones nuevas como nodos y técnicas nuevas como flechas. Lo nuevo
 MUST destacarse con un color que respira: pasa suavemente de su color
-normal al color de resaltado (amarillo dorado (más oscuro que el blanco de las sumisiones)) y vuelve, de forma continua y sin
+normal al color de resaltado (amarillo vivo, solo en el borde de los nodos y en la línea de las flechas) y vuelve, de forma continua y sin
 cambiar de tamaño. Una posición o sumisión existente que recibe una
 técnica nueva no se resalta; solo la flecha.
 
