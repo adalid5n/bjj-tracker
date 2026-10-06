@@ -20,7 +20,6 @@
 	import ImportarClaseDialog from '$lib/components/ImportarClaseDialog.svelte';
 	import {
 		ImportacionBorrador,
-		filtrarPorDisciplinaImportacion,
 		type DisciplinaPaso,
 		type NoCreado
 	} from '$lib/importacion-borrador.svelte';
@@ -509,16 +508,30 @@
 					sumisiones: sumisionesPorDisciplina,
 					tecnicas: tecnicasPorDisciplina
 				},
-				{
-					posiciones: filtrarPorDisciplinaImportacion(posiciones, borrador.disciplina),
-					sumisiones: filtrarPorDisciplinaImportacion(sumisiones, borrador.disciplina)
-				},
+				// T-4.it7: cada paso se compara con el catálogo de SU lado; lo
+				// que solo existe en el otro lado de un "Ambos" se creará aquí.
+				{ posiciones: posicionesPorDisciplina, sumisiones: sumisionesPorDisciplina },
 				{
 					posiciones: borrador.posicionesDraft,
 					sumisiones: borrador.sumisionesDraft,
 					tecnicas: borrador.tecnicasDraft
 				},
-				new Set(borrador.excluidosPorError.map((e) => e.clave))
+				// Exclusiones por error: solo las de este lado.
+				new Set(
+					borrador.excluidosPorError
+						.filter((e) => pasosPreview[e.paso] === disciplinaPaso)
+						.map((e) => e.clave)
+				),
+				{
+					lado: disciplinaPaso,
+					catalogoOtroLado:
+						pasosPreview.length > 1
+							? {
+									posiciones: posiciones.filter((p) => p.disciplina !== disciplinaPaso),
+									sumisiones: sumisiones.filter((x) => x.disciplina !== disciplinaPaso)
+								}
+							: undefined
+				}
 			);
 			if (r.problemas.length > 0) {
 				return {
@@ -566,6 +579,8 @@
 	let errorAceptarPreview = $state<string | null>(null);
 	// Tras aceptar: elementos que no se crearon (pasos con error saltados).
 	let avisoNoCreados = $state<NoCreado[]>([]);
+	// T-4.it7 (P2): lo creado solo en un lado para completar la otra disciplina.
+	let avisoCreadosEnUnLado = $state<NoCreado[]>([]);
 
 	/**
 	 * "Ver en el mapa" (paso "Añadir detalles"): cierra fichas (respetando
@@ -579,6 +594,7 @@
 			vistaPrincipal = 'grafo';
 			errorAceptarPreview = null;
 			avisoNoCreados = [];
+			avisoCreadosEnUnLado = [];
 			borrador.entrarPreview();
 		};
 		if (modalHost) modalHost.attemptCloseAll(entrar);
@@ -622,6 +638,7 @@
 			}
 			await refresh(() => borrador.reset());
 			avisoNoCreados = res.noCreados;
+			avisoCreadosEnUnLado = res.creadosEnUnLado;
 		} catch (err) {
 			errorAceptarPreview = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -1331,21 +1348,40 @@
 {/if}
 
 <!-- T-3.it7: aviso tras aceptar de lo que no se creó (pasos con error saltados). -->
-{#if avisoNoCreados.length > 0 && !previewActivo}
+{#if (avisoNoCreados.length > 0 || avisoCreadosEnUnLado.length > 0) && !previewActivo}
 	<div
 		class="fixed right-0 bottom-14 left-0 z-40 border-t border-warning/40 bg-card px-4 py-3 shadow-lg"
 		role="status"
 	>
 		<div class="mx-auto flex max-w-2xl items-start gap-3">
 			<div class="min-w-0 flex-1 text-sm">
-				<p class="font-medium text-warning">No se creó:</p>
-				<ul class="mt-1 space-y-0.5 text-xs text-muted-foreground">
-					{#each avisoNoCreados as nc, i (i)}
-						<li><span class="font-medium text-foreground">«{nc.nombre}»</span> — {nc.motivo}</li>
-					{/each}
-				</ul>
+				{#if avisoNoCreados.length > 0}
+					<p class="font-medium text-warning">No se creó:</p>
+					<ul class="mt-1 space-y-0.5 text-xs text-muted-foreground">
+						{#each avisoNoCreados as nc, i (i)}
+							<li><span class="font-medium text-foreground">«{nc.nombre}»</span> — {nc.motivo}</li>
+						{/each}
+					</ul>
+				{/if}
+				{#if avisoCreadosEnUnLado.length > 0}
+					<p class="font-medium text-foreground {avisoNoCreados.length > 0 ? 'mt-2' : ''}">
+						Creado para completar la otra disciplina:
+					</p>
+					<ul class="mt-1 space-y-0.5 text-xs text-muted-foreground">
+						{#each avisoCreadosEnUnLado as c, i (i)}
+							<li><span class="font-medium text-foreground">«{c.nombre}»</span> — {c.motivo}</li>
+						{/each}
+					</ul>
+				{/if}
 			</div>
-			<Button variant="outline" size="sm" onclick={() => (avisoNoCreados = [])}>Entendido</Button>
+			<Button
+				variant="outline"
+				size="sm"
+				onclick={() => {
+					avisoNoCreados = [];
+					avisoCreadosEnUnLado = [];
+				}}>Entendido</Button
+			>
 		</div>
 	</div>
 {/if}

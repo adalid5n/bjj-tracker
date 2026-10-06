@@ -16,6 +16,7 @@
  * módulo en `.svelte.ts`.
  */
 import { listPosiciones, createPosicion } from '$lib/posiciones';
+import { getTagsForPosicion, setTagsForPosicion } from '$lib/tags';
 import { listTecnicas, createTecnica } from '$lib/tecnicas';
 import { listSumisiones, createSumision } from '$lib/sumisiones';
 import {
@@ -25,7 +26,14 @@ import {
 	validarPropuesta
 } from '$lib/ai';
 import type { CatalogoSnapshot, AIPropuesta, NormalizacionResult } from '$lib/ai';
-import type { CategoriaPosicion, Disciplina, TipoRolPosicion, TipoTecnica } from '$lib/types';
+import type {
+	CategoriaPosicion,
+	Disciplina,
+	Posicion,
+	SumisionTerminal,
+	TipoRolPosicion,
+	TipoTecnica
+} from '$lib/types';
 import { settings } from '$lib/settings.svelte';
 import { capitalizeFirst } from '$lib/utils';
 import {
@@ -89,28 +97,51 @@ export type ExcluidoPorError = {
 export type NoCreado = { nombre: string; motivo: string };
 
 export type ResultadoConfirmar =
-	| { ok: true; ghostToReal: Map<string, string>; noCreados: NoCreado[] }
+	| {
+			ok: true;
+			ghostToReal: Map<string, string>;
+			noCreados: NoCreado[];
+			/** T-4.it7 (P2): lo creado solo en un lado para completar la otra disciplina. */
+			creadosEnUnLado: NoCreado[];
+	  }
 	| { ok: false };
 
+const LADO_LABEL: Record<DisciplinaPaso, string> = { bjj: 'BJJ', grappling: 'Grappling' };
+
 /**
- * Disciplinas del catálogo con las que se compara una importación (y que
- * se envían a la IA): BJJ o Grappling → esa y "Ambos"; "Ambos" → solo
- * "Ambos". Lo que no esté ahí se crea nuevo con la disciplina de la
- * importación, aunque exista con el mismo nombre en la otra.
+ * T-4.it7: lados de una importación. BJJ o Grappling → ese; "Ambos" → los
+ * dos (cada elemento nuevo se crea como dos copias independientes). Cada
+ * lado se compara solo con el catálogo de su disciplina (sustituye la regla
+ * de T-3 "Ambos → solo Ambos").
  */
-export function disciplinasDeCatalogo(d: Disciplina): Disciplina[] {
-	if (d === 'ambos') return ['ambos'];
-	return [d, 'ambos'];
+export function ladosDeImportacion(d: Disciplina): DisciplinaPaso[] {
+	return d === 'ambos' ? ['bjj', 'grappling'] : [d];
 }
 
-/** Filtra una lista del catálogo por la disciplina de la importación. */
-export function filtrarPorDisciplinaImportacion<T extends { disciplina: Disciplina }>(
+/** Filtra una lista del catálogo a los lados de la importación. */
+export function filtrarPorDisciplinaImportacion<T extends { disciplina: string }>(
 	items: T[],
 	d: Disciplina
 ): T[] {
-	const permitidas = new Set(disciplinasDeCatalogo(d));
+	const permitidas = new Set<string>(ladosDeImportacion(d));
 	return items.filter((it) => permitidas.has(it.disciplina));
 }
+
+/** Une listas sin repetir nombres (normalizados); gana la primera aparición. */
+function unirPorNombre<T extends { nombre: string }>(items: T[]): T[] {
+	const vistos = new Set<string>();
+	return items.filter((it) => {
+		const n = normalizarNombre(it.nombre);
+		if (vistos.has(n)) return false;
+		vistos.add(n);
+		return true;
+	});
+}
+
+type CatalogoLado = {
+	posiciones: { id: string; nombre: string; categoria: CategoriaPosicion; tipo?: TipoRolPosicion }[];
+	sumisiones: { id: string; nombre: string; notas: string }[];
+};
 
 function mensajeErrorIA(err: unknown): string {
 	if (err instanceof Error && err.message === 'GROQ_KEY_MISSING') {
@@ -145,7 +176,46 @@ export class ImportacionBorrador {
 
 	/** Pasos de la vista previa: uno por disciplina; "Ambos" → BJJ y Grappling. */
 	get pasosPreview(): DisciplinaPaso[] {
-		return this.disciplina === 'ambos' ? ['bjj', 'grappling'] : [this.disciplina];
+		return ladosDeImportacion(this.disciplina);
+	}
+
+	/**
+	 * T-4.it7: catálogo de cada lado al generar la propuesta. Decide qué es
+	 * nuevo en cada lado (`ladosNuevos*`). La IA y "+ Añadir" usan la unión
+	 * (`catalogoPosicionesBase` / `catalogoSumisionesBase`).
+	 */
+	catalogoPorLado = $state<Partial<Record<DisciplinaPaso, CatalogoLado>>>({});
+
+	/** Lados de la importación en los que una posición con ese nombre no existe. */
+	ladosNuevosPosicion(nombre: string): DisciplinaPaso[] {
+		const n = normalizarNombre(nombre);
+		return this.pasosPreview.filter(
+			(l) => !(this.catalogoPorLado[l]?.posiciones ?? []).some((p) => normalizarNombre(p.nombre) === n)
+		);
+	}
+
+	/** Lados de la importación en los que una sumisión con ese nombre no existe. */
+	ladosNuevosSumision(nombre: string): DisciplinaPaso[] {
+		const n = normalizarNombre(nombre);
+		return this.pasosPreview.filter(
+			(l) => !(this.catalogoPorLado[l]?.sumisiones ?? []).some((s) => normalizarNombre(s.nombre) === n)
+		);
+	}
+
+	/**
+	 * Indicador de la revisión en una importación "Ambos" (vacío si no
+	 * aplica): "Nueva en BJJ y Grappling" / "Nueva solo en Grappling · ya
+	 * existe en BJJ".
+	 */
+	indicadorLados(kind: 'pos' | 'sum', nombre: string): string {
+		if (this.pasosPreview.length < 2 || !nombre.trim()) return '';
+		const nuevos = kind === 'pos' ? this.ladosNuevosPosicion(nombre) : this.ladosNuevosSumision(nombre);
+		if (nuevos.length === 2) return 'Nueva en BJJ y Grappling';
+		if (nuevos.length === 1) {
+			const otro = nuevos[0] === 'bjj' ? 'grappling' : 'bjj';
+			return `Nueva solo en ${LADO_LABEL[nuevos[0]]} · ya existe en ${LADO_LABEL[otro]}`;
+		}
+		return 'Ya existe en BJJ y Grappling';
 	}
 	textoClase = $state('');
 	normalizacion = $state<NormalizacionResult | null>(null);
@@ -174,19 +244,29 @@ export class ImportacionBorrador {
 	catalogoPosicionesBase = $state<{ id: string; nombre: string }[]>([]);
 	catalogoSumisionesBase = $state<{ id: string; nombre: string }[]>([]);
 
-	todasPosicionesDisponibles = $derived([
-		...this.catalogoPosicionesBase.map((p) => p.nombre),
-		...this.posicionesDraft
-			.filter((p) => p.seleccionado && p.nombreEditado.trim())
-			.map((p) => p.nombreEditado.trim())
-	]);
+	// T-4.it7: sin repetir nombres (en "Ambos", una posición que existe en
+	// un lado y es nueva en el otro aparece una sola vez).
+	todasPosicionesDisponibles = $derived(
+		unirPorNombre(
+			[
+				...this.catalogoPosicionesBase.map((p) => p.nombre),
+				...this.posicionesDraft
+					.filter((p) => p.seleccionado && p.nombreEditado.trim())
+					.map((p) => p.nombreEditado.trim())
+			].map((nombre) => ({ nombre }))
+		).map((x) => x.nombre)
+	);
 
-	todasSumisionesDisponibles = $derived([
-		...this.catalogoSumisionesBase.map((s) => s.nombre),
-		...this.sumisionesDraft
-			.filter((s) => s.seleccionado && s.nombreEditado.trim())
-			.map((s) => s.nombreEditado.trim())
-	]);
+	todasSumisionesDisponibles = $derived(
+		unirPorNombre(
+			[
+				...this.catalogoSumisionesBase.map((s) => s.nombre),
+				...this.sumisionesDraft
+					.filter((s) => s.seleccionado && s.nombreEditado.trim())
+					.map((s) => s.nombreEditado.trim())
+			].map((nombre) => ({ nombre }))
+		).map((x) => x.nombre)
+	);
 
 	haySeleccionados = $derived(
 		this.posicionesDraft.some((p) => p.seleccionado) ||
@@ -217,6 +297,7 @@ export class ImportacionBorrador {
 		this.tecnicasDraft = [];
 		this.catalogoPosicionesBase = [];
 		this.catalogoSumisionesBase = [];
+		this.catalogoPorLado = {};
 		this.textoRefinamiento = '';
 		this.propuestaActual = null;
 		this.validacionCorrecciones = [];
@@ -346,7 +427,16 @@ export class ImportacionBorrador {
 		}
 	}
 
-	/** Rellena los borradores a partir de una propuesta de la IA. */
+	/**
+	 * Rellena los borradores a partir de una propuesta de la IA.
+	 *
+	 * T-4.it7: "existe" se decide por lado. Una posición/sumisión que ya
+	 * existe en TODOS los lados de la importación no aparece como nueva; si
+	 * existe solo en alguno (importación "Ambos"), aparece como nueva para
+	 * el lado que falta aunque la IA la marque como existente. Además, en
+	 * "Ambos", los extremos de técnicas que existen solo en un lado se
+	 * añaden como nuevos para el otro (P2: "Ambos" completo en las dos).
+	 */
 	private aplicarPropuesta(propuesta: AIPropuesta, posBase: string[], sumBase: string[]) {
 		const posNombres = new Set([
 			...posBase.map((n) => n.toLowerCase()),
@@ -360,26 +450,80 @@ export class ImportacionBorrador {
 		this.propuestaActual = propuesta;
 		this.resumenAI = propuesta.resumen;
 
-		this.posicionesDraft = propuesta.posiciones
-			.filter((p) => !p.esExistente)
-			.map((p) => ({
-				nombre: capitalizeFirst(p.nombre),
-				categoria: p.categoria,
-				tipo: p.tipo,
-				seleccionado: true,
-				nombreEditado: capitalizeFirst(p.nombre),
-				categoriaEditada: p.categoria,
-				tipoEditado: p.tipo
-			}));
+		const ambos = this.pasosPreview.length > 1;
+		const lados = this.pasosPreview;
+		const existenteEn = (kind: 'pos' | 'sum', nombre: string) => {
+			const n = normalizarNombre(nombre);
+			for (const l of lados) {
+				const lista = kind === 'pos' ? this.catalogoPorLado[l]?.posiciones : this.catalogoPorLado[l]?.sumisiones;
+				const e = (lista ?? []).find((x) => normalizarNombre(x.nombre) === n);
+				if (e) return e;
+			}
+			return undefined;
+		};
 
-		this.sumisionesDraft = propuesta.sumisiones
-			.filter((s) => !s.esExistente)
-			.map((s) => ({
-				nombre: capitalizeFirst(s.nombre),
+		const posiciones: PosicionItem[] = [];
+		const vistasPos = new Set<string>();
+		const addPos = (nombre: string, categoria: CategoriaPosicion, tipo: TipoRolPosicion | undefined) => {
+			const n = normalizarNombre(nombre);
+			if (!n || vistasPos.has(n)) return;
+			if (this.ladosNuevosPosicion(nombre).length === 0) return;
+			vistasPos.add(n);
+			posiciones.push({
+				nombre: capitalizeFirst(nombre),
+				categoria,
+				tipo,
 				seleccionado: true,
-				nombreEditado: capitalizeFirst(s.nombre),
-				notas: s.notas
-			}));
+				nombreEditado: capitalizeFirst(nombre),
+				categoriaEditada: categoria,
+				tipoEditado: tipo
+			});
+		};
+		for (const p of propuesta.posiciones) {
+			if (p.esExistente && !ambos) continue;
+			const e = p.esExistente ? existenteEn('pos', p.nombre) : undefined;
+			const ex = e as CatalogoLado['posiciones'][number] | undefined;
+			addPos(ex?.nombre ?? p.nombre, ex?.categoria ?? p.categoria, ex ? ex.tipo : p.tipo);
+		}
+
+		const sumisiones: SumisionItem[] = [];
+		const vistasSum = new Set<string>();
+		const addSum = (nombre: string, notas: string | undefined) => {
+			const n = normalizarNombre(nombre);
+			if (!n || vistasSum.has(n)) return;
+			if (this.ladosNuevosSumision(nombre).length === 0) return;
+			vistasSum.add(n);
+			sumisiones.push({
+				nombre: capitalizeFirst(nombre),
+				seleccionado: true,
+				nombreEditado: capitalizeFirst(nombre),
+				notas
+			});
+		};
+		for (const sm of propuesta.sumisiones) {
+			if (sm.esExistente && !ambos) continue;
+			const ex = (sm.esExistente ? existenteEn('sum', sm.nombre) : undefined) as
+				| CatalogoLado['sumisiones'][number]
+				| undefined;
+			addSum(ex?.nombre ?? sm.nombre, ex ? ex.notas : sm.notas);
+		}
+
+		// "Ambos": extremos de técnicas que existen solo en un lado.
+		if (ambos) {
+			for (const t of propuesta.tecnicas) {
+				for (const nombre of [t.posicionOrigenNombre, t.tipo === 'sumision' ? undefined : t.posicionDestinoNombre]) {
+					const ex = nombre ? (existenteEn('pos', nombre) as CatalogoLado['posiciones'][number] | undefined) : undefined;
+					if (ex) addPos(ex.nombre, ex.categoria, ex.tipo);
+				}
+				if (t.tipo === 'sumision' && t.sumisionDestinoNombre) {
+					const ex = existenteEn('sum', t.sumisionDestinoNombre) as CatalogoLado['sumisiones'][number] | undefined;
+					if (ex) addSum(ex.nombre, ex.notas);
+				}
+			}
+		}
+
+		this.posicionesDraft = posiciones;
+		this.sumisionesDraft = sumisiones;
 
 		this.tecnicasDraft = propuesta.tecnicas.map((t) => {
 			const origenOk = posNombres.has(t.posicionOrigenNombre.toLowerCase());
@@ -405,18 +549,31 @@ export class ImportacionBorrador {
 		this.errorAI = null;
 		const histId = this.importacionId;
 		try {
-			// Solo el catálogo de la disciplina de la importación: es lo que
-			// recibe la IA y con lo que se compara "ya existe".
+			// Solo el catálogo de los lados de la importación: es lo que
+			// recibe la IA (en "Ambos", BJJ ∪ Grappling sin repetir nombres)
+			// y con lo que se compara "ya existe" (cada lado con el suyo).
 			const d = this.disciplina;
 			const [posiciones, tecnicas, sumisiones] = await Promise.all([
 				listPosiciones().then((l) => filtrarPorDisciplinaImportacion(l, d)),
 				listTecnicas().then((l) => filtrarPorDisciplinaImportacion(l, d)),
 				listSumisiones().then((l) => filtrarPorDisciplinaImportacion(l, d))
 			]);
+			const porLado: Partial<Record<DisciplinaPaso, CatalogoLado>> = {};
+			for (const lado of ladosDeImportacion(d)) {
+				porLado[lado] = {
+					posiciones: posiciones
+						.filter((p) => p.disciplina === lado)
+						.map((p) => ({ id: p.id, nombre: p.nombre, categoria: p.categoria, tipo: p.tipo })),
+					sumisiones: sumisiones
+						.filter((s) => s.disciplina === lado)
+						.map((s) => ({ id: s.id, nombre: s.nombre, notas: s.notas }))
+				};
+			}
+			this.catalogoPorLado = porLado;
 			const catalogo: CatalogoSnapshot = {
-				posiciones: posiciones.map((p) => ({ id: p.id, nombre: p.nombre })),
+				posiciones: unirPorNombre(posiciones).map((p) => ({ id: p.id, nombre: p.nombre })),
 				tecnicas: tecnicas.map((t) => ({ nombre: t.nombre, posicion_origen_id: t.posicion_origen_id })),
-				sumisiones: sumisiones.map((s) => ({ id: s.id, nombre: s.nombre }))
+				sumisiones: unirPorNombre(sumisiones).map((s) => ({ id: s.id, nombre: s.nombre }))
 			};
 			this.catalogoPosicionesBase = catalogo.posiciones;
 			this.catalogoSumisionesBase = catalogo.sumisiones;
@@ -520,197 +677,247 @@ export class ImportacionBorrador {
 
 	/**
 	 * Inserta en el catálogo lo marcado (posiciones → sumisiones →
-	 * técnicas) con la disciplina de la importación, excepto
-	 * `excluidosPorError` (y las técnicas que dependen de ellos).
-	 * `ok: false` = fallo general (queda en `errorInsert`). Registra lo
-	 * creado en el historial. `ghostToReal` mapea el id fantasma de la
-	 * vista previa al id real en el grafo, para conservar su posición.
+	 * técnicas), excepto `excluidosPorError` (y las técnicas que dependen
+	 * de ellos). `ok: false` = fallo general (queda en `errorInsert`).
+	 * Registra lo creado en el historial. `ghostToReal` mapea el id
+	 * fantasma de la vista previa al id real en el grafo, para conservar su
+	 * posición.
+	 *
+	 * T-4.it7: un bucle por lado (BJJ y/o Grappling), cada uno con su mapa
+	 * nombre → id. Lo que ya existe en un lado se enlaza (no se crea); lo
+	 * que falta para una técnica y existe en el otro lado se crea como copia
+	 * (P2) y se avisa en `creadosEnUnLado`. "Técnica idéntica", "no se creó"
+	 * y las exclusiones por error se evalúan por lado.
 	 */
 	async confirmar(): Promise<ResultadoConfirmar> {
 		if (this.inserting) return { ok: false };
 		this.inserting = true;
 		this.errorInsert = null;
 		const histId = this.importacionId;
-		const disciplina = this.disciplina;
+		const lados = this.pasosPreview;
+		const ambos = lados.length > 1;
 		// T-2.it7: lo realmente creado en este intento (ids + nombres).
 		const creado: Aceptado = { posiciones: [], sumisiones: [], tecnicas: [] };
 		const ghostToReal = new Map<string, string>();
-		const excluidos = new Map(this.excluidosPorError.map((e) => [e.clave as string, e]));
-		const noCreados: NoCreado[] = this.excluidosPorError.map((e) => ({
-			nombre: e.nombre,
-			motivo: e.motivo
-		}));
-		// Nombres (normalizados) de posiciones/sumisiones excluidas, para
-		// avisar de las técnicas que dependían de ellas.
-		const posExcluidas = new Map<string, string>();
-		const sumExcluidas = new Map<string, string>();
+		const noCreados: NoCreado[] = [];
+		const creadosEnUnLado: NoCreado[] = [];
 		try {
-			// Catálogo fresco de la disciplina de la importación para
-			// resolver nombres → ids (misma regla que la comparación).
-			const [posicionesExistentes, sumisionesExistentes] = await Promise.all([
-				listPosiciones().then((l) => filtrarPorDisciplinaImportacion(l, disciplina)),
-				listSumisiones().then((l) => filtrarPorDisciplinaImportacion(l, disciplina))
+			const [todasPos, todasSum, todasTec] = await Promise.all([
+				listPosiciones(),
+				listSumisiones(),
+				listTecnicas()
 			]);
-
-			const posNormMap = new Map(
-				posicionesExistentes.map((p) => [p.nombre.toLowerCase().trim(), p.id])
-			);
-			const sumNormMap = new Map(
-				sumisionesExistentes.map((s) => [s.nombre.toLowerCase().trim(), s.id])
-			);
 			// id → nombre real del catálogo, para el bloque "Aceptado".
 			const nombrePorId = new Map<string, string>([
-				...posicionesExistentes.map((p) => [p.id, p.nombre] as [string, string]),
-				...sumisionesExistentes.map((s) => [s.id, s.nombre] as [string, string])
+				...todasPos.map((p) => [p.id, p.nombre] as [string, string]),
+				...todasSum.map((s) => [s.id, s.nombre] as [string, string])
+			]);
+			const norm = (n: string | undefined) => normalizarNombre(n ?? '');
+			// Nombres desmarcados en el borrador: nunca se crean en ningún lado.
+			const desmarcadas = new Set([
+				...this.posicionesDraft.filter((p) => !p.seleccionado).map((p) => `p:${norm(p.nombreEditado)}`),
+				...this.sumisionesDraft.filter((s) => !s.seleccionado).map((s) => `s:${norm(s.nombreEditado)}`)
 			]);
 
-			// Fase A: posiciones marcadas
-			for (const [i, item] of this.posicionesDraft.entries()) {
-				if (!item.seleccionado) continue;
-				if (excluidos.has(`pos:${i}`)) {
-					posExcluidas.set(normalizarNombre(item.nombreEditado), item.nombreEditado);
-					continue;
+			for (const [paso, lado] of lados.entries()) {
+				const en = ambos ? ` en ${LADO_LABEL[lado]}` : '';
+				const excluidos = new Map(
+					this.excluidosPorError.filter((e) => e.paso === paso).map((e) => [e.clave as string, e])
+				);
+				for (const e of excluidos.values()) {
+					noCreados.push({ nombre: e.nombre, motivo: ambos ? `${e.motivo} (${LADO_LABEL[lado]})` : e.motivo });
 				}
-				try {
+				const posMap = new Map(todasPos.filter((p) => p.disciplina === lado).map((p) => [norm(p.nombre), p.id]));
+				const sumMap = new Map(todasSum.filter((s) => s.disciplina === lado).map((s) => [norm(s.nombre), s.id]));
+				const posOtro: Posicion[] = ambos ? todasPos.filter((p) => p.disciplina !== lado) : [];
+				const sumOtro: SumisionTerminal[] = ambos ? todasSum.filter((s) => s.disciplina !== lado) : [];
+				const tecKeys = new Set(
+					todasTec
+						.filter((t) => t.disciplina === lado)
+						.map((t) => `${norm(t.nombre)}\u0000${t.posicion_origen_id}\u0000${norm(t.variante)}`)
+				);
+				// Nombres (normalizados) de posiciones/sumisiones excluidas en
+				// este lado, para avisar de las técnicas que dependían de ellas.
+				const posExcluidas = new Map<string, string>();
+				const sumExcluidas = new Map<string, string>();
+
+				// Fase A: posiciones marcadas (solo donde no existen)
+				for (const [i, item] of this.posicionesDraft.entries()) {
+					if (!item.seleccionado || !item.nombreEditado.trim()) continue;
+					if (excluidos.has(`pos:${i}`)) {
+						posExcluidas.set(norm(item.nombreEditado), item.nombreEditado);
+						continue;
+					}
+					if (posMap.has(norm(item.nombreEditado))) {
+						// Ya existe en este lado: se enlaza. Si existe en todos,
+						// no se creó en ningún sitio → avisar una vez.
+						if (paso === 0 && this.ladosNuevosPosicionEn(item.nombreEditado, todasPos).length === 0) {
+							noCreados.push({ nombre: item.nombreEditado, motivo: 'ya existía' });
+						}
+						continue;
+					}
+					try {
+						const created = await createPosicion({
+							nombre: item.nombreEditado,
+							categoria: item.categoriaEditada,
+							tipo: item.tipoEditado,
+							notas: '',
+							posicion_complementaria_id: null,
+							disciplina: lado
+						});
+						posMap.set(norm(item.nombreEditado), created.id);
+						ghostToReal.set(ghostIdPosicion(item.nombreEditado, lado), `pos:${created.id}`);
+						nombrePorId.set(created.id, created.nombre);
+						creado.posiciones.push({ id: created.id, nombre: created.nombre, categoria: created.categoria });
+						if (ambos && this.ladosNuevosPosicionEn(item.nombreEditado, todasPos).length === 1) {
+							creadosEnUnLado.push({ nombre: created.nombre, motivo: `posición creada en ${LADO_LABEL[lado]}` });
+						}
+					} catch (e) {
+						console.warn('Error creando posición', item.nombreEditado, e);
+						noCreados.push({ nombre: item.nombreEditado, motivo: `no se pudo crear${en}` });
+					}
+				}
+
+				// Fase B: sumisiones marcadas (solo donde no existen)
+				for (const [i, item] of this.sumisionesDraft.entries()) {
+					if (!item.seleccionado || !item.nombreEditado.trim()) continue;
+					if (excluidos.has(`sum:${i}`)) {
+						sumExcluidas.set(norm(item.nombreEditado), item.nombreEditado);
+						continue;
+					}
+					if (sumMap.has(norm(item.nombreEditado))) {
+						if (paso === 0 && this.ladosNuevosSumisionEn(item.nombreEditado, todasSum).length === 0) {
+							noCreados.push({ nombre: item.nombreEditado, motivo: 'ya existía una sumisión con ese nombre' });
+						}
+						continue;
+					}
+					try {
+						const created = await createSumision({
+							nombre: item.nombreEditado,
+							notas: item.notas ?? '',
+							disciplina: lado
+						});
+						sumMap.set(norm(item.nombreEditado), created.id);
+						ghostToReal.set(ghostIdSumision(item.nombreEditado, lado), `sum:${created.id}`);
+						nombrePorId.set(created.id, created.nombre);
+						creado.sumisiones.push({ id: created.id, nombre: created.nombre });
+						if (ambos && this.ladosNuevosSumisionEn(item.nombreEditado, todasSum).length === 1) {
+							creadosEnUnLado.push({ nombre: created.nombre, motivo: `sumisión creada en ${LADO_LABEL[lado]}` });
+						}
+					} catch (e) {
+						console.warn('Error creando sumisión', item.nombreEditado, e);
+						noCreados.push({ nombre: item.nombreEditado, motivo: `no se pudo crear${en}` });
+					}
+				}
+
+				// P2: extremo de técnica que solo existe en el otro lado → copia.
+				const completarPos = async (nombre: string): Promise<string | undefined> => {
+					if (!ambos || desmarcadas.has(`p:${norm(nombre)}`) || posExcluidas.has(norm(nombre))) return undefined;
+					const otro = posOtro
+						.filter((p) => norm(p.nombre) === norm(nombre))
+						.sort((a, b) => (a.created_at < b.created_at ? -1 : 1))[0];
+					if (!otro) return undefined;
 					const created = await createPosicion({
-						nombre: item.nombreEditado,
-						categoria: item.categoriaEditada,
-						tipo: item.tipoEditado,
-						notas: '',
+						nombre: otro.nombre,
+						categoria: otro.categoria,
+						tipo: otro.tipo,
+						notas: otro.notas,
 						posicion_complementaria_id: null,
-						disciplina
+						disciplina: lado
 					});
-					posNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
-					ghostToReal.set(ghostIdPosicion(item.nombreEditado), `pos:${created.id}`);
+					const tags = await getTagsForPosicion(otro.id);
+					if (tags.length > 0) await setTagsForPosicion(created.id, tags.map((t) => t.id));
+					posMap.set(norm(otro.nombre), created.id);
+					ghostToReal.set(ghostIdPosicion(otro.nombre, lado), `pos:${created.id}`);
 					nombrePorId.set(created.id, created.nombre);
 					creado.posiciones.push({ id: created.id, nombre: created.nombre, categoria: created.categoria });
-				} catch (e) {
-					console.warn('Error creando posición', item.nombreEditado, e);
-				}
-			}
-
-			// Fase B: sumisiones marcadas
-			for (const [i, item] of this.sumisionesDraft.entries()) {
-				if (!item.seleccionado) continue;
-				if (excluidos.has(`sum:${i}`)) {
-					sumExcluidas.set(normalizarNombre(item.nombreEditado), item.nombreEditado);
-					continue;
-				}
-				try {
-					const created = await createSumision({
-						nombre: item.nombreEditado,
-						notas: item.notas ?? '',
-						disciplina
-					});
-					sumNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
-					ghostToReal.set(ghostIdSumision(item.nombreEditado), `sum:${created.id}`);
+					creadosEnUnLado.push({ nombre: created.nombre, motivo: `posición creada en ${LADO_LABEL[lado]}` });
+					return created.id;
+				};
+				const completarSum = async (nombre: string): Promise<string | undefined> => {
+					if (!ambos || desmarcadas.has(`s:${norm(nombre)}`) || sumExcluidas.has(norm(nombre))) return undefined;
+					const otro = sumOtro
+						.filter((s) => norm(s.nombre) === norm(nombre))
+						.sort((a, b) => (a.created_at < b.created_at ? -1 : 1))[0];
+					if (!otro) return undefined;
+					const created = await createSumision({ nombre: otro.nombre, notas: otro.notas, disciplina: lado });
+					sumMap.set(norm(otro.nombre), created.id);
+					ghostToReal.set(ghostIdSumision(otro.nombre, lado), `sum:${created.id}`);
 					nombrePorId.set(created.id, created.nombre);
 					creado.sumisiones.push({ id: created.id, nombre: created.nombre });
-				} catch (e) {
-					console.warn('Error creando sumisión', item.nombreEditado, e);
-				}
-			}
+					creadosEnUnLado.push({ nombre: created.nombre, motivo: `sumisión creada en ${LADO_LABEL[lado]}` });
+					return created.id;
+				};
 
-			// Fase C: técnicas marcadas
-			const dependeDeExcluido = (item: TecnicaItem): string | undefined => {
-				const dest =
-					item.tipo === 'sumision'
-						? sumExcluidas.get(normalizarNombre(item.sumisionDestinoNombre ?? ''))
-						: posExcluidas.get(normalizarNombre(item.posicionDestinoNombre ?? ''));
-				return posExcluidas.get(normalizarNombre(item.posicionOrigenNombre)) ?? dest;
-			};
-			for (const [i, item] of this.tecnicasDraft.entries()) {
-				if (!item.seleccionado || excluidos.has(`tec:${i}`)) continue;
-				const origenId = posNormMap.get(item.posicionOrigenNombre.toLowerCase().trim());
-				const excluidoDelQueDepende = dependeDeExcluido(item);
-				if (excluidoDelQueDepende && !origenId) {
-					noCreados.push({
-						nombre: item.nombre,
-						motivo: `depende de «${excluidoDelQueDepende}», que no se creó`
-					});
-					continue;
-				}
-				if (!origenId) {
-					console.warn('Origen no encontrado, saltando técnica:', item.nombre);
-					continue;
-				}
-				try {
-					if (item.tipo === 'sumision') {
-						const sumId = item.sumisionDestinoNombre
-							? sumNormMap.get(item.sumisionDestinoNombre.toLowerCase().trim())
-							: undefined;
-						if (!sumId) {
-							if (excluidoDelQueDepende) {
-								noCreados.push({
-									nombre: item.nombre,
-									motivo: `depende de «${excluidoDelQueDepende}», que no se creó`
-								});
-							}
-							console.warn('Sumisión destino no encontrada, saltando:', item.nombre);
+				// Fase C: técnicas marcadas
+				const dependeDeExcluido = (item: TecnicaItem): string | undefined => {
+					const dest =
+						item.tipo === 'sumision'
+							? sumExcluidas.get(norm(item.sumisionDestinoNombre))
+							: posExcluidas.get(norm(item.posicionDestinoNombre));
+					return posExcluidas.get(norm(item.posicionOrigenNombre)) ?? dest;
+				};
+				for (const [i, item] of this.tecnicasDraft.entries()) {
+					if (!item.seleccionado || excluidos.has(`tec:${i}`)) continue;
+					try {
+						const origenId =
+							posMap.get(norm(item.posicionOrigenNombre)) ??
+							(await completarPos(item.posicionOrigenNombre));
+						const destinoNombre =
+							item.tipo === 'sumision' ? item.sumisionDestinoNombre : item.posicionDestinoNombre;
+						let destId: string | undefined;
+						if (destinoNombre) {
+							destId =
+								item.tipo === 'sumision'
+									? (sumMap.get(norm(destinoNombre)) ?? (await completarSum(destinoNombre)))
+									: (posMap.get(norm(destinoNombre)) ?? (await completarPos(destinoNombre)));
+						}
+						if (!origenId || !destId) {
+							const excl = dependeDeExcluido(item);
+							noCreados.push({
+								nombre: item.nombre,
+								motivo: excl
+									? `depende de «${excl}», que no se creó${en}`
+									: `su origen o destino ya no está disponible${en}`
+							});
+							continue;
+						}
+						const clave = `${norm(item.nombre)}\u0000${origenId}\u0000${norm(item.variante)}`;
+						if (tecKeys.has(clave)) {
+							noCreados.push({ nombre: item.nombre, motivo: `ya existía${en}` });
 							continue;
 						}
 						const tec = await createTecnica({
 							nombre: item.nombre,
 							variante: item.variante,
 							posicion_origen_id: origenId,
-							posicion_destino_id: undefined,
-							sumision_destino_id: sumId,
+							posicion_destino_id: item.tipo === 'sumision' ? undefined : destId,
+							sumision_destino_id: item.tipo === 'sumision' ? destId : undefined,
 							tipo: item.tipo,
 							estado: 'probando',
 							detalles: item.detalles ?? '',
 							errores_comunes: '',
-							disciplina
+							disciplina: lado
 						});
+						tecKeys.add(clave);
 						creado.tecnicas.push({
 							id: tec.id,
 							nombre: tec.nombre,
 							tipo: tec.tipo,
 							origen: nombrePorId.get(origenId) ?? item.posicionOrigenNombre,
-							destino: nombrePorId.get(sumId) ?? item.sumisionDestinoNombre ?? ''
+							destino: nombrePorId.get(destId) ?? destinoNombre ?? ''
 						});
-					} else {
-						const destId = item.posicionDestinoNombre
-							? posNormMap.get(item.posicionDestinoNombre.toLowerCase().trim())
-							: undefined;
-						if (!destId) {
-							if (excluidoDelQueDepende) {
-								noCreados.push({
-									nombre: item.nombre,
-									motivo: `depende de «${excluidoDelQueDepende}», que no se creó`
-								});
-							}
-							console.warn('Destino no encontrado, saltando técnica:', item.nombre);
-							continue;
-						}
-						const tec = await createTecnica({
-							nombre: item.nombre,
-							variante: item.variante,
-							posicion_origen_id: origenId,
-							posicion_destino_id: destId,
-							sumision_destino_id: undefined,
-							tipo: item.tipo,
-							estado: 'probando',
-							detalles: item.detalles ?? '',
-							errores_comunes: '',
-							disciplina
-						});
-						creado.tecnicas.push({
-							id: tec.id,
-							nombre: tec.nombre,
-							tipo: tec.tipo,
-							origen: nombrePorId.get(origenId) ?? item.posicionOrigenNombre,
-							destino: nombrePorId.get(destId) ?? item.posicionDestinoNombre ?? ''
-						});
+					} catch (e) {
+						console.warn('Error creando técnica', item.nombre, e);
+						noCreados.push({ nombre: item.nombre, motivo: `no se pudo crear${en}` });
 					}
-				} catch (e) {
-					console.warn('Error creando técnica', item.nombre, e);
 				}
 			}
 
 			// T-2.it7: lo aceptado se SUMA a lo que la entrada ya tuviera
 			// (reintento de una importación ya "Importada").
 			await this.guardarAceptado(histId, creado, { estado: 'importada', error: null });
-			return { ok: true, ghostToReal, noCreados };
+			return { ok: true, ghostToReal, noCreados, creadosEnUnLado };
 		} catch (err) {
 			this.errorInsert = err instanceof Error ? err.message : String(err);
 			// Lo que sí llegó a crearse no se pierde del historial.
@@ -719,5 +926,20 @@ export class ImportacionBorrador {
 		} finally {
 			this.inserting = false;
 		}
+	}
+
+	/** Como `ladosNuevosPosicion`, pero contra un catálogo fresco (al confirmar). */
+	private ladosNuevosPosicionEn(nombre: string, todas: Posicion[]): DisciplinaPaso[] {
+		const n = normalizarNombre(nombre);
+		return this.pasosPreview.filter(
+			(l) => !todas.some((p) => p.disciplina === l && normalizarNombre(p.nombre) === n)
+		);
+	}
+
+	private ladosNuevosSumisionEn(nombre: string, todas: SumisionTerminal[]): DisciplinaPaso[] {
+		const n = normalizarNombre(nombre);
+		return this.pasosPreview.filter(
+			(l) => !todas.some((s) => s.disciplina === l && normalizarNombre(s.nombre) === n)
+		);
 	}
 }

@@ -46,10 +46,10 @@
 
 ## 5. Importación de "Ambos" como copias
 
-- [ ] 5.1 Borrador: `ladosDeImportacion`, catálogo por lado, unión deduplicada para la IA y `+ Añadir`, `ladosNuevos` en posiciones/sumisiones; verificar en la pestaña Red de `pnpm dev` que una importación Ambos envía BJJ ∪ Grappling sin repetidos y una de Grappling solo Grappling
-- [ ] 5.2 Revisión: indicador "Nueva en BJJ y Grappling" / "Nueva solo en <D> · ya existe en <otra>"; verificar con "Kimura" existente solo en BJJ
-- [ ] 5.3 `confirmar()` por lado (mapas, técnicas idénticas y "no se creó" por lado, exclusiones por error con lado, aviso de lo creado solo en un lado); verificar los escenarios "Inserción de Ambos", "Lo que falta en un lado se crea y se avisa" y "Técnica idéntica en un solo lado"
-- [ ] 5.4 Vista previa por lado: fantasma solo de lo nuevo en el lado, ids fantasma con el lado, `ghostToReal` de los dos pasos; verificar que en el paso BJJ "Kimura" (existente en BJJ) no se resalta y en Grappling sí, y que tras aceptar cada copia aparece donde se vio en su paso
+- [x] 5.1 Borrador: `ladosDeImportacion`, catálogo por lado, unión deduplicada para la IA y `+ Añadir`, `ladosNuevos` en posiciones/sumisiones; verificar en la pestaña Red de `pnpm dev` que una importación Ambos envía BJJ ∪ Grappling sin repetidos y una de Grappling solo Grappling
+- [x] 5.2 Revisión: indicador "Nueva en BJJ y Grappling" / "Nueva solo en <D> · ya existe en <otra>"; verificar con "Kimura" existente solo en BJJ
+- [x] 5.3 `confirmar()` por lado (mapas, técnicas idénticas y "no se creó" por lado, exclusiones por error con lado, aviso de lo creado solo en un lado); verificar los escenarios "Inserción de Ambos", "Lo que falta en un lado se crea y se avisa" y "Técnica idéntica en un solo lado"
+- [x] 5.4 Vista previa por lado: fantasma solo de lo nuevo en el lado, ids fantasma con el lado, `ghostToReal` de los dos pasos; verificar que en el paso BJJ "Kimura" (existente en BJJ) no se resalta y en Grappling sí, y que tras aceptar cada copia aparece donde se vio en su paso
 
 ## 6. Verificación y cierre
 

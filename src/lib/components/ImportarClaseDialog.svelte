@@ -396,6 +396,12 @@
 											</Select.Content>
 										</Select.Root>
 									</div>
+									<!-- T-4.it7: dónde se crea en una importación "Ambos". -->
+									{#if b.indicadorLados('pos', item.nombreEditado)}
+										<p class="mt-2 text-xs text-muted-foreground">
+											{b.indicadorLados('pos', item.nombreEditado)}
+										</p>
+									{/if}
 								</div>
 							{/each}
 						</div>
@@ -427,11 +433,19 @@
 										bind:checked={b.sumisionesDraft[i].seleccionado}
 										class="h-4 w-4 accent-primary"
 									/>
-									<Input
-										bind:value={b.sumisionesDraft[i].nombreEditado}
-										placeholder="Nombre de la sumisión"
-										class="h-7 flex-1 text-sm"
-									/>
+									<div class="flex flex-1 flex-col gap-1">
+										<Input
+											bind:value={b.sumisionesDraft[i].nombreEditado}
+											placeholder="Nombre de la sumisión"
+											class="h-7 text-sm"
+										/>
+										<!-- T-4.it7: dónde se crea en una importación "Ambos". -->
+										{#if b.indicadorLados('sum', item.nombreEditado)}
+											<p class="text-xs text-muted-foreground">
+												{b.indicadorLados('sum', item.nombreEditado)}
+											</p>
+										{/if}
+									</div>
 								</div>
 							{/each}
 						</div>

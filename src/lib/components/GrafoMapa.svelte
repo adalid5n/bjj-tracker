@@ -16,6 +16,11 @@
 	 * NO es state reactivo — es solo memo mutable.
 	 */
 	const positionsCache = new Map<string, { x: number; y: number }>();
+	// T-4.it7: última posición en pantalla de cada fantasma de la vista
+	// previa (ids con su lado). Permite que, en una importación "Ambos",
+	// lo visto en el paso de BJJ conserve su sitio aunque al aceptar el
+	// grafo muestre ya el paso de Grappling. No se usa para el layout.
+	const ghostPositions = new Map<string, { x: number; y: number }>();
 </script>
 
 <script lang="ts">
@@ -796,10 +801,13 @@
 		if (!cy) return;
 		for (const [ghostId, realId] of ghostToReal) {
 			const node = cy.getElementById(ghostId);
-			if (node.empty()) continue;
-			const p = node.position();
+			// Paso visible: posición actual; pasos anteriores ("Ambos"): la
+			// última que tuvieron en pantalla.
+			const p = node.empty() ? ghostPositions.get(ghostId) : node.position();
+			if (!p) continue;
 			positionsCache.set(realId, { x: p.x, y: p.y });
 		}
+		ghostPositions.clear();
 	}
 
 	onMount(() => {
@@ -861,7 +869,11 @@
 				instance.on('layoutstop', () => {
 					instance.nodes().forEach((n) => {
 						// T-3.it7: los fantasma no entran en el cache.
-						if (n.data('nuevo')) return;
+						if (n.data('nuevo')) {
+							const g = n.position();
+							ghostPositions.set(n.id(), { x: g.x, y: g.y });
+							return;
+						}
 						const p = n.position();
 						positionsCache.set(n.id(), { x: p.x, y: p.y });
 					});

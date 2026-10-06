@@ -149,10 +149,16 @@ export function buildGrafoElements(
 /** Criterio de comparación de nombres de la importación (igual que `confirmar()`). */
 export const normalizarNombre = (n: string) => n.toLowerCase().trim();
 
-/** Id Cytoscape de una posición nueva aún no creada. */
-export const ghostIdPosicion = (nombre: string) => `new-pos:${normalizarNombre(nombre)}`;
-/** Id Cytoscape de una sumisión nueva aún no creada. */
-export const ghostIdSumision = (nombre: string) => `new-sum:${normalizarNombre(nombre)}`;
+/**
+ * Id Cytoscape de una posición nueva aún no creada. T-4.it7: lleva el lado
+ * (disciplina del paso) para que las posiciones calculadas en el paso de
+ * BJJ y en el de Grappling de una importación "Ambos" no se pisen.
+ */
+export const ghostIdPosicion = (nombre: string, lado?: string) =>
+	lado ? `new-pos:${lado}:${normalizarNombre(nombre)}` : `new-pos:${normalizarNombre(nombre)}`;
+/** Id Cytoscape de una sumisión nueva aún no creada (con su lado, ver arriba). */
+export const ghostIdSumision = (nombre: string, lado?: string) =>
+	lado ? `new-sum:${lado}:${normalizarNombre(nombre)}` : `new-sum:${normalizarNombre(nombre)}`;
 
 /** Clave estable de un elemento del borrador (índice en su lista). */
 export type ClaveBorrador = `pos:${number}` | `sum:${number}` | `tec:${number}`;
@@ -204,13 +210,29 @@ export interface PreviewElements extends GrafoElements {
  * - `excluidos`: elementos que no se van a crear (paso anterior con
  *   error); no se pintan.
  * - `degree` se recalcula como quedaría el mapa tras aceptar.
+ *
+ * T-4.it7 (importación "Ambos" como copias), con `opts.lado`:
+ * - `catalogoImportacion` es el catálogo de ESE lado: una posición o
+ *   sumisión del borrador que ya existe en él no es nueva en este paso (se
+ *   enlaza a la existente y no se resalta).
+ * - `opts.catalogoOtroLado`: un extremo de técnica que solo existe en la
+ *   otra disciplina se creará en esta al aceptar → se pinta como nuevo.
+ * - Los ids fantasma llevan el lado (`new-pos:<lado>:<nombre>`).
  */
 export function buildPreviewElements(
 	catalogoPaso: { posiciones: Posicion[]; sumisiones: SumisionTerminal[]; tecnicas: Tecnica[] },
 	catalogoImportacion: { posiciones: { id: string; nombre: string }[]; sumisiones: { id: string; nombre: string }[] },
 	draft: PreviewDraft,
-	excluidos: ReadonlySet<string> = new Set()
+	excluidos: ReadonlySet<string> = new Set(),
+	opts: {
+		lado?: string;
+		catalogoOtroLado?: {
+			posiciones: { nombre: string; categoria?: CategoriaPosicion; tipo?: TipoRolPosicion }[];
+			sumisiones: { nombre: string }[];
+		};
+	} = {}
 ): PreviewElements {
+	const lado = opts.lado;
 	const base = buildGrafoElements(catalogoPaso.posiciones, catalogoPaso.sumisiones, catalogoPaso.tecnicas);
 	const nodes = [...base.nodes];
 	const edges = [...base.edges];
@@ -225,7 +247,9 @@ export function buildPreviewElements(
 
 	draft.posiciones.forEach((p, i) => {
 		if (!p.seleccionado || excluidos.has(`pos:${i}`) || !p.nombreEditado.trim()) return;
-		const id = ghostIdPosicion(p.nombreEditado);
+		// Ya existe en este lado: no es nueva aquí (se enlaza a la existente).
+		if (lado && posMap.has(normalizarNombre(p.nombreEditado))) return;
+		const id = ghostIdPosicion(p.nombreEditado, lado);
 		posMap.set(normalizarNombre(p.nombreEditado), id);
 		if (nodeIds.has(id)) return; // mismo nombre repetido en el borrador
 		nodeIds.add(id);
@@ -245,7 +269,8 @@ export function buildPreviewElements(
 
 	draft.sumisiones.forEach((s, i) => {
 		if (!s.seleccionado || excluidos.has(`sum:${i}`) || !s.nombreEditado.trim()) return;
-		const id = ghostIdSumision(s.nombreEditado);
+		if (lado && sumMap.has(normalizarNombre(s.nombreEditado))) return;
+		const id = ghostIdSumision(s.nombreEditado, lado);
 		sumMap.set(normalizarNombre(s.nombreEditado), id);
 		if (nodeIds.has(id)) return;
 		nodeIds.add(id);
@@ -255,12 +280,66 @@ export function buildPreviewElements(
 		});
 	});
 
+	// Extremo que solo existe en la otra disciplina: se creará en esta,
+	// salvo que el usuario lo desmarcara (o se excluyera) en el borrador.
+	const bloqueadas = new Set<string>();
+	draft.posiciones.forEach((p, i) => {
+		if (!p.seleccionado || excluidos.has(`pos:${i}`)) bloqueadas.add(`p:${normalizarNombre(p.nombreEditado)}`);
+	});
+	draft.sumisiones.forEach((s, i) => {
+		if (!s.seleccionado || excluidos.has(`sum:${i}`)) bloqueadas.add(`s:${normalizarNombre(s.nombreEditado)}`);
+	});
+	const completarPos = (nombre: string): string | undefined => {
+		if (bloqueadas.has(`p:${normalizarNombre(nombre)}`)) return undefined;
+		const otro = opts.catalogoOtroLado?.posiciones.find(
+			(p) => normalizarNombre(p.nombre) === normalizarNombre(nombre)
+		);
+		if (!otro) return undefined;
+		const id = ghostIdPosicion(otro.nombre, lado);
+		posMap.set(normalizarNombre(otro.nombre), id);
+		if (!nodeIds.has(id)) {
+			nodeIds.add(id);
+			recuento.posiciones++;
+			nodes.push({
+				data: {
+					id,
+					label: otro.nombre.trim(),
+					kind: 'posicion',
+					categoria: otro.categoria ?? 'otro',
+					tipoRol: otro.tipo,
+					degree: 0,
+					nuevo: true
+				}
+			});
+		}
+		return id;
+	};
+	const completarSum = (nombre: string): string | undefined => {
+		if (bloqueadas.has(`s:${normalizarNombre(nombre)}`)) return undefined;
+		const otro = opts.catalogoOtroLado?.sumisiones.find(
+			(s) => normalizarNombre(s.nombre) === normalizarNombre(nombre)
+		);
+		if (!otro) return undefined;
+		const id = ghostIdSumision(otro.nombre, lado);
+		sumMap.set(normalizarNombre(otro.nombre), id);
+		if (!nodeIds.has(id)) {
+			nodeIds.add(id);
+			recuento.sumisiones++;
+			nodes.push({
+				data: { id, label: otro.nombre.trim(), kind: 'sumision', degree: 0, nuevo: true }
+			});
+		}
+		return id;
+	};
+
 	draft.tecnicas.forEach((t, i) => {
 		if (!t.seleccionado || excluidos.has(`tec:${i}`)) return;
-		const source = posMap.get(normalizarNombre(t.posicionOrigenNombre));
+		const source =
+			posMap.get(normalizarNombre(t.posicionOrigenNombre)) ?? completarPos(t.posicionOrigenNombre);
 		const destinoNombre = t.tipo === 'sumision' ? t.sumisionDestinoNombre : t.posicionDestinoNombre;
 		const target = destinoNombre
-			? (t.tipo === 'sumision' ? sumMap : posMap).get(normalizarNombre(destinoNombre))
+			? ((t.tipo === 'sumision' ? sumMap : posMap).get(normalizarNombre(destinoNombre)) ??
+				(t.tipo === 'sumision' ? completarSum(destinoNombre) : completarPos(destinoNombre)))
 			: undefined;
 		if (!source || !target) return; // no se creará: no se pinta
 		const fuera = [source, target].filter((id) => !nodeIds.has(id));
