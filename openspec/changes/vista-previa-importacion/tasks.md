@@ -6,8 +6,8 @@
 
 ## 1. Borrador fuera del diálogo (sin cambio visible)
 
-- [ ] 1.1 Crear `src/lib/importacion-borrador.svelte.ts` con la clase `ImportacionBorrador` (`$state` en class fields), moviendo el estado del borrador, `confirmar()`, `reset()` y las escrituras de historial desde `ImportarClaseDialog.svelte`; verificar con `pnpm check`
-- [ ] 1.2 Instanciar el borrador en `src/routes/mapa/+page.svelte` y pasarlo al diálogo; abrir/cerrar el `Dialog` ya no resetea, solo "Descartar"; verificar en `pnpm dev` el flujo completo de importación de punta a punta igual que antes (incluido el historial)
+- [x] 1.1 Crear `src/lib/importacion-borrador.svelte.ts` con la clase `ImportacionBorrador` (`$state` en class fields), moviendo el estado del borrador, `confirmar()`, `reset()` y las escrituras de historial desde `ImportarClaseDialog.svelte`; verificar con `pnpm check`
+- [x] 1.2 Instanciar el borrador en `src/routes/mapa/+page.svelte` y pasarlo al diálogo; abrir/cerrar el `Dialog` ya no resetea, solo "Descartar"; verificar en `pnpm dev` el flujo completo de importación de punta a punta igual que antes (incluido el historial)
 
 ## 2. Disciplina de la importación
 

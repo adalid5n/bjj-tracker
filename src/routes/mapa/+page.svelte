@@ -18,6 +18,7 @@
 	import { useMediaQuery } from '$lib/hooks/use-media.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import ImportarClaseDialog from '$lib/components/ImportarClaseDialog.svelte';
+	import { ImportacionBorrador } from '$lib/importacion-borrador.svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
@@ -495,12 +496,13 @@
 	}
 
 	let importarDialogOpen = $state(false);
+	// T-3.it7: el borrador de la importación vive en la página (no en el
+	// diálogo) para sobrevivir al cierre del diálogo durante la vista
+	// previa. Instancia por página: salir de /mapa lo pierde.
+	const borrador = new ImportacionBorrador();
 
-	// T-2.it7: historial de importaciones. `reintento` lleva la entrada a
-	// reutilizar cuando el diálogo se abre desde "Reintentar"; se limpia al
-	// cerrar el diálogo o al abrirlo desde "Nuevo" → "Importar de clase".
+	// T-2.it7: historial de importaciones.
 	let historialOpen = $state(false);
-	let reintento = $state<{ id: string; texto: string } | null>(null);
 
 	function abrirHistorial() {
 		// Cerrar antes el stack de fichas para no apilar dos paneles
@@ -513,13 +515,13 @@
 	}
 
 	function abrirImportarNueva() {
-		reintento = null;
+		borrador.reset();
 		importarDialogOpen = true;
 	}
 
 	function reintentarImportacion(entrada: { id: string; texto: string }) {
 		historialOpen = false;
-		reintento = entrada;
+		borrador.prepararReintento(entrada.id, entrada.texto);
 		importarDialogOpen = true;
 	}
 
@@ -1145,13 +1147,11 @@
 
 <ImportarClaseDialog
 	bind:open={importarDialogOpen}
+	{borrador}
 	onClose={() => {
 		importarDialogOpen = false;
-		reintento = null;
 	}}
 	onCatalogChanged={refresh}
-	textoInicial={reintento?.texto}
-	importacionIdInicial={reintento?.id}
 />
 
 <HistorialImportacionesPanel bind:open={historialOpen} onReintentar={reintentarImportacion} />

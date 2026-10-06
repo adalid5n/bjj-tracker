@@ -9,108 +9,28 @@
 	import MicIcon from '@lucide/svelte/icons/mic';
 	import MicOffIcon from '@lucide/svelte/icons/mic-off';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { listPosiciones, createPosicion } from '$lib/posiciones';
-	import { listTecnicas, createTecnica } from '$lib/tecnicas';
-	import { listSumisiones, createSumision } from '$lib/sumisiones';
-	import { generarPropuestaDeClase, refinarPropuesta, normalizarDescripcion, validarPropuesta } from '$lib/ai';
-	import type { CatalogoSnapshot, AIPropuesta, NormalizacionResult } from '$lib/ai';
 	import type { CategoriaPosicion, TipoRolPosicion, TipoTecnica } from '$lib/types';
 	import { settings } from '$lib/settings.svelte';
-	import { capitalizeFirst } from '$lib/utils';
-	import {
-		createImportacion,
-		getImportacion,
-		updateImportacion,
-		mergeAceptado,
-		parseAceptado,
-		tituloDeRespaldo,
-		type Aceptado,
-		type ImportacionPatch
-	} from '$lib/importaciones';
+	import type { ImportacionBorrador } from '$lib/importacion-borrador.svelte';
 
+	/**
+	 * T-3.it7: el diálogo es una VISTA del borrador (`ImportacionBorrador`,
+	 * instancia de `/mapa`). Abrir/cerrar el `Dialog` no resetea nada;
+	 * solo "Descartar"/"Cerrar" del aviso de cierre llama a `reset()`.
+	 */
 	let {
 		open = $bindable(false),
+		borrador: b,
 		onClose,
-		onCatalogChanged,
-		textoInicial,
-		importacionIdInicial
+		onCatalogChanged
 	}: {
 		open?: boolean;
+		borrador: ImportacionBorrador;
 		onClose?: () => void;
 		onCatalogChanged?: () => void;
-		/** T-2.it7 "Reintentar": texto guardado precargado en el primer paso. */
-		textoInicial?: string;
-		/** T-2.it7 "Reintentar": entrada del historial que se reutiliza. */
-		importacionIdInicial?: string;
 	} = $props();
 
-	type PosicionItem = {
-		nombre: string;
-		categoria: CategoriaPosicion;
-		tipo?: TipoRolPosicion;
-		seleccionado: boolean;
-		nombreEditado: string;
-		categoriaEditada: CategoriaPosicion;
-		tipoEditado: TipoRolPosicion | undefined;
-		esManual?: boolean;
-	};
-
-	type SumisionItem = {
-		nombre: string;
-		seleccionado: boolean;
-		nombreEditado: string;
-		notas?: string;
-	};
-
-	type TecnicaItem = {
-		nombre: string;
-		variante?: string;
-		tipo: TipoTecnica;
-		posicionOrigenNombre: string;
-		posicionDestinoNombre?: string;
-		sumisionDestinoNombre?: string;
-		seleccionado: boolean;
-		puedeCrearse: boolean;
-		esManual?: boolean;
-		detalles?: string;
-	};
-
-	let step = $state<'input' | 'normalizado' | 'review' | 'detalles'>('input');
-	let textoClase = $state('');
-	let normalizacion = $state<NormalizacionResult | null>(null);
-	let textoParaPropuesta = $state('');
-	let resumenAI = $state<string | undefined>(undefined);
-	let loadingAI = $state(false);
-	let loadingLabel = $state('');
-	let errorAI = $state<string | null>(null);
-	let inserting = $state(false);
-	let errorInsert = $state<string | null>(null);
-	let textoRefinamiento = $state('');
-	let propuestaActual = $state<AIPropuesta | null>(null);
-	let validacionCorrecciones = $state<string[]>([]);
-	let validacionBannerAbierto = $state(true);
 	let confirmDescartarOpen = $state(false);
-	// T-2.it7: entrada del historial de esta importación. Se fija al primer
-	// "Analizar clase" o al abrir desde "Reintentar"; mientras no sea null,
-	// los siguientes análisis actualizan la misma entrada.
-	let importacionId = $state<string | null>(null);
-
-	let posicionesDraft = $state<PosicionItem[]>([]);
-	let sumisionesDraft = $state<SumisionItem[]>([]);
-	let tecnicasDraft = $state<TecnicaItem[]>([]);
-
-	let catalogoPosicionesBase = $state<{ id: string; nombre: string }[]>([]);
-	let catalogoSumisionesBase = $state<{ id: string; nombre: string }[]>([]);
-
-	const todasPosicionesDisponibles = $derived([
-		...catalogoPosicionesBase.map((p) => p.nombre),
-		...posicionesDraft.filter((p) => p.seleccionado && p.nombreEditado.trim()).map((p) => p.nombreEditado.trim())
-	]);
-
-	const todasSumisionesDisponibles = $derived([
-		...catalogoSumisionesBase.map((s) => s.nombre),
-		...sumisionesDraft.filter((s) => s.seleccionado && s.nombreEditado.trim()).map((s) => s.nombreEditado.trim())
-	]);
 
 	let speechSoportado = $state(false);
 	let grabando = $state(false);
@@ -145,32 +65,6 @@
 			typeof window !== 'undefined' &&
 			('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 	});
-
-	// T-2.it7 "Reintentar": al abrirse con una entrada del historial,
-	// precarga su texto (editable) y reutiliza esa entrada.
-	let prevOpen = false;
-	$effect(() => {
-		const abierto = open;
-		if (abierto && !prevOpen && importacionIdInicial) {
-			importacionId = importacionIdInicial;
-			textoClase = textoInicial ?? '';
-			step = 'input';
-		}
-		prevOpen = abierto;
-	});
-
-	/**
-	 * Escritura en el historial protegida: un fallo al guardar historial
-	 * nunca bloquea la importación (solo se loguea).
-	 */
-	async function guardarHistorial(id: string | null, patch: ImportacionPatch) {
-		if (!id) return;
-		try {
-			await updateImportacion(id, patch);
-		} catch (e) {
-			console.warn('[historial] no se pudo actualizar la importación', id, e);
-		}
-	}
 
 	$effect(() => {
 		if (!open) {
@@ -208,8 +102,8 @@
 	let interpretadoDiv = $state<HTMLElement | null>(null);
 
 	$effect(() => {
-		if (!interpretadoDiv || !normalizacion) return;
-		const html = parseSegmentos(normalizacion.textoConMarcas)
+		if (!interpretadoDiv || !b.normalizacion) return;
+		const html = parseSegmentos(b.normalizacion.textoConMarcas)
 			.map((seg) => {
 				if (seg.kind === 'corrected')
 					return `<mark style="border-radius:2px;background-color:color-mix(in srgb,var(--color-warning,#f59e0b) 35%,transparent);padding:0 2px;color:inherit">${escapeHtml(seg.text)}</mark>`;
@@ -219,47 +113,27 @@
 			})
 			.join('');
 		interpretadoDiv.innerHTML = html;
-		textoParaPropuesta = interpretadoDiv.innerText;
+		b.textoParaPropuesta = interpretadoDiv.innerText;
 	});
 
-	function resetState() {
-		step = 'input';
-		textoClase = '';
-		normalizacion = null;
-		textoParaPropuesta = '';
-		resumenAI = undefined;
-		errorAI = null;
-		errorInsert = null;
-		posicionesDraft = [];
-		sumisionesDraft = [];
-		tecnicasDraft = [];
-		catalogoPosicionesBase = [];
-		catalogoSumisionesBase = [];
-		textoRefinamiento = '';
-		propuestaActual = null;
-		validacionCorrecciones = [];
-		validacionBannerAbierto = true;
-		// Cerrar no borra nada del historial; solo suelta la referencia.
-		importacionId = null;
-	}
-
-	const tieneDatos = $derived(
-		textoClase.trim().length > 0 || step === 'normalizado' || step === 'review' || step === 'detalles'
-	);
-
-	function handleClose() {
+	function pararGrabacion() {
 		deberiaGrabar = false;
 		recognition?.stop();
 		grabando = false;
+	}
+
+	/** Cierre explícito (Descartar / Cerrar): el borrador se vacía. */
+	function handleClose() {
+		pararGrabacion();
 		confirmDescartarOpen = false;
 		open = false;
 		onClose?.();
-		resetState();
+		b.reset();
 	}
 
 	function intentarCerrar() {
 		if (!open) return;
-		if (tieneDatos) {
+		if (b.tieneDatos) {
 			confirmDescartarOpen = true;
 		} else {
 			handleClose();
@@ -268,9 +142,7 @@
 
 	function toggleGrabacion() {
 		if (grabando) {
-			deberiaGrabar = false;
-			recognition?.stop();
-			grabando = false;
+			pararGrabacion();
 			return;
 		}
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -287,7 +159,7 @@
 			for (let i = e.resultIndex; i < e.results.length; i++) {
 				if (e.results[i].isFinal) chunk += e.results[i][0].transcript;
 			}
-			if (chunk.trim()) textoClase = textoClase ? textoClase + ' ' + chunk.trim() : chunk.trim();
+			if (chunk.trim()) b.textoClase = b.textoClase ? b.textoClase + ' ' + chunk.trim() : chunk.trim();
 		};
 		recognition.onend = () => {
 			if (deberiaGrabar) {
@@ -304,7 +176,7 @@
 		recognition.onerror = (e: any) => {
 			grabando = false;
 			if (e.error !== 'no-speech' && e.error !== 'aborted') {
-				errorAI = 'Error de micrófono: ' + e.error;
+				b.errorAI = 'Error de micrófono: ' + e.error;
 			}
 		};
 		deberiaGrabar = true;
@@ -312,429 +184,14 @@
 		grabando = true;
 	}
 
-	async function handleNormalizar() {
-		if (!textoClase.trim() || loadingAI) return;
-		loadingAI = true;
-		loadingLabel = 'Interpretando descripción…';
-		errorAI = null;
-
-		// T-2.it7: registrar en el historial ANTES de esperar a la IA.
-		// Primera vez → crear entrada; siguientes (Volver + analizar o
-		// Reintentar) → el texto analizado sustituye al guardado.
-		const textoAnalizado = textoClase;
-		try {
-			if (!importacionId) {
-				const entrada = await createImportacion(textoAnalizado);
-				importacionId = entrada.id;
-			} else {
-				const previa = await getImportacion(importacionId);
-				const patch: ImportacionPatch = { texto: textoAnalizado, estado: 'sin_terminar', error: null };
-				if (previa && previa.titulo_origen === 'texto') patch.titulo = tituloDeRespaldo(textoAnalizado);
-				await updateImportacion(importacionId, patch);
-			}
-		} catch (e) {
-			console.warn('[historial] no se pudo registrar la importación', e);
-		}
-		// Id capturado: si el usuario cierra durante la carga, la entrada
-		// se sigue completando aunque `importacionId` se haya reseteado.
-		const histId = importacionId;
-
-		try {
-			const resultado = await normalizarDescripcion(textoClase);
-			normalizacion = resultado;
-			textoParaPropuesta = resultado.textoConMarcas.replace(/\*\*/g, '');
-			step = 'normalizado';
-			await guardarHistorial(
-				histId,
-				resultado.titulo
-					? { titulo: resultado.titulo, titulo_origen: 'ia', estado: 'sin_terminar', error: null }
-					: { estado: 'sin_terminar', error: null }
-			);
-		} catch (err) {
-			if (err instanceof Error && err.message === 'AI_TIMEOUT') {
-				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
-			} else {
-				errorAI = err instanceof Error ? err.message : String(err);
-			}
-			await guardarHistorial(histId, { estado: 'fallo', error: errorAI });
-		} finally {
-			loadingAI = false;
-			loadingLabel = '';
-		}
-	}
-
-	async function handleGenerarPropuesta() {
-		if (!textoParaPropuesta.trim() || loadingAI) return;
-		loadingAI = true;
-		loadingLabel = 'Generando propuesta…';
-		errorAI = null;
-		const histId = importacionId;
-		try {
-			const [posiciones, tecnicas, sumisiones] = await Promise.all([
-				listPosiciones(),
-				listTecnicas(),
-				listSumisiones()
-			]);
-			const catalogo: CatalogoSnapshot = {
-				posiciones: posiciones.map((p) => ({ id: p.id, nombre: p.nombre })),
-				tecnicas: tecnicas.map((t) => ({ nombre: t.nombre, posicion_origen_id: t.posicion_origen_id })),
-				sumisiones: sumisiones.map((s) => ({ id: s.id, nombre: s.nombre }))
-			};
-			catalogoPosicionesBase = catalogo.posiciones;
-			catalogoSumisionesBase = catalogo.sumisiones;
-
-			let propuesta = await generarPropuestaDeClase(textoParaPropuesta, catalogo);
-
-			loadingLabel = 'Verificando propuesta…';
-			try {
-				const validacion = await validarPropuesta(textoParaPropuesta, propuesta, catalogo);
-				propuesta = validacion.propuesta;
-				validacionCorrecciones = validacion.correcciones;
-				validacionBannerAbierto = validacion.correcciones.length > 0;
-			} catch {
-				// Si falla la validación, seguimos con la propuesta original sin bloquear
-			}
-
-			// Build name sets for validating técnica FK resolution
-			const posNombres = new Set([
-				...posiciones.map((p) => p.nombre.toLowerCase()),
-				...propuesta.posiciones
-					.filter((p) => !p.esExistente)
-					.map((p) => p.nombre.toLowerCase())
-			]);
-			const sumNombres = new Set([
-				...sumisiones.map((s) => s.nombre.toLowerCase()),
-				...propuesta.sumisiones
-					.filter((s) => !s.esExistente)
-					.map((s) => s.nombre.toLowerCase())
-			]);
-
-			propuestaActual = propuesta;
-			resumenAI = propuesta.resumen;
-
-			posicionesDraft = propuesta.posiciones
-				.filter((p) => !p.esExistente)
-				.map((p) => ({
-					nombre: capitalizeFirst(p.nombre),
-					categoria: p.categoria,
-					tipo: p.tipo,
-					seleccionado: true,
-					nombreEditado: capitalizeFirst(p.nombre),
-					categoriaEditada: p.categoria,
-					tipoEditado: p.tipo
-				}));
-
-			sumisionesDraft = propuesta.sumisiones
-				.filter((s) => !s.esExistente)
-				.map((s) => ({
-					nombre: capitalizeFirst(s.nombre),
-					seleccionado: true,
-					nombreEditado: capitalizeFirst(s.nombre),
-					notas: s.notas
-				}));
-
-			tecnicasDraft = propuesta.tecnicas.map((t) => {
-				const origenOk = posNombres.has(t.posicionOrigenNombre.toLowerCase());
-				const destinoOk =
-					t.tipo === 'sumision'
-						? !!(t.sumisionDestinoNombre && sumNombres.has(t.sumisionDestinoNombre.toLowerCase()))
-						: !!(t.posicionDestinoNombre && posNombres.has(t.posicionDestinoNombre.toLowerCase()));
-				const puedeCrearse = origenOk && destinoOk;
-				return {
-					...t,
-					nombre: capitalizeFirst(t.nombre),
-					seleccionado: puedeCrearse,
-					puedeCrearse,
-					detalles: t.detalles
-				};
-			});
-
-			step = 'review';
-			// La propuesta no se guarda: solo el estado.
-			await guardarHistorial(histId, { estado: 'sin_terminar', error: null });
-		} catch (err) {
-			if (err instanceof Error && err.message === 'GROQ_KEY_MISSING') {
-				errorAI = 'No hay clave de Groq configurada.';
-			} else if (err instanceof Error && err.message === 'AI_TIMEOUT') {
-				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
-			} else if (err instanceof Error && err.message === 'AI_RESPONSE_INVALID') {
-				errorAI = 'El AI devolvió una respuesta inesperada. Inténtalo de nuevo.';
-			} else if (err instanceof Error && err.message.includes('503')) {
-				errorAI = 'El servidor de Groq está saturado ahora mismo. Espera un minuto e inténtalo de nuevo.';
-			} else if (err instanceof Error && err.message.includes('429')) {
-				errorAI = 'Límite de uso alcanzado. Espera unos segundos e inténtalo de nuevo.';
-			} else {
-				errorAI = err instanceof Error ? err.message : String(err);
-			}
-			await guardarHistorial(histId, { estado: 'fallo', error: errorAI });
-		} finally {
-			loadingAI = false;
-			loadingLabel = '';
-		}
-	}
-
 	async function handleConfirmar() {
-		if (inserting) return;
-		inserting = true;
-		errorInsert = null;
-		const histId = importacionId;
-		// T-2.it7: lo realmente creado en este intento (ids + nombres).
-		const creado: Aceptado = { posiciones: [], sumisiones: [], tecnicas: [] };
-		try {
-			// Load fresh catalog for FK resolution
-			const [posicionesExistentes, sumisionesExistentes] = await Promise.all([
-				listPosiciones(),
-				listSumisiones()
-			]);
-
-			const posNormMap = new Map(
-				posicionesExistentes.map((p) => [p.nombre.toLowerCase().trim(), p.id])
-			);
-			const sumNormMap = new Map(
-				sumisionesExistentes.map((s) => [s.nombre.toLowerCase().trim(), s.id])
-			);
-			// id → nombre real del catálogo, para el bloque "Aceptado".
-			const nombrePorId = new Map<string, string>([
-				...posicionesExistentes.map((p) => [p.id, p.nombre] as [string, string]),
-				...sumisionesExistentes.map((s) => [s.id, s.nombre] as [string, string])
-			]);
-
-			// Phase A: crear posiciones seleccionadas
-			for (const item of posicionesDraft.filter((p) => p.seleccionado)) {
-				try {
-					const created = await createPosicion({
-						nombre: item.nombreEditado,
-						categoria: item.categoriaEditada,
-						tipo: item.tipoEditado,
-						notas: '',
-						posicion_complementaria_id: null,
-						disciplina: settings.disciplinaActiva
-					});
-					posNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
-					nombrePorId.set(created.id, created.nombre);
-					creado.posiciones.push({ id: created.id, nombre: created.nombre, categoria: created.categoria });
-				} catch (e) {
-					console.warn('Error creando posición', item.nombreEditado, e);
-				}
-			}
-
-			// Phase B: crear sumisiones seleccionadas
-			for (const item of sumisionesDraft.filter((s) => s.seleccionado)) {
-				try {
-					const created = await createSumision({ nombre: item.nombreEditado, notas: item.notas ?? '', disciplina: settings.disciplinaActiva });
-					sumNormMap.set(item.nombreEditado.toLowerCase().trim(), created.id);
-					nombrePorId.set(created.id, created.nombre);
-					creado.sumisiones.push({ id: created.id, nombre: created.nombre });
-				} catch (e) {
-					console.warn('Error creando sumisión', item.nombreEditado, e);
-				}
-			}
-
-			// Phase C: crear técnicas seleccionadas
-			for (const item of tecnicasDraft.filter((t) => t.seleccionado)) {
-				const origenId = posNormMap.get(item.posicionOrigenNombre.toLowerCase().trim());
-				if (!origenId) {
-					console.warn('Origen no encontrado, saltando técnica:', item.nombre);
-					continue;
-				}
-				try {
-					if (item.tipo === 'sumision') {
-						const sumId = item.sumisionDestinoNombre
-							? sumNormMap.get(item.sumisionDestinoNombre.toLowerCase().trim())
-							: undefined;
-						if (!sumId) {
-							console.warn('Sumisión destino no encontrada, saltando:', item.nombre);
-							continue;
-						}
-						const tec = await createTecnica({
-							nombre: item.nombre,
-							variante: item.variante,
-							posicion_origen_id: origenId,
-							posicion_destino_id: undefined,
-							sumision_destino_id: sumId,
-							tipo: item.tipo,
-							estado: 'probando',
-							detalles: item.detalles ?? '',
-							errores_comunes: '',
-							disciplina: settings.disciplinaActiva
-						});
-						creado.tecnicas.push({
-							id: tec.id,
-							nombre: tec.nombre,
-							tipo: tec.tipo,
-							origen: nombrePorId.get(origenId) ?? item.posicionOrigenNombre,
-							destino: nombrePorId.get(sumId) ?? item.sumisionDestinoNombre ?? ''
-						});
-					} else {
-						const destId = item.posicionDestinoNombre
-							? posNormMap.get(item.posicionDestinoNombre.toLowerCase().trim())
-							: undefined;
-						if (!destId) {
-							console.warn('Destino no encontrado, saltando técnica:', item.nombre);
-							continue;
-						}
-						const tec = await createTecnica({
-							nombre: item.nombre,
-							variante: item.variante,
-							posicion_origen_id: origenId,
-							posicion_destino_id: destId,
-							sumision_destino_id: undefined,
-							tipo: item.tipo,
-							estado: 'probando',
-							detalles: item.detalles ?? '',
-							errores_comunes: '',
-							disciplina: settings.disciplinaActiva
-						});
-						creado.tecnicas.push({
-							id: tec.id,
-							nombre: tec.nombre,
-							tipo: tec.tipo,
-							origen: nombrePorId.get(origenId) ?? item.posicionOrigenNombre,
-							destino: nombrePorId.get(destId) ?? item.posicionDestinoNombre ?? ''
-						});
-					}
-				} catch (e) {
-					console.warn('Error creando técnica', item.nombre, e);
-				}
-			}
-
-			// T-2.it7: lo aceptado se SUMA a lo que la entrada ya tuviera
-			// (reintento de una importación ya "Importada").
-			await guardarAceptado(histId, creado, { estado: 'importada', error: null });
-
-			onCatalogChanged?.();
-			open = false;
-			onClose?.();
-			resetState();
-		} catch (err) {
-			errorInsert = err instanceof Error ? err.message : String(err);
-			// Lo que sí llegó a crearse no se pierde del historial.
-			await guardarAceptado(histId, creado, { estado: 'fallo', error: errorInsert });
-		} finally {
-			inserting = false;
-		}
+		const ok = await b.confirmar();
+		if (!ok) return;
+		onCatalogChanged?.();
+		open = false;
+		onClose?.();
+		b.reset();
 	}
-
-	async function guardarAceptado(id: string | null, creado: Aceptado, patch: ImportacionPatch) {
-		if (!id) return;
-		try {
-			const previa = await getImportacion(id);
-			const aceptado = mergeAceptado(parseAceptado(previa?.aceptado_json), creado);
-			await updateImportacion(id, { ...patch, aceptado });
-		} catch (e) {
-			console.warn('[historial] no se pudo guardar lo aceptado', id, e);
-		}
-	}
-
-	async function handleRefinar() {
-		if (!textoRefinamiento.trim() || !propuestaActual || loadingAI) return;
-		loadingAI = true;
-		errorAI = null;
-		const histId = importacionId;
-		try {
-			const catalogo: CatalogoSnapshot = {
-				posiciones: catalogoPosicionesBase,
-				tecnicas: [],
-				sumisiones: catalogoSumisionesBase
-			};
-			const propuestaRefinada = await refinarPropuesta(
-				textoClase,
-				propuestaActual,
-				textoRefinamiento,
-				catalogo
-			);
-
-			propuestaActual = propuestaRefinada;
-			resumenAI = propuestaRefinada.resumen;
-			textoRefinamiento = '';
-
-			const posNombres = new Set([
-				...catalogoPosicionesBase.map((p) => p.nombre.toLowerCase()),
-				...propuestaRefinada.posiciones.filter((p) => !p.esExistente).map((p) => p.nombre.toLowerCase())
-			]);
-			const sumNombres = new Set([
-				...catalogoSumisionesBase.map((s) => s.nombre.toLowerCase()),
-				...propuestaRefinada.sumisiones.filter((s) => !s.esExistente).map((s) => s.nombre.toLowerCase())
-			]);
-
-			posicionesDraft = propuestaRefinada.posiciones
-				.filter((p) => !p.esExistente)
-				.map((p) => ({
-					nombre: capitalizeFirst(p.nombre),
-					categoria: p.categoria,
-					tipo: p.tipo,
-					seleccionado: true,
-					nombreEditado: capitalizeFirst(p.nombre),
-					categoriaEditada: p.categoria,
-					tipoEditado: p.tipo
-				}));
-
-			sumisionesDraft = propuestaRefinada.sumisiones
-				.filter((s) => !s.esExistente)
-				.map((s) => ({ nombre: capitalizeFirst(s.nombre), seleccionado: true, nombreEditado: capitalizeFirst(s.nombre), notas: s.notas }));
-
-			tecnicasDraft = propuestaRefinada.tecnicas.map((t) => {
-				const origenOk = posNombres.has(t.posicionOrigenNombre.toLowerCase());
-				const destinoOk =
-					t.tipo === 'sumision'
-						? !!(t.sumisionDestinoNombre && sumNombres.has(t.sumisionDestinoNombre.toLowerCase()))
-						: !!(t.posicionDestinoNombre && posNombres.has(t.posicionDestinoNombre.toLowerCase()));
-				const puedeCrearse = origenOk && destinoOk;
-				return { ...t, nombre: capitalizeFirst(t.nombre), seleccionado: puedeCrearse, puedeCrearse, detalles: t.detalles };
-			});
-			await guardarHistorial(histId, { estado: 'sin_terminar', error: null });
-		} catch (err) {
-			if (err instanceof Error && err.message === 'AI_TIMEOUT') {
-				errorAI = 'La petición tardó demasiado y se canceló. Revisa tu conexión e inténtalo de nuevo.';
-			} else if (err instanceof Error && err.message.includes('429')) {
-				errorAI = 'Límite de uso alcanzado. Espera unos segundos e inténtalo de nuevo.';
-			} else {
-				errorAI = err instanceof Error ? err.message : String(err);
-			}
-			await guardarHistorial(histId, { estado: 'fallo', error: errorAI });
-		} finally {
-			loadingAI = false;
-		}
-	}
-
-	function addPosicionManual() {
-		posicionesDraft.push({
-			nombre: '',
-			categoria: 'otro',
-			tipo: undefined,
-			seleccionado: true,
-			nombreEditado: '',
-			categoriaEditada: 'otro',
-			tipoEditado: undefined,
-			esManual: true
-		});
-	}
-
-	function addSumisionManual() {
-		sumisionesDraft.push({
-			nombre: '',
-			seleccionado: true,
-			nombreEditado: ''
-		});
-	}
-
-	function addTecnicaManual() {
-		tecnicasDraft.push({
-			nombre: '',
-			tipo: 'transicion',
-			posicionOrigenNombre: '',
-			posicionDestinoNombre: '',
-			seleccionado: false,
-			puedeCrearse: false,
-			esManual: true
-		});
-	}
-
-	const haySeleccionados = $derived(
-		posicionesDraft.some((p) => p.seleccionado) ||
-			sumisionesDraft.some((s) => s.seleccionado) ||
-			tecnicasDraft.some((t) => t.seleccionado)
-	);
 </script>
 
 <Dialog.Root {open} onOpenChange={(v) => { if (!v) intentarCerrar(); }}>
@@ -745,24 +202,24 @@
 	>
 		<Dialog.Header class="px-6 pt-6 pb-4">
 			<Dialog.Title>
-				{step === 'input' ? '✨ Importar de clase' : step === 'normalizado' ? 'Texto interpretado' : step === 'review' ? 'Revisar propuesta' : 'Añadir detalles'}
+				{b.paso === 'input' ? '✨ Importar de clase' : b.paso === 'normalizado' ? 'Texto interpretado' : b.paso === 'review' ? 'Revisar propuesta' : 'Añadir detalles'}
 			</Dialog.Title>
-			{#if resumenAI && step === 'review'}
+			{#if b.resumenAI && b.paso === 'review'}
 				<Dialog.Description class="text-sm text-muted-foreground">
-					{resumenAI}
+					{b.resumenAI}
 				</Dialog.Description>
 			{/if}
 		</Dialog.Header>
 
 		<!-- Step 1: Input -->
-		{#if step === 'input'}
+		{#if b.paso === 'input'}
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-2">
 				<div class="relative">
 					<Textarea
-						bind:value={textoClase}
+						bind:value={b.textoClase}
 						placeholder="Ej: Hoy trabajamos el toreando pass desde de pie hacia side control, el knee slide hacia half guard top, y el armbar desde mount..."
 						class="min-h-32 resize-none pr-10"
-						disabled={loadingAI}
+						disabled={b.loadingAI}
 					/>
 					{#if speechSoportado}
 						<button
@@ -781,20 +238,20 @@
 						</button>
 					{/if}
 				</div>
-				{#if errorAI}
+				{#if b.errorAI}
 					<div
 						class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
 					>
-						{errorAI}
+						{b.errorAI}
 					</div>
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2 border-t border-border px-6 py-4">
 				<Button variant="outline" onclick={intentarCerrar}>Cancelar</Button>
-				<Button onclick={handleNormalizar} disabled={!textoClase.trim() || loadingAI}>
-					{#if loadingAI}
+				<Button onclick={() => b.normalizar()} disabled={!b.textoClase.trim() || b.loadingAI}>
+					{#if b.loadingAI}
 						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
-						{loadingLabel || 'Analizando…'}
+						{b.loadingLabel || 'Analizando…'}
 					{:else}
 						Analizar clase
 					{/if}
@@ -803,7 +260,7 @@
 		{/if}
 
 		<!-- Step 1b: Texto normalizado con correcciones resaltadas -->
-		{#if step === 'normalizado'}
+		{#if b.paso === 'normalizado'}
 			<div class="flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-2">
 				<p class="text-xs text-muted-foreground">
 					<mark class="rounded bg-warning/40 px-0.5 text-foreground">Amarillo</mark> = corregido ·
@@ -813,7 +270,7 @@
 				<div class="flex flex-col gap-1.5">
 					<p class="text-xs font-medium text-muted-foreground">Original</p>
 					<div class="h-52 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
-						{#each resaltarOriginal(textoClase, normalizacion?.correcciones ?? []) as seg}
+						{#each resaltarOriginal(b.textoClase, b.normalizacion?.correcciones ?? []) as seg}
 							{#if seg.highlighted}<mark class="rounded bg-warning/40 px-0.5 text-muted-foreground">{seg.text}</mark>{:else}{seg.text}{/if}
 						{/each}
 					</div>
@@ -829,23 +286,23 @@
 						aria-multiline="true"
 						aria-label="Texto interpretado, editable"
 						class="h-52 overflow-y-auto rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-relaxed focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-						oninput={(e) => { textoParaPropuesta = (e.target as HTMLElement).innerText; }}
+						oninput={(e) => { b.textoParaPropuesta = (e.target as HTMLElement).innerText; }}
 					></div>
 				</div>
-				{#if errorAI}
+				{#if b.errorAI}
 					<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{errorAI}
+						{b.errorAI}
 					</div>
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2 border-t border-border px-6 py-4">
-				<Button variant="outline" onclick={() => { step = 'input'; errorAI = null; }} disabled={loadingAI}>
+				<Button variant="outline" onclick={() => { b.paso = 'input'; b.errorAI = null; }} disabled={b.loadingAI}>
 					← Volver
 				</Button>
-				<Button onclick={handleGenerarPropuesta} disabled={!textoParaPropuesta.trim() || loadingAI}>
-					{#if loadingAI}
+				<Button onclick={() => b.generarPropuesta()} disabled={!b.textoParaPropuesta.trim() || b.loadingAI}>
+					{#if b.loadingAI}
 						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
-						{loadingLabel || 'Generando…'}
+						{b.loadingLabel || 'Generando…'}
 					{:else}
 						Generar propuesta
 					{/if}
@@ -854,24 +311,24 @@
 		{/if}
 
 		<!-- Step 2: Review -->
-		{#if step === 'review'}
+		{#if b.paso === 'review'}
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-2">
 
 					<!-- Posiciones -->
 				<section>
 					<div class="mb-2 flex items-center justify-between">
 						<h3 class="text-sm font-medium">
-							Posiciones{#if posicionesDraft.length > 0} ({posicionesDraft.filter((p) => p.seleccionado).length}/{posicionesDraft.length}){/if}
+							Posiciones{#if b.posicionesDraft.length > 0} ({b.posicionesDraft.filter((p) => p.seleccionado).length}/{b.posicionesDraft.length}){/if}
 						</h3>
 						<button
 							type="button"
-							onclick={addPosicionManual}
+							onclick={() => b.addPosicionManual()}
 							class="text-xs text-muted-foreground hover:text-foreground"
 						>+ Añadir</button>
 					</div>
-					{#if posicionesDraft.length > 0}
+					{#if b.posicionesDraft.length > 0}
 						<div class="flex flex-col gap-2">
-							{#each posicionesDraft as item, i}
+							{#each b.posicionesDraft as item, i}
 								<div
 									class="rounded-md border border-border p-3 transition-opacity {!item.seleccionado
 										? 'opacity-50'
@@ -880,11 +337,11 @@
 									<div class="mb-2 flex items-center gap-2">
 										<input
 											type="checkbox"
-											bind:checked={posicionesDraft[i].seleccionado}
+											bind:checked={b.posicionesDraft[i].seleccionado}
 											class="h-4 w-4 accent-primary"
 										/>
 										<Input
-											bind:value={posicionesDraft[i].nombreEditado}
+											bind:value={b.posicionesDraft[i].nombreEditado}
 											placeholder="Nombre de la posición"
 											class="h-7 flex-1 text-sm"
 										/>
@@ -892,7 +349,7 @@
 									<div class="flex gap-2">
 										<Select.Root
 											type="single"
-											bind:value={posicionesDraft[i].categoriaEditada as string}
+											bind:value={b.posicionesDraft[i].categoriaEditada as string}
 										>
 											<Select.Trigger class="h-7 flex-1 text-xs">
 												{CATEGORIAS.find((c) => c.value === item.categoriaEditada)?.label ??
@@ -908,7 +365,7 @@
 											type="single"
 											value={item.tipoEditado ?? ''}
 											onValueChange={(v) => {
-												posicionesDraft[i].tipoEditado = v
+												b.posicionesDraft[i].tipoEditado = v
 													? (v as TipoRolPosicion)
 													: undefined;
 											}}
@@ -935,17 +392,17 @@
 				<section>
 					<div class="mb-2 flex items-center justify-between">
 						<h3 class="text-sm font-medium">
-							Sumisiones{#if sumisionesDraft.length > 0} ({sumisionesDraft.filter((s) => s.seleccionado).length}/{sumisionesDraft.length}){/if}
+							Sumisiones{#if b.sumisionesDraft.length > 0} ({b.sumisionesDraft.filter((s) => s.seleccionado).length}/{b.sumisionesDraft.length}){/if}
 						</h3>
 						<button
 							type="button"
-							onclick={addSumisionManual}
+							onclick={() => b.addSumisionManual()}
 							class="text-xs text-muted-foreground hover:text-foreground"
 						>+ Añadir</button>
 					</div>
-					{#if sumisionesDraft.length > 0}
+					{#if b.sumisionesDraft.length > 0}
 						<div class="flex flex-col gap-2">
-							{#each sumisionesDraft as item, i}
+							{#each b.sumisionesDraft as item, i}
 								<div
 									class="flex items-center gap-2 rounded-md border border-border p-3 transition-opacity {!item.seleccionado
 										? 'opacity-50'
@@ -953,11 +410,11 @@
 								>
 									<input
 										type="checkbox"
-										bind:checked={sumisionesDraft[i].seleccionado}
+										bind:checked={b.sumisionesDraft[i].seleccionado}
 										class="h-4 w-4 accent-primary"
 									/>
 									<Input
-										bind:value={sumisionesDraft[i].nombreEditado}
+										bind:value={b.sumisionesDraft[i].nombreEditado}
 										placeholder="Nombre de la sumisión"
 										class="h-7 flex-1 text-sm"
 									/>
@@ -971,33 +428,33 @@
 				<section>
 					<div class="mb-2 flex items-center justify-between">
 						<h3 class="text-sm font-medium">
-							Técnicas{#if tecnicasDraft.length > 0} ({tecnicasDraft.filter((t) => t.seleccionado).length}/{tecnicasDraft.length}){/if}
+							Técnicas{#if b.tecnicasDraft.length > 0} ({b.tecnicasDraft.filter((t) => t.seleccionado).length}/{b.tecnicasDraft.length}){/if}
 						</h3>
 						<button
 							type="button"
-							onclick={addTecnicaManual}
+							onclick={() => b.addTecnicaManual()}
 							class="text-xs text-muted-foreground hover:text-foreground"
 						>+ Añadir</button>
 					</div>
-					{#if tecnicasDraft.length > 0}
+					{#if b.tecnicasDraft.length > 0}
 						<div class="flex flex-col gap-2">
-							{#each tecnicasDraft as item, i}
+							{#each b.tecnicasDraft as item, i}
 								{@const canCreate = item.esManual
 									? item.posicionOrigenNombre.trim() !== '' &&
-										todasPosicionesDisponibles.some(
+										b.todasPosicionesDisponibles.some(
 											(p) => p.toLowerCase() === item.posicionOrigenNombre.toLowerCase()
 										) &&
 										(item.tipo === 'sumision'
 											? !!(
 													item.sumisionDestinoNombre?.trim() &&
-													todasSumisionesDisponibles.some(
+													b.todasSumisionesDisponibles.some(
 														(s) =>
 															s.toLowerCase() === item.sumisionDestinoNombre?.toLowerCase()
 													)
 												)
 											: !!(
 													item.posicionDestinoNombre?.trim() &&
-													todasPosicionesDisponibles.some(
+													b.todasPosicionesDisponibles.some(
 														(p) =>
 															p.toLowerCase() === item.posicionDestinoNombre?.toLowerCase()
 													)
@@ -1018,12 +475,12 @@
 												checked={item.seleccionado && canCreate}
 												disabled={!canCreate}
 												onchange={(e) => {
-													tecnicasDraft[i].seleccionado = (e.target as HTMLInputElement).checked;
+													b.tecnicasDraft[i].seleccionado = (e.target as HTMLInputElement).checked;
 												}}
 												class="h-4 w-4 accent-primary"
 											/>
 											<Input
-												bind:value={tecnicasDraft[i].nombre}
+												bind:value={b.tecnicasDraft[i].nombre}
 												placeholder="Nombre de la técnica"
 												class="h-7 flex-1 text-sm"
 											/>
@@ -1032,9 +489,9 @@
 												value={item.tipo}
 												onValueChange={(v) => {
 													if (v) {
-														tecnicasDraft[i].tipo = v as TipoTecnica;
-														tecnicasDraft[i].posicionDestinoNombre = '';
-														tecnicasDraft[i].sumisionDestinoNombre = undefined;
+														b.tecnicasDraft[i].tipo = v as TipoTecnica;
+														b.tecnicasDraft[i].posicionDestinoNombre = '';
+														b.tecnicasDraft[i].sumisionDestinoNombre = undefined;
 													}
 												}}
 											>
@@ -1052,13 +509,13 @@
 											<Select.Root
 												type="single"
 												value={item.posicionOrigenNombre}
-												onValueChange={(v) => { if (v) tecnicasDraft[i].posicionOrigenNombre = v; }}
+												onValueChange={(v) => { if (v) b.tecnicasDraft[i].posicionOrigenNombre = v; }}
 											>
 												<Select.Trigger class="h-6 flex-1 text-xs">
 													{item.posicionOrigenNombre || 'Origen'}
 												</Select.Trigger>
 												<Select.Content>
-													{#each todasPosicionesDisponibles as nombre}
+													{#each b.todasPosicionesDisponibles as nombre}
 														<Select.Item value={nombre}>{nombre}</Select.Item>
 													{/each}
 												</Select.Content>
@@ -1068,13 +525,13 @@
 												<Select.Root
 													type="single"
 													value={item.sumisionDestinoNombre ?? ''}
-													onValueChange={(v) => { if (v) tecnicasDraft[i].sumisionDestinoNombre = v; }}
+													onValueChange={(v) => { if (v) b.tecnicasDraft[i].sumisionDestinoNombre = v; }}
 												>
 													<Select.Trigger class="h-6 flex-1 text-xs">
 														{item.sumisionDestinoNombre ? `🔴 ${item.sumisionDestinoNombre}` : 'Sumisión destino'}
 													</Select.Trigger>
 													<Select.Content>
-														{#each todasSumisionesDisponibles as nombre}
+														{#each b.todasSumisionesDisponibles as nombre}
 															<Select.Item value={nombre}>🔴 {nombre}</Select.Item>
 														{/each}
 													</Select.Content>
@@ -1083,13 +540,13 @@
 												<Select.Root
 													type="single"
 													value={item.posicionDestinoNombre ?? ''}
-													onValueChange={(v) => { if (v) tecnicasDraft[i].posicionDestinoNombre = v; }}
+													onValueChange={(v) => { if (v) b.tecnicasDraft[i].posicionDestinoNombre = v; }}
 												>
 													<Select.Trigger class="h-6 flex-1 text-xs">
 														{item.posicionDestinoNombre || 'Destino'}
 													</Select.Trigger>
 													<Select.Content>
-														{#each todasPosicionesDisponibles as nombre}
+														{#each b.todasPosicionesDisponibles as nombre}
 															<Select.Item value={nombre}>{nombre}</Select.Item>
 														{/each}
 													</Select.Content>
@@ -1101,7 +558,7 @@
 										<div class="mb-1 flex items-center gap-2">
 											<input
 												type="checkbox"
-												bind:checked={tecnicasDraft[i].seleccionado}
+												bind:checked={b.tecnicasDraft[i].seleccionado}
 												disabled={!canCreate}
 												class="h-4 w-4 accent-primary"
 											/>
@@ -1136,23 +593,23 @@
 					<h3 class="mb-2 text-sm font-medium text-muted-foreground">Refinar con IA</h3>
 					<div class="flex flex-col gap-2">
 						<Textarea
-							bind:value={textoRefinamiento}
+							bind:value={b.textoRefinamiento}
 							placeholder="Ej: Electric Chair debería ser categoría 'otro', la Transición a Seat Belt viene del Dogfight overhook no del underhook..."
 							class="min-h-16 resize-none text-sm"
-							disabled={loadingAI}
+							disabled={b.loadingAI}
 						/>
-						{#if errorAI}
+						{#if b.errorAI}
 							<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-								{errorAI}
+								{b.errorAI}
 							</div>
 						{/if}
 						<Button
 							variant="outline"
-							onclick={handleRefinar}
-							disabled={!textoRefinamiento.trim() || loadingAI}
+							onclick={() => b.refinar()}
+							disabled={!b.textoRefinamiento.trim() || b.loadingAI}
 							class="self-end"
 						>
-							{#if loadingAI}
+							{#if b.loadingAI}
 								<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
 								Refinando…
 							{:else}
@@ -1162,29 +619,29 @@
 					</div>
 				</section>
 
-				{#if errorInsert}
+				{#if b.errorInsert}
 					<div
 						class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
 					>
-						{errorInsert}
+						{b.errorInsert}
 					</div>
 				{/if}
 			</div>
 
 			<div class="flex justify-between gap-2 border-t border-border px-6 py-4">
-				<Button variant="outline" onclick={() => { step = 'input'; errorAI = null; }}>
+				<Button variant="outline" onclick={() => { b.paso = 'input'; b.errorAI = null; }}>
 					← Volver
 				</Button>
-				<Button onclick={() => (step = 'detalles')} disabled={!haySeleccionados}>
+				<Button onclick={() => (b.paso = 'detalles')} disabled={!b.haySeleccionados}>
 					Continuar →
 				</Button>
 			</div>
 		{/if}
 
 		<!-- Step 3: Detalles (opcional) -->
-		{#if step === 'detalles'}
-			{@const tecnicasSeleccionadas = tecnicasDraft.filter((t) => t.seleccionado)}
-			{@const sumisionesSeleccionadas = sumisionesDraft.filter((s) => s.seleccionado)}
+		{#if b.paso === 'detalles'}
+			{@const tecnicasSeleccionadas = b.tecnicasDraft.filter((t) => t.seleccionado)}
+			{@const sumisionesSeleccionadas = b.sumisionesDraft.filter((s) => s.seleccionado)}
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-2">
 				<p class="text-xs text-muted-foreground">
 					Opcional — añade notas sobre ejecución, setup o puntos clave. Puedes dejarlo vacío y completarlo después.
@@ -1193,7 +650,7 @@
 				{#if tecnicasSeleccionadas.length > 0}
 					<section class="space-y-3">
 						<h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Técnicas</h3>
-						{#each tecnicasDraft as t, i (i)}
+						{#each b.tecnicasDraft as t, i (i)}
 							{#if t.seleccionado}
 								<div class="space-y-1">
 									<p class="text-sm font-medium">{t.nombre}{t.variante ? ` (${t.variante})` : ''} <span class="text-xs text-muted-foreground">desde {t.posicionOrigenNombre}</span></p>
@@ -1212,7 +669,7 @@
 				{#if sumisionesSeleccionadas.length > 0}
 					<section class="space-y-3">
 						<h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sumisiones</h3>
-						{#each sumisionesDraft as s, i (i)}
+						{#each b.sumisionesDraft as s, i (i)}
 							{#if s.seleccionado}
 								<div class="space-y-1">
 									<p class="text-sm font-medium">{s.nombreEditado || s.nombre}</p>
@@ -1232,19 +689,19 @@
 					<p class="text-sm text-muted-foreground">No hay técnicas ni sumisiones seleccionadas.</p>
 				{/if}
 
-				{#if errorInsert}
+				{#if b.errorInsert}
 					<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{errorInsert}
+						{b.errorInsert}
 					</div>
 				{/if}
 			</div>
 
 			<div class="flex justify-between gap-2 border-t border-border px-6 py-4">
-				<Button variant="outline" onclick={() => (step = 'review')}>
+				<Button variant="outline" onclick={() => (b.paso = 'review')}>
 					← Volver
 				</Button>
-				<Button onclick={handleConfirmar} disabled={inserting}>
-					{#if inserting}
+				<Button onclick={handleConfirmar} disabled={b.inserting}>
+					{#if b.inserting}
 						<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
 						Insertando…
 					{:else}
@@ -1262,7 +719,7 @@
 >
 	<AlertDialog.Content>
 		<AlertDialog.Header>
-			{#if importacionId}
+			{#if b.importacionId}
 				<AlertDialog.Title>¿Cerrar? La importación queda guardada en el historial</AlertDialog.Title>
 				<AlertDialog.Description>
 					Podrás consultarla o reintentarla desde el historial de importaciones del mapa.
@@ -1276,7 +733,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
-			{#if importacionId}
+			{#if b.importacionId}
 				<AlertDialog.Action onclick={handleClose}>Cerrar</AlertDialog.Action>
 			{:else}
 				<AlertDialog.Action
