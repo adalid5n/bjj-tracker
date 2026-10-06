@@ -176,26 +176,36 @@ y qué falta), nunca el error técnico en bruto.
 
 ### 4. Resaltado que respira
 
-> Revisado tras la validación del owner (2026-10-06): amarillo limón en
-> vez de magenta y transición suave en vez de encendido/apagado.
+> Revisado dos veces tras la validación del owner (2026-10-06): primero
+> amarillo en vez de magenta y transición suave en vez de encendido/
+> apagado; después amarillo **apagado** y animación por bucle propio,
+> porque la transición por clases de Cytoscape no interpolaba.
 
 - Token nuevo en `src/routes/layout.css`: `--highlight` y
   `--highlight-foreground` en `:root` y `.dark`, expuestos como
   `--color-highlight` / `--color-highlight-foreground` en `@theme inline`.
-  Amarillo limón (hue ≈ 98; oscuro `oklch(0.88 0.17 98)`, claro
-  `oklch(0.80 0.16 98)`), distinguible de `--warning` (ámbar, hue 80), de
-  `--primary` (selección) y de los resaltados del texto interpretado. El lienzo fuerza `.dark`, así que en el grafo se ve
-  el valor oscuro; el claro se usa en la leyenda (muestra de color).
-- `readTokens()` añade `highlight`. Estilos `node.nuevo` (borde y relleno
-  hacia `highlight`) y `edge.nuevo` (`line-color`, `target-arrow-color`);
-  `.pulso-on` pone relleno/borde/línea en `highlight`; `.pulso-anim`
-  añade `transition-property` de color con `ease-in-out` y duración igual
-  a medio periodo (900 ms). Un `setInterval` de 900 ms alterna
-  `.pulso-on`, así el color va y vuelve sin pausas (ciclo ≈ 1,8 s, efecto
-  "respirar" desde el color normal del elemento). Sin cambios de tamaño.
+  Amarillo apagado, crema / mostaza suave (hue 95, croma 0.09; oscuro
+  `oklch(0.84 0.09 95)`, claro `oklch(0.78 0.09 95)`): visible en el
+  lienzo oscuro pero tranquilo, distinguible de `--warning` (ámbar
+  saturado, hue 80) y de `--primary` (selección). El lienzo fuerza
+  `.dark`, así que en el grafo se ve el valor oscuro; el claro se usa en
+  la muestra de color de la barra.
+- `readTokens()` añade `highlight` (resuelto a `rgb(...)`, que es lo que
+  entiende Cytoscape; nunca oklch ni `var()`).
+- **Animación:** un bucle `requestAnimationFrame` limitado a ~30 fps
+  calcula `t = 0.5 − 0.5·cos(2π·fase)` sobre un periodo de 1,8 s (empieza
+  en el color normal, sube suave al resaltado y baja suave) y aplica a
+  cada elemento `nuevo` un estilo directo con la mezcla RGB entre su
+  color normal (posición: relleno `muted` y borde `muted-foreground`;
+  sumisión: `foreground`; flecha: `muted-foreground`) y `highlight`. Sin
+  cambios de tamaño. El bucle se para al salir de la vista previa y en
+  `onDestroy`, y se quitan los estilos directos.
+- *Por qué no transiciones de Cytoscape:* la versión anterior alternaba
+  una clase con `transition-duration: 0.9`, pero Cytoscape interpreta los
+  tiempos sin unidad como **milisegundos** (`implicitUnits: 'ms'`), así
+  que la "transición" duraba 0,9 ms y se veía como un semáforo.
 - `matchMedia('(prefers-reduced-motion: reduce)')`: si coincide, sin
-  intervalo ni `.pulso-anim` y `.pulso-on` fijo; se escucha `change`. Intervalo limpiado al
-  salir del modo y en `onDestroy`.
+  bucle y resaltado fijo (t = 1); se escucha `change`.
 
 ### 5. Selector de disciplina en el primer paso
 

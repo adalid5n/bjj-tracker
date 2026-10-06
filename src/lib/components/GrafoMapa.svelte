@@ -83,13 +83,23 @@
 		preview = false
 	}: Props = $props();
 
-	// T-3.it7: estado del resaltado de los elementos nuevos. No es reactivo
-	// (se aplica imperativamente sobre Cytoscape).
-	let pulsoOn = false;
+	// T-3.it7: resaltado "que respira" de los elementos nuevos. No es
+	// reactivo: un bucle requestAnimationFrame (~30 fps) mezcla en RGB el
+	// color normal de cada elemento con `--highlight` según un factor
+	// t ∈ [0,1] con curva senoidal (0 → 1 → 0 en PERIODO_MS) y lo aplica
+	// como estilo directo de Cytoscape. Así la subida y bajada es gradual
+	// sí o sí, sin depender de las transiciones de Cytoscape.
 	let reducirMovimiento = false;
-	let pulsoTimer: ReturnType<typeof setInterval> | null = null;
-	// Medio periodo del "respirar" (ida o vuelta): ciclo completo 1,8 s.
-	const PULSO_MS = 900;
+	let rafId: number | null = null;
+	let rafInicio = 0;
+	let rafUltimoFrame = 0;
+	let ultimoFactor = 0;
+	const PERIODO_MS = 1800;
+	const FRAME_MS = 33;
+	// Tokens (rgb) del último stylesheet aplicado: colores normales de los
+	// elementos y el de resaltado, ya resueltos a `rgb(...)` (Cytoscape no
+	// entiende oklch ni var()).
+	let tokensActuales: ReturnType<typeof readTokens> | null = null;
 	let quitarListenerReduce: (() => void) | null = null;
 	let resizeObserver: ResizeObserver | null = null;
 
@@ -200,6 +210,7 @@
 	 * sumision a primary/success/warning/muted-foreground/destructive).
 	 */
 	function buildStylesheet(t: ReturnType<typeof readTokens>): StylesheetJson {
+		tokensActuales = t;
 		return [
 			// Base común para todos los nodos: forma, tamaño, label, borde
 			// con grosor visible. El color de fondo y borde lo fijan los
@@ -286,37 +297,6 @@
 			{
 				selector: 'edge[estado = "descartada"]',
 				style: { width: 1, opacity: 0.4, 'line-style': 'dotted' }
-			},
-			// T-3.it7: elementos nuevos de la vista previa. "Respiran": pasan
-			// SUAVEMENTE de su color normal al de resaltado y vuelven
-			// (`.pulso-on` alterna cada medio periodo y la transición
-			// ease-in-out de igual duración interpola el color). Solo
-			// cambia COLOR, nunca tamaño. La transición solo existe con
-			// `.pulso-anim`; con "reducir movimiento" no se pone y
-			// `.pulso-on` queda fijo (color de resaltado estático).
-			{
-				selector: 'node[?nuevo].pulso-anim',
-				style: {
-					'transition-property': 'background-color, border-color',
-					'transition-duration': PULSO_MS / 1000,
-					'transition-timing-function': 'ease-in-out'
-				}
-			},
-			{
-				selector: 'node[?nuevo].pulso-on',
-				style: { 'background-color': t.highlight, 'border-color': t.highlight }
-			},
-			{
-				selector: 'edge[?nuevo].pulso-anim',
-				style: {
-					'transition-property': 'line-color, target-arrow-color',
-					'transition-duration': PULSO_MS / 1000,
-					'transition-timing-function': 'ease-in-out'
-				}
-			},
-			{
-				selector: 'edge[?nuevo].pulso-on',
-				style: { 'line-color': t.highlight, 'target-arrow-color': t.highlight }
 			},
 			// Estado "selected" (sesión 39): indica el nodo o arista que
 			// corresponde a la entidad abierta en el modal/Sheet. Borde
@@ -710,41 +690,87 @@
 		aplicarPulso(instance);
 	});
 
-	/** Aplica el estado actual del resaltado a los elementos nuevos. */
-	function aplicarPulso(instance: Core) {
+	function parseRgb(c: string): [number, number, number] | null {
+		const m = c.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/);
+		return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+	}
+
+	/** Mezcla lineal en RGB: t=0 → `a`, t=1 → `b`. */
+	function mezclar(a: string, b: string, t: number): string {
+		const ca = parseRgb(a);
+		const cb = parseRgb(b);
+		if (!ca || !cb) return t < 0.5 ? a : b;
+		const ch = (i: number) => Math.round(ca[i] + (cb[i] - ca[i]) * t);
+		return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
+	}
+
+	/**
+	 * Pinta los elementos nuevos con el factor de resaltado `t`: mezcla del
+	 * color normal (mismo que el stylesheet: posición = muted / borde
+	 * muted-foreground; sumisión = foreground; flecha = muted-foreground)
+	 * con `highlight`. Solo cambia COLOR, nunca tamaño.
+	 */
+	function aplicarPulso(instance: Core, t = reducirMovimiento ? 1 : ultimoFactor) {
+		const tok = tokensActuales;
+		if (!tok) return;
 		const nuevos = instance.elements('[?nuevo]');
 		if (nuevos.empty()) return;
-		if (reducirMovimiento) nuevos.removeClass('pulso-anim');
-		else nuevos.addClass('pulso-anim');
-		if (pulsoOn || reducirMovimiento) nuevos.addClass('pulso-on');
-		else nuevos.removeClass('pulso-on');
+		const hl = tok.highlight;
+		const flecha = mezclar(tok.mutedForeground, hl, t);
+		instance.batch(() => {
+			nuevos.forEach((el) => {
+				if (el.group() === 'edges') {
+					el.style({ 'line-color': flecha, 'target-arrow-color': flecha });
+				} else if (el.data('kind') === 'sumision') {
+					const c = mezclar(tok.foreground, hl, t);
+					el.style({ 'background-color': c, 'border-color': c });
+				} else {
+					el.style({
+						'background-color': mezclar(tok.muted, hl, t),
+						'border-color': mezclar(tok.mutedForeground, hl, t)
+					});
+				}
+			});
+		});
 	}
 
 	function pararPulso() {
-		if (pulsoTimer) clearInterval(pulsoTimer);
-		pulsoTimer = null;
+		if (rafId !== null) cancelAnimationFrame(rafId);
+		rafId = null;
+	}
+
+	function framePulso(ahora: number) {
+		rafId = requestAnimationFrame(framePulso);
+		if (!cy || ahora - rafUltimoFrame < FRAME_MS) return;
+		rafUltimoFrame = ahora;
+		const fase = ((ahora - rafInicio) % PERIODO_MS) / PERIODO_MS;
+		// Curva senoidal: arranca en el color normal, sube suave al
+		// resaltado a mitad de periodo y baja suave de nuevo.
+		ultimoFactor = 0.5 - 0.5 * Math.cos(2 * Math.PI * fase);
+		aplicarPulso(cy, ultimoFactor);
 	}
 
 	/**
 	 * T-3.it7: color que respira mientras dure la vista previa. Con
-	 * `prefers-reduced-motion: reduce` no hay intervalo: color fijo.
+	 * `prefers-reduced-motion: reduce` no hay bucle: resaltado fijo.
 	 */
 	function sincronizarPulso() {
 		pararPulso();
 		if (!cy) return;
 		if (!preview) {
-			pulsoOn = false;
-			cy.elements('.pulso-on, .pulso-anim').removeClass('pulso-on pulso-anim');
+			ultimoFactor = 0;
+			cy.elements('[?nuevo]').removeStyle();
 			return;
 		}
-		pulsoOn = true;
-		aplicarPulso(cy);
-		if (reducirMovimiento) return;
-		pulsoTimer = setInterval(() => {
-			if (!cy) return;
-			pulsoOn = !pulsoOn;
-			aplicarPulso(cy);
-		}, PULSO_MS);
+		if (reducirMovimiento) {
+			aplicarPulso(cy, 1);
+			return;
+		}
+		ultimoFactor = 0;
+		aplicarPulso(cy, 0);
+		rafInicio = performance.now();
+		rafUltimoFrame = 0;
+		rafId = requestAnimationFrame(framePulso);
 	}
 
 	$effect(() => {
