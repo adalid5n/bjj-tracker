@@ -5,10 +5,12 @@
 
 import { init, query, run } from '$lib/db';
 import { deleteLayout } from '$lib/grafo-layout';
+import { conSavepoint } from '$lib/transaccion';
 import type { Posicion } from '$lib/types';
 
 export type NewPosicion = Omit<Posicion, 'id' | 'created_at' | 'updated_at'>;
-export type PosicionUpdate = Omit<Posicion, 'created_at' | 'updated_at'>;
+// T-4.it7 (P3): la disciplina se fija al crear; `updatePosicion` no la cambia.
+export type PosicionUpdate = Omit<Posicion, 'created_at' | 'updated_at' | 'disciplina'>;
 
 export async function listPosiciones(): Promise<Posicion[]> {
 	await init();
@@ -60,9 +62,9 @@ export async function updatePosicion(data: PosicionUpdate): Promise<void> {
 	// aplica vía syncComplementaria para mantener la simetría bidireccional.
 	await run(
 		`UPDATE posiciones
-		 SET nombre = ?, categoria = ?, tipo = ?, notas = ?, disciplina = ?, updated_at = ?
+		 SET nombre = ?, categoria = ?, tipo = ?, notas = ?, updated_at = ?
 		 WHERE id = ?`,
-		[data.nombre, data.categoria, data.tipo ?? null, data.notas, data.disciplina, now, data.id]
+		[data.nombre, data.categoria, data.tipo ?? null, data.notas, now, data.id]
 	);
 	await syncComplementaria(data.id, data.posicion_complementaria_id ?? null);
 }
@@ -85,7 +87,7 @@ export async function deletePosicion(id: string): Promise<void> {
 /**
  * Aplica un cambio de complementaria en A → newB manteniendo la simetría
  * bidireccional con cualquier emparejamiento previo que se rompa. Operación
- * atómica (BEGIN/COMMIT, ROLLBACK si algo falla a mitad). Ver ADR-002.
+ * atómica (SAVEPOINT, se deshace si algo falla a mitad). Ver ADR-002.
  *
  * Casos cubiertos:
  * - newB === oldB de A → no-op (no toca DB, no marca updated_at).
@@ -102,8 +104,9 @@ export async function syncComplementaria(aId: string, newBId: string | null): Pr
 	}
 	const now = new Date().toISOString();
 
-	await run('BEGIN');
-	try {
+	// SAVEPOINT (no BEGIN) para poder anidarse dentro de la creación doble
+	// de "Ambos" (T-4.it7); por sí sola sigue siendo atómica.
+	await conSavepoint(async () => {
 		const aRows = await query<{ posicion_complementaria_id: string | null }>(
 			'SELECT posicion_complementaria_id FROM posiciones WHERE id = ?',
 			[aId]
@@ -113,10 +116,7 @@ export async function syncComplementaria(aId: string, newBId: string | null): Pr
 		}
 		const oldB = aRows[0].posicion_complementaria_id ?? null;
 
-		if (oldB === newBId) {
-			await run('COMMIT');
-			return;
-		}
+		if (oldB === newBId) return;
 
 		// 1. Liberar la pareja anterior de A.
 		if (oldB !== null) {
@@ -158,13 +158,5 @@ export async function syncComplementaria(aId: string, newBId: string | null): Pr
 			`UPDATE posiciones SET posicion_complementaria_id = ?, updated_at = ? WHERE id = ?`,
 			[newBId, now, aId]
 		);
-
-		await run('COMMIT');
-	} catch (err) {
-		await run('ROLLBACK').catch(() => {
-			// Si el ROLLBACK falla (transacción ya cerrada), priorizamos el
-			// error original.
-		});
-		throw err;
-	}
+	});
 }

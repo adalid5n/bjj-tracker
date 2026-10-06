@@ -41,6 +41,8 @@
 	import PosicionWizard from './PosicionWizard.svelte';
 	import SumisionWizard from './SumisionWizard.svelte';
 	import TecnicaWizard from './TecnicaWizard.svelte';
+	import AvisoCatalogo from './AvisoCatalogo.svelte';
+	import { avisoCatalogo } from '$lib/aviso-catalogo.svelte';
 
 	// T-8.b: el host es agnóstico del contenedor visual; el padre decide
 	// cómo presentar el modal en función del contexto:
@@ -109,6 +111,12 @@
 		if (!tieneWizardTecnica && tecnicaWizardDraft.value !== null) {
 			tecnicaWizardDraft.clear();
 		}
+	});
+
+	// T-4.it7: el aviso de "se creó en la otra disciplina" vive mientras el
+	// stack esté abierto; al cerrarlo del todo se descarta.
+	$effect(() => {
+		if (stack.length === 0 && avisoCatalogo.texto !== null) avisoCatalogo.clear();
 	});
 
 	// Mismo patrón para el draft del wizard de posición (T-1.it2): sobrevive
@@ -417,6 +425,8 @@
 				</div>
 			</Dialog.Header>
 
+			<AvisoCatalogo />
+
 			<!--
 			  `{#key top.id}` fuerza remount del modal-content al navegar
 			  entre entidades del mismo kind (p. ej. técnica → técnica al
@@ -500,6 +510,7 @@
 								? top.isComplementariaSubWizard
 								: false}
 							isSubWizard={stack.length > 1}
+							opcionesDisciplina={top.modo === 'crear' ? (top.disciplina ?? {}) : {}}
 							onSaved={handlePosicionWizardSaved}
 							onRequestClose={handleWizardRequestClose}
 						/>
@@ -510,6 +521,7 @@
 					<SumisionWizard
 						modo={top.modo}
 						sumisionId={top.modo === 'editar' ? top.id : undefined}
+						opcionesDisciplina={top.modo === 'crear' ? (top.disciplina ?? {}) : {}}
 						onSaved={handleSumisionWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>
@@ -520,6 +532,7 @@
 						modo={top.modo}
 						tecnicaId={top.modo === 'editar' ? top.id : undefined}
 						posicionOrigenId={top.modo === 'crear' ? top.posicionOrigenId : undefined}
+						opcionesDisciplina={top.modo === 'crear' ? (top.disciplina ?? {}) : {}}
 						onSaved={handleTecnicaWizardSaved}
 						onRequestClose={handleWizardRequestClose}
 					/>

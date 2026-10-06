@@ -13,7 +13,8 @@ import { deleteLayout } from '$lib/grafo-layout';
 import type { SumisionTerminal } from '$lib/types';
 
 export type NewSumisionTerminal = Omit<SumisionTerminal, 'id' | 'created_at' | 'updated_at'>;
-export type SumisionTerminalUpdate = Omit<SumisionTerminal, 'created_at' | 'updated_at'>;
+// T-4.it7 (P3): la disciplina se fija al crear; `updateSumision` no la cambia.
+export type SumisionTerminalUpdate = Omit<SumisionTerminal, 'created_at' | 'updated_at' | 'disciplina'>;
 
 export async function listSumisiones(): Promise<SumisionTerminal[]> {
 	await init();
@@ -51,9 +52,9 @@ export async function updateSumision(data: SumisionTerminalUpdate): Promise<void
 	const now = new Date().toISOString();
 	await run(
 		`UPDATE sumisiones_terminales
-		 SET nombre = ?, notas = ?, disciplina = ?, updated_at = ?
+		 SET nombre = ?, notas = ?, updated_at = ?
 		 WHERE id = ?`,
-		[data.nombre, data.notas, data.disciplina, now, data.id]
+		[data.nombre, data.notas, now, data.id]
 	);
 }
 

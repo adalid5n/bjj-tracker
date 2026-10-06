@@ -24,14 +24,19 @@
 	import PosicionWizard from './PosicionWizard.svelte';
 	import PosicionWizardDialogSelf from './PosicionWizardDialog.svelte';
 	import type { Posicion } from '$lib/types';
+	import type { OpcionesDisciplina } from './mapa-modal-stack.svelte';
 
 	let {
 		open = $bindable(false),
 		onSaved,
 		onCancel,
 		isComplementariaSubWizard = false,
-		allowCreateNewComplementaria = true
+		allowCreateNewComplementaria = true,
+		opcionesDisciplina = {}
 	}: {
+		// T-4.it7: disciplina ofrecida (p. ej. desde un roll: la del roll o
+		// "Ambos"; con "Ambos" se devuelve la copia de `preferido`).
+		opcionesDisciplina?: OpcionesDisciplina;
 		open?: boolean;
 		// Se invoca cuando el wizard guarda con éxito. El padre puede usar
 		// el id (y la posición completa, recargada de BD) para añadirla a
@@ -59,9 +64,14 @@
 	// al callback con el id y cerramos el sub.
 	let subWizardOpen = $state(false);
 	let onComplementariaResult: ((id: string) => void) | null = null;
+	let opcionesSub = $state<OpcionesDisciplina>({});
 
-	function requestCreateComplementaria(onResult: (id: string) => void) {
+	function requestCreateComplementaria(
+		onResult: (id: string) => void,
+		opciones: OpcionesDisciplina
+	) {
 		onComplementariaResult = onResult;
+		opcionesSub = opciones;
 		subWizardOpen = true;
 	}
 
@@ -174,6 +184,7 @@
 				modo="crear"
 				mode="standalone"
 				{isComplementariaSubWizard}
+				{opcionesDisciplina}
 				onCreateNewComplementaria={allowCreateNewComplementaria
 					? requestCreateComplementaria
 					: undefined}
@@ -202,6 +213,7 @@
 		onCancel={handleSubWizardCancel}
 		isComplementariaSubWizard={true}
 		allowCreateNewComplementaria={false}
+		opcionesDisciplina={opcionesSub}
 	/>
 {/if}
 

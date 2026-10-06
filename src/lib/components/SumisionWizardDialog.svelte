@@ -14,15 +14,19 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { buttonVariants } from '$lib/components/ui/button';
+	import type { OpcionesDisciplina } from './mapa-modal-stack.svelte';
 	import SumisionWizard from './SumisionWizard.svelte';
 	import type { SumisionTerminal } from '$lib/types';
 
 	let {
 		open = $bindable(false),
 		onSaved,
-		onCancel
+		onCancel,
+		opcionesDisciplina = {}
 	}: {
 		open?: boolean;
+		// T-4.it7: disciplina ofrecida (heredada del asistente padre).
+		opcionesDisciplina?: OpcionesDisciplina;
 		// Se invoca cuando el wizard guarda con éxito. El wrapper cierra el
 		// Dialog automáticamente después.
 		onSaved: (sumision: SumisionTerminal) => void | Promise<void>;
@@ -106,6 +110,7 @@
 			<SumisionWizard
 				modo="crear"
 				mode="standalone"
+				{opcionesDisciplina}
 				onSaved={handleWizardSaved}
 				onRequestClose={handleWizardRequestClose}
 				onDirtyChange={handleDirtyChange}

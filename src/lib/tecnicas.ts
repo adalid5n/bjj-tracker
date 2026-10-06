@@ -15,7 +15,8 @@ import { init, query, run } from '$lib/db';
 import type { Tecnica, TipoTecnica } from '$lib/types';
 
 export type NewTecnica = Omit<Tecnica, 'id' | 'created_at' | 'updated_at'>;
-export type TecnicaUpdate = Omit<Tecnica, 'created_at' | 'updated_at'>;
+// T-4.it7 (P3): la disciplina se fija al crear; `updateTecnica` no la cambia.
+export type TecnicaUpdate = Omit<Tecnica, 'created_at' | 'updated_at' | 'disciplina'>;
 
 function assertDestinoCoherente(data: Pick<Tecnica, 'tipo' | 'posicion_destino_id' | 'sumision_destino_id'>): void {
 	const tienePosicion = !!data.posicion_destino_id;
@@ -91,7 +92,7 @@ export async function updateTecnica(data: TecnicaUpdate): Promise<void> {
 		`UPDATE tecnicas
 		 SET nombre = ?, variante = ?, posicion_origen_id = ?, posicion_destino_id = ?,
 		     sumision_destino_id = ?, tipo = ?, estado = ?, detalles = ?, errores_comunes = ?,
-		     disciplina = ?, updated_at = ?
+		     updated_at = ?
 		 WHERE id = ?`,
 		[
 			data.nombre,
@@ -103,7 +104,6 @@ export async function updateTecnica(data: TecnicaUpdate): Promise<void> {
 			data.estado,
 			data.detalles,
 			data.errores_comunes,
-			data.disciplina,
 			now,
 			data.id
 		]

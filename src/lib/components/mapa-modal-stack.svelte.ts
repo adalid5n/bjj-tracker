@@ -14,6 +14,23 @@
  * runa `$state` dentro de class field privado, exponer get/set.
  */
 
+import type { Disciplina, DisciplinaCatalogo } from '$lib/types';
+
+/**
+ * Disciplina que ofrece un asistente de creación (T-4.it7). Todo opcional:
+ *  - `preferido`: la copia que se abre / se devuelve cuando se crea con
+ *    "Ambos" (por defecto, la disciplina activa del mapa).
+ *  - `porDefecto`: opción elegida al abrir (por defecto, `preferido`).
+ *  - `permitidas`: opciones del selector (por defecto BJJ, Grappling, Ambos).
+ * Los sub-asistentes "+ Crear nueva" heredan la disciplina del padre por
+ * aquí (complementaria de la misma disciplina, destino de una técnica…).
+ */
+export type OpcionesDisciplina = {
+	preferido?: DisciplinaCatalogo;
+	porDefecto?: Disciplina;
+	permitidas?: Disciplina[];
+};
+
 export type MapaModalEntry =
 	| { kind: 'posicion'; id: string; nombre: string }
 	| { kind: 'tecnica'; id: string; nombre: string }
@@ -42,11 +59,20 @@ export type MapaModalEntry =
 			 * por estar en stack.length > 1, no toques draft del padre").
 			 */
 			isComplementariaSubWizard?: boolean;
+			/** T-4.it7: disciplina heredada del asistente padre. */
+			disciplina?: OpcionesDisciplina;
 	  }
 	| { kind: 'wizard-posicion'; modo: 'editar'; id: string; nombre: string }
-	| { kind: 'wizard-sumision'; modo: 'crear'; nombre: string }
+	| { kind: 'wizard-sumision'; modo: 'crear'; nombre: string; disciplina?: OpcionesDisciplina }
 	| { kind: 'wizard-sumision'; modo: 'editar'; id: string; nombre: string }
-	| { kind: 'wizard-tecnica'; modo: 'crear'; nombre: string; posicionOrigenId?: string }
+	| {
+			kind: 'wizard-tecnica';
+			modo: 'crear';
+			nombre: string;
+			posicionOrigenId?: string;
+			/** T-4.it7: disciplina de origen (contras: la de la técnica contrarrestada). */
+			disciplina?: OpcionesDisciplina;
+	  }
 	| { kind: 'wizard-tecnica'; modo: 'editar'; id: string; nombre: string };
 
 /**
@@ -249,6 +275,8 @@ export type TecnicaWizardDraftState = {
 	// el draft permite que sobreviva el remount tras un sub-wizard inline.
 	detalles: string;
 	erroresComunes: string;
+	/** T-4.it7: "crear también en la otra disciplina". */
+	ambos?: boolean;
 	currentStep: number;
 	visitedSteps: number[];
 };
@@ -292,6 +320,8 @@ export type PosicionWizardDraftState = {
 	// persisten como '' y el paso no se renderiza. Mantener el campo en
 	// el draft permite que sobreviva el remount tras un sub-wizard inline.
 	notas: string;
+	/** T-4.it7: disciplina elegida (sobrevive al remount tras un sub-asistente). */
+	disciplina?: Disciplina;
 	currentStep: number;
 	visitedSteps: number[];
 };

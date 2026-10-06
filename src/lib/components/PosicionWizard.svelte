@@ -61,9 +61,21 @@
 	import Combobox from '$lib/components/Combobox.svelte';
 
 	type ComboboxItem = { id: string; label: string; sublabel?: string };
-	import type { CategoriaPosicion, Disciplina, Posicion, Tag, TipoRolPosicion } from '$lib/types';
+	import type {
+		CategoriaPosicion,
+		Disciplina,
+		DisciplinaCatalogo,
+		Posicion,
+		Tag,
+		TipoRolPosicion
+	} from '$lib/types';
 	import { TAG_PRESET_COLORS } from '$lib/tags';
-	import { mapaModalStack, posicionWizardDraft } from './mapa-modal-stack.svelte';
+	import {
+		mapaModalStack,
+		posicionWizardDraft,
+		type OpcionesDisciplina
+	} from './mapa-modal-stack.svelte';
+	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
@@ -82,9 +94,13 @@
 		onCreateNewComplementaria,
 		onSaved,
 		onRequestClose,
-		onDirtyChange
+		onDirtyChange,
+		opcionesDisciplina = {}
 	}: {
 		modo: 'crear' | 'editar';
+		// T-4.it7: disciplina ofrecida al crear (preferida, por defecto y
+		// permitidas). Ver `OpcionesDisciplina`.
+		opcionesDisciplina?: OpcionesDisciplina;
 		// Modo de integración con el padre (T-12). 'stack' usa
 		// `mapaModalStack`; 'standalone' usa solo callbacks.
 		mode?: 'stack' | 'standalone';
@@ -111,7 +127,11 @@
 		// (PosicionWizardDialog) abre un sub-Dialog y, al guardarse, llama
 		// `onResult(newId)`. Si está undefined, el botón "+ Crear nueva" no
 		// aparece (igual que pasaba en stack antes de T-1.it2).
-		onCreateNewComplementaria?: (onResult: (newId: string) => void) => void;
+		// `opciones`: disciplina que hereda la complementaria nueva (T-4.it7).
+		onCreateNewComplementaria?: (
+			onResult: (newId: string) => void,
+			opciones: OpcionesDisciplina
+		) => void;
 		// Hook para que el host invalide su cache tras guardar/crear.
 		// id = id de la posición creada/editada; mode permite distinguir.
 		// En `standalone`, además, el padre cierra el Dialog tras esto.
@@ -142,11 +162,21 @@
 		{ value: 'neutral', label: 'Neutral' }
 	];
 
-	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
-		{ value: 'bjj', label: 'BJJ' },
-		{ value: 'grappling', label: 'Grappling' },
-		{ value: 'ambos', label: 'Ambos' }
-	];
+	// T-4.it7: "Ambos" = crear dos posiciones independientes (una por
+	// disciplina). Solo al crear; al editar la disciplina es de solo lectura.
+	const DISCIPLINAS = $derived<{ value: Disciplina; label: string }[]>(
+		(opcionesDisciplina.permitidas ?? ['bjj', 'grappling', 'ambos']).map((d) => ({
+			value: d,
+			label: DISCIPLINA_LABEL[d]
+		}))
+	);
+	// Copia que se abre tras crear con "Ambos" y lista de la complementaria.
+	const preferido = $derived<DisciplinaCatalogo>(
+		opcionesDisciplina.preferido ?? settings.disciplinaActiva
+	);
+	function disciplinaInicial(): Disciplina {
+		return opcionesDisciplina.porDefecto ?? opcionesDisciplina.preferido ?? settings.disciplinaActiva;
+	}
 
 	// Pasos semánticos: 1=Nombre, 2=Categoría, 3=Tipo, 4=Complementaria,
 	// 5=Tags (siempre), 6=Notas (solo modo avanzado, T-3.it6).
@@ -181,9 +211,14 @@
 	// pisan con '' — se mantienen).
 	let notas = $state('');
 	let notasOriginal = $state('');
-	// `disciplina`: el usuario puede especificar si la posición pertenece a
-	// BJJ, Grappling o ambos. Arranca con la disciplina activa global.
-	let disciplina = $state<Disciplina>(settings.disciplinaActiva);
+	// `disciplina`: BJJ, Grappling o "Ambos" (crea una en cada una). Arranca
+	// con la disciplina activa global (o la heredada del asistente padre).
+	// En editar es la guardada y no se puede cambiar (P3).
+	let disciplina = $state<Disciplina>('bjj');
+	// Disciplina en cuya lista se elige la complementaria.
+	const ladoLista = $derived<DisciplinaCatalogo>(
+		disciplina === 'ambos' ? preferido : disciplina
+	);
 
 	let allTags = $state<Tag[]>([]);
 	let tagsSeleccionados = $state<string[]>([]);
@@ -250,7 +285,7 @@
 		// Ahora que settings está hidratado, actualiza disciplina con el
 		// valor real (solo en crear; en editar se sobreescribe desde BD).
 		if (modo !== 'editar') {
-			disciplina = settings.disciplinaActiva;
+			disciplina = disciplinaInicial();
 		}
 		// Registra el dirty handler en el stack (solo `stack`). En
 		// `standalone` el padre se entera vía `onDirtyChange` (efecto
@@ -295,6 +330,7 @@
 			tipo = draft.tipo;
 			complementariaId = draft.complementariaId;
 			notas = draft.notas;
+			if (draft.disciplina) disciplina = draft.disciplina;
 			currentStep = draft.currentStep;
 			visitedSteps = new Set(draft.visitedSteps);
 		}
@@ -394,6 +430,7 @@
 			tipo,
 			complementariaId,
 			notas,
+			disciplina,
 			currentStep,
 			visitedSteps: Array.from(visitedSteps)
 		});
@@ -422,6 +459,9 @@
 		const items: ComboboxItem[] = existentes
 			.filter((p) => {
 				if (p.id === posicionId) return false;
+				// T-4.it7: solo de la misma disciplina (la actual se conserva
+				// aunque sea de otra, para vínculos antiguos).
+				if (p.disciplina !== ladoLista && p.id !== complementariaId) return false;
 				const otraPareja = p.posicion_complementaria_id ?? null;
 				if (otraPareja === null) return true;
 				if (posicionId && otraPareja === posicionId) return true;
@@ -449,15 +489,37 @@
 		}
 	}
 
+	// Disciplina que hereda la complementaria creada al vuelo: la misma que
+	// esta posición (con "Ambos", también "Ambos": cada copia se vincula con
+	// la suya al guardar, ver `crearPosicionEnLados`).
+	const opcionesComplementaria = $derived<OpcionesDisciplina>({
+		preferido,
+		porDefecto: disciplina,
+		permitidas: [disciplina]
+	});
+
+	function handleDisciplinaChange(v: string | null) {
+		disciplina = (v ?? disciplina) as Disciplina;
+		// La complementaria elegida debe ser de la nueva disciplina.
+		if (complementariaId) {
+			const c = existentes.find((p) => p.id === complementariaId);
+			if (c && c.disciplina !== ladoLista) complementariaId = null;
+		}
+		if (nombreError) nombreError = '';
+	}
+
 	function handleStandaloneCreateNewComplementaria() {
 		// Patrón equivalente al stack pero sin `mapaModalStack`: el padre
 		// (PosicionWizardDialog) abre un sub-Dialog anidado y nos pasa el id
 		// del recién creado por callback. Igual que el stack, escribimos al
 		// state local (la instancia no se desmonta en standalone, así que la
 		// asignación es lo único que necesitamos).
-		onCreateNewComplementaria?.((newId) => {
+		onCreateNewComplementaria?.(async (newId) => {
 			complementariaId = newId;
-		});
+			// Refresca el catálogo para que el Combobox muestre la nueva.
+			const { listPosiciones } = await import('$lib/posiciones');
+			existentes = await listPosiciones();
+		}, opcionesComplementaria);
 	}
 
 	function handleCreateNewComplementaria() {
@@ -487,7 +549,8 @@
 			modo: 'crear',
 			nombre: 'Nueva posición',
 			parentForComplementaria: posicionId,
-			isComplementariaSubWizard: true
+			isComplementariaSubWizard: true,
+			disciplina: opcionesComplementaria
 		});
 	}
 
@@ -510,19 +573,36 @@
 		return idx > 0 ? visibleSteps[idx - 1] : null;
 	}
 
-	function nombreYaExiste(n: string): boolean {
+	/**
+	 * T-4.it7: nombre repetido POR DISCIPLINA. Devuelve la disciplina donde
+	 * ya existe (con "Ambos", cualquiera de las dos) o null.
+	 */
+	function nombreYaExiste(n: string): DisciplinaCatalogo | null {
 		const norm = n.trim().toLowerCase();
-		if (!norm) return false;
-		return existentes.some(
-			(p) => p.nombre.toLowerCase() === norm && (modo === 'crear' || p.id !== posicionId)
+		if (!norm) return null;
+		const lados: DisciplinaCatalogo[] =
+			disciplina === 'ambos' ? ['bjj', 'grappling'] : [disciplina];
+		const choque = existentes.find(
+			(p) =>
+				lados.includes(p.disciplina) &&
+				p.nombre.trim().toLowerCase() === norm &&
+				(modo === 'crear' || p.id !== posicionId)
 		);
+		return choque ? choque.disciplina : null;
+	}
+
+	function mensajeNombreRepetido(lado: DisciplinaCatalogo): string {
+		return disciplina === 'ambos'
+			? `Ya existe una posición con ese nombre en ${DISCIPLINA_LABEL[lado]}.`
+			: 'Ya existe una posición con ese nombre.';
 	}
 
 	function tryAdvanceFromStep1() {
 		const n = nombre.trim();
 		if (!n) return;
-		if (nombreYaExiste(n)) {
-			nombreError = 'Ya existe una posición con ese nombre.';
+		const choque = nombreYaExiste(n);
+		if (choque) {
+			nombreError = mensajeNombreRepetido(choque);
 			return;
 		}
 		nombreError = '';
@@ -696,22 +776,26 @@
 			// Materializa el default 'otro' si el usuario nunca tocó la categoría.
 			const categoriaFinal: CategoriaPosicion = categoria ?? 'otro';
 			if (modo === 'crear') {
-				const { createPosicion } = await import('$lib/posiciones');
+				// T-4.it7: el nombre se valida en el paso 1, pero la
+				// disciplina se elige después (paso 2) → re-validar aquí.
+				const choque = nombreYaExiste(nombreFinal);
+				if (choque) {
+					nombreError = mensajeNombreRepetido(choque);
+					currentStep = 1;
+					return;
+				}
+				const { crearPosicionEnLados } = await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En
 				// hobbyist persistimos cadena vacía.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
-				const nueva = await createPosicion({
-					nombre: nombreFinal,
-					categoria: categoriaFinal,
-					tipo,
-					notas: notasFinal,
-					posicion_complementaria_id: complementariaId,
-					disciplina
-				});
-				if (tagsSeleccionados.length > 0) {
-					const { setTagsForPosicion } = await import('$lib/tags');
-					await setTagsForPosicion(nueva.id, tagsSeleccionados);
-				}
+				// "Ambos" crea dos posiciones independientes (misma
+				// etiquetas); se abre / devuelve la de `preferido`.
+				const creadas = await crearPosicionEnLados(
+					{ nombre: nombreFinal, categoria: categoriaFinal, tipo, notas: notasFinal },
+					disciplina,
+					{ preferido, tagIds: tagsSeleccionados, complementariaId }
+				);
+				const nueva = (creadas[ladoLista] ?? Object.values(creadas)[0])!;
 				if (mode === 'stack') {
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.
@@ -756,14 +840,13 @@
 				// reenvía el valor original cargado de BD para no pisar el
 				// dato existente.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : notasOriginal;
-				const update: Omit<Posicion, 'created_at' | 'updated_at'> = {
+				const update: Omit<Posicion, 'created_at' | 'updated_at' | 'disciplina'> = {
 					id: posicionId,
 					nombre: nombreFinal,
 					categoria: categoriaFinal,
 					tipo,
 					notas: notasFinal,
-					posicion_complementaria_id: complementariaId,
-					disciplina
+					posicion_complementaria_id: complementariaId
 				};
 				await updatePosicion(update);
 				const { setTagsForPosicion } = await import('$lib/tags');
@@ -879,11 +962,12 @@
 					options={DISCIPLINAS}
 					value={disciplina}
 					required
-					onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+					onChange={handleDisciplinaChange}
 					ariaLabel="Disciplina de la posición"
 				/>
 				<p class="text-xs text-muted-foreground">
-					Si la saltas, queda como "Otro". Disciplina se puede cambiar después.
+					Si saltas la categoría, queda como "Otro". La disciplina no se puede cambiar
+					después; "Ambos" crea una posición en cada disciplina, independientes entre sí.
 				</p>
 			</div>
 
@@ -1091,13 +1175,9 @@
 
 				<div class="space-y-1.5">
 					<Label>Disciplina</Label>
-					<Chips
-						options={DISCIPLINAS}
-						value={disciplina}
-						required
-						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
-						ariaLabel="Disciplina de la posición"
-					/>
+					<!-- T-4.it7 (P3): fija tras crear, solo lectura. -->
+					<p class="text-sm text-foreground">{DISCIPLINA_LABEL[disciplina]}</p>
+					<p class="text-xs text-muted-foreground">No se puede cambiar después de crear.</p>
 				</div>
 
 				<div class="space-y-1.5">

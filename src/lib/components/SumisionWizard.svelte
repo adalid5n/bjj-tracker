@@ -34,8 +34,9 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
-	import type { Disciplina, SumisionTerminal } from '$lib/types';
-	import { mapaModalStack } from './mapa-modal-stack.svelte';
+	import type { Disciplina, DisciplinaCatalogo, SumisionTerminal } from '$lib/types';
+	import { mapaModalStack, type OpcionesDisciplina } from './mapa-modal-stack.svelte';
+	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
@@ -45,9 +46,12 @@
 		sumisionId,
 		onSaved,
 		onRequestClose,
-		onDirtyChange
+		onDirtyChange,
+		opcionesDisciplina = {}
 	}: {
 		modo: 'crear' | 'editar';
+		// T-4.it7: disciplina ofrecida al crear (ver `OpcionesDisciplina`).
+		opcionesDisciplina?: OpcionesDisciplina;
 		// Modo de integración con el padre. 'stack' usa `mapaModalStack`;
 		// 'standalone' usa solo callbacks (mismo patrón que PosicionWizard).
 		mode?: 'stack' | 'standalone';
@@ -79,11 +83,17 @@
 	let notasOriginal = $state('');
 	let disciplina = $state<Disciplina>('bjj');
 
-	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
-		{ value: 'bjj', label: 'BJJ' },
-		{ value: 'grappling', label: 'Grappling' },
-		{ value: 'ambos', label: 'Ambos' }
-	];
+	// T-4.it7: "Ambos" crea dos sumisiones independientes (una por
+	// disciplina). Al editar la disciplina es de solo lectura (P3).
+	const DISCIPLINAS = $derived<{ value: Disciplina; label: string }[]>(
+		(opcionesDisciplina.permitidas ?? ['bjj', 'grappling', 'ambos']).map((d) => ({
+			value: d,
+			label: DISCIPLINA_LABEL[d]
+		}))
+	);
+	const preferido = $derived<DisciplinaCatalogo>(
+		opcionesDisciplina.preferido ?? settings.disciplinaActiva
+	);
 
 	let currentStep = $state(1);
 	let visitedSteps = $state<Set<number>>(new Set([1]));
@@ -109,7 +119,8 @@
 	onMount(async () => {
 		await settings.init();
 		if (modo !== 'editar') {
-			disciplina = settings.disciplinaActiva;
+			disciplina =
+				opcionesDisciplina.porDefecto ?? opcionesDisciplina.preferido ?? settings.disciplinaActiva;
 		}
 		// Registra el dirty handler en el stack (solo `stack`). En
 		// `standalone` el padre se entera vía `onDirtyChange`.
@@ -199,15 +210,26 @@
 	// Schema v11 (T-3.it7): el nombre es único POR DISCIPLINA — "Kimura"
 	// de BJJ y "Kimura" de Grappling pueden convivir. Solo es repetido si
 	// coincide nombre (sin distinguir mayúsculas) y disciplina.
-	function nombreYaExiste(n: string): boolean {
+	// T-4.it7: con "Ambos" el nombre no puede existir en ninguna de las dos;
+	// devuelve la disciplina donde ya existe (o null).
+	function nombreYaExiste(n: string): DisciplinaCatalogo | null {
 		const norm = n.trim().toLowerCase();
-		if (!norm) return false;
-		return existentes.some(
+		if (!norm) return null;
+		const lados: DisciplinaCatalogo[] =
+			disciplina === 'ambos' ? ['bjj', 'grappling'] : [disciplina];
+		const choque = existentes.find(
 			(s) =>
-				s.nombre.toLowerCase() === norm &&
-				s.disciplina === disciplina &&
+				s.nombre.trim().toLowerCase() === norm &&
+				lados.includes(s.disciplina) &&
 				(modo === 'crear' || s.id !== sumisionId)
 		);
+		return choque ? choque.disciplina : null;
+	}
+
+	function mensajeNombreRepetido(lado: DisciplinaCatalogo): string {
+		return disciplina === 'ambos'
+			? `Ya existe una sumisión con ese nombre en ${DISCIPLINA_LABEL[lado]}.`
+			: 'Ya existe una sumisión con ese nombre.';
 	}
 
 	function goToStep(step: number) {
@@ -230,8 +252,9 @@
 		// carreras entre pestañas.
 		const n = nombre.trim();
 		if (!n) return;
-		if (nombreYaExiste(n)) {
-			nombreError = 'Ya existe una sumisión con ese nombre.';
+		const choque = nombreYaExiste(n);
+		if (choque) {
+			nombreError = mensajeNombreRepetido(choque);
 			return;
 		}
 		nombreError = '';
@@ -332,15 +355,24 @@
 		errorMsg = '';
 		try {
 			if (modo === 'crear') {
-				const { createSumision } = await import('$lib/sumisiones');
+				const choque = nombreYaExiste(nombreFinal);
+				if (choque) {
+					nombreError = mensajeNombreRepetido(choque);
+					currentStep = 1;
+					return;
+				}
+				const { crearSumisionEnLados } = await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
 				// persistimos cadena vacía.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
-				const nueva = await createSumision({
-					nombre: nombreFinal,
-					notas: notasFinal,
-					disciplina
-				});
+				// "Ambos" crea dos sumisiones; se abre / devuelve la de `preferido`.
+				const creadas = await crearSumisionEnLados(
+					{ nombre: nombreFinal, notas: notasFinal },
+					disciplina,
+					{ preferido }
+				);
+				const nueva = (creadas[disciplina === 'ambos' ? preferido : disciplina] ??
+					Object.values(creadas)[0])!;
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
 					mapaModalStack.setDirtyHandler(null);
@@ -372,11 +404,10 @@
 				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
 				// reenvía el valor original cargado de BD.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : notasOriginal;
-				const update: Omit<SumisionTerminal, 'created_at' | 'updated_at'> = {
+				const update: Omit<SumisionTerminal, 'created_at' | 'updated_at' | 'disciplina'> = {
 					id: sumisionId,
 					nombre: nombreFinal,
-					notas: notasFinal,
-					disciplina
+					notas: notasFinal
 				};
 				await updateSumision(update);
 				if (mode === 'stack') {
@@ -479,9 +510,15 @@
 					options={DISCIPLINAS}
 					value={disciplina}
 					required
-					onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
+					onChange={(v) => {
+						disciplina = (v ?? disciplina) as Disciplina;
+						if (nombreError) nombreError = '';
+					}}
 					ariaLabel="Disciplina de la sumisión"
 				/>
+				<p class="text-xs text-muted-foreground">
+					No se puede cambiar después; "Ambos" crea una sumisión en cada disciplina.
+				</p>
 			</div>
 
 			{#if settings.modoAvanzado}
@@ -545,13 +582,9 @@
 
 				<div class="space-y-1.5">
 					<Label>Disciplina</Label>
-					<Chips
-						options={DISCIPLINAS}
-						value={disciplina}
-						required
-						onChange={(v) => (disciplina = (v ?? 'bjj') as Disciplina)}
-						ariaLabel="Disciplina de la sumisión"
-					/>
+					<!-- T-4.it7 (P3): fija tras crear, solo lectura. -->
+					<p class="text-sm text-foreground">{DISCIPLINA_LABEL[disciplina]}</p>
+					<p class="text-xs text-muted-foreground">No se puede cambiar después de crear.</p>
 				</div>
 
 				{#if errorMsg}
