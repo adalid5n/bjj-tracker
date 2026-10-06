@@ -28,7 +28,7 @@ importación.
 - **Vista previa en el mapa.** En el punto de confirmar, la ventana de
   importación (y cualquier ficha abierta) se cierra y el usuario queda en
   el mapa, vista Grafo, viendo el grafo real con lo que se va a añadir
-  **resaltado con un color amarillo apagado que respira** (pasa suavemente del color
+  **resaltado con un color amarillo dorado (más oscuro que el blanco de las sumisiones) que respira** (pasa suavemente del color
   normal al de resaltado y vuelve; no cambia el tamaño).
 - Mismo modelo visual que siempre: posiciones y sumisiones son nodos; las
   técnicas son flechas. Una posición existente que recibe una técnica
@@ -70,7 +70,7 @@ importación.
   versión del diseño): la ventana se cierra y el usuario ve el mapa.
 - "Aceptar" inserta y deja al usuario en el mapa; "Cancelar" vuelve a la
   revisión con el borrador intacto. Nada se escribe hasta "Aceptar".
-- Resaltado por color que respira (transición suave, amarillo apagado), no
+- Resaltado por color que respira (transición suave, amarillo dorado (más oscuro que el blanco de las sumisiones)), no
   por tamaño; las posiciones existentes que reciben técnica nueva no se
   resaltan.
 - `prefers-reduced-motion` → color fijo sin animación.
