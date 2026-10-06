@@ -16,6 +16,7 @@
 	import type {
 		CategoriaPosicion,
 		Companero,
+		DisciplinaCatalogo,
 		PesoRelativo,
 		Posicion,
 		ResultadoRoll,
@@ -24,12 +25,10 @@
 		TipoSesion
 	} from '$lib/types';
 	import type { RollWithContext } from '$lib/rolls';
+	import { TIPO_SESION_LABEL, etiquetaSesion } from '$lib/sesion-etiquetas';
 
-	const TIPO_LABEL: Record<TipoSesion, string> = {
-		bjj: 'BJJ',
-		grappling: 'Grappling',
-		open_mat: 'Open mat'
-	};
+	// T-4.it7: tipo Clase / Open mat; la etiqueta incluye la disciplina.
+	const TIPO_LABEL = TIPO_SESION_LABEL;
 	const RESULTADO_LABEL: Record<ResultadoRoll, string> = {
 		domine: 'Dominé',
 		equilibrado: 'Equilibrado',
@@ -187,6 +186,7 @@
 	async function handleSaveRoll(data: {
 		id: string;
 		sesion_id: string;
+		disciplina: DisciplinaCatalogo;
 		companero_id?: string;
 		tamano_relativo?: PesoRelativo;
 		duracion_min?: number;
@@ -342,8 +342,7 @@
 							{tipoSesion ? TIPO_LABEL[tipoSesion] : 'Cualquiera'}
 						</Select.Trigger>
 						<Select.Content>
-							<Select.Item value="bjj">BJJ</Select.Item>
-							<Select.Item value="grappling">Grappling</Select.Item>
+							<Select.Item value="clase">Clase</Select.Item>
 							<Select.Item value="open_mat">Open mat</Select.Item>
 						</Select.Content>
 					</Select.Root>
@@ -443,7 +442,7 @@
 									{/if}
 								</div>
 								<div class="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-									<span>{TIPO_LABEL[r.sesion_tipo]}</span>
+									<span>{etiquetaSesion({ tipo: r.sesion_tipo, disciplina: r.sesion_disciplina })}</span>
 									<a
 										href={resolve(`/sesion/${r.sesion_id}`)}
 										class="text-primary underline hover:opacity-80"
@@ -488,6 +487,7 @@
 	<RollEditor
 		bind:open={editorOpen}
 		sesionId={editingRollSesionId}
+		sesionDisciplina={editingRoll?.sesion_disciplina}
 		roll={editingRoll}
 		onSave={handleSaveRoll}
 		onDelete={editingRoll ? handleDeleteRoll : undefined}

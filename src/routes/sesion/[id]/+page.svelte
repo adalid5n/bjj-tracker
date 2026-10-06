@@ -9,7 +9,17 @@
 	import Fab from '$lib/components/Fab.svelte';
 	import ChipPicker from '$lib/components/ChipPicker.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import type { Companero, Posicion, Roll, Sesion, Tecnica, TipoSesion } from '$lib/types';
+	import type {
+		Companero,
+		Disciplina,
+		DisciplinaCatalogo,
+		Posicion,
+		Roll,
+		Sesion,
+		Tecnica,
+		TipoSesion
+	} from '$lib/types';
+	import { DISCIPLINA_SESION_LABEL } from '$lib/sesion-etiquetas';
 
 	const RESULTADO_LABEL = {
 		domine: 'Dominé',
@@ -124,6 +134,7 @@
 	async function handleSubmitSesion(data: {
 		fecha: string;
 		tipo: TipoSesion;
+		disciplina: Disciplina;
 		foco?: string;
 		tecnica_clase?: string;
 		obs_profesor?: string;
@@ -157,6 +168,7 @@
 	async function handleSaveRoll(data: {
 		id: string;
 		sesion_id: string;
+		disciplina: DisciplinaCatalogo;
 		companero_id?: string;
 		tamano_relativo?: Roll['tamano_relativo'];
 		duracion_min?: number;
@@ -259,6 +271,8 @@
 								<div class="flex items-baseline justify-between gap-2">
 									<div class="flex items-baseline gap-2">
 										<span class="text-xs font-semibold text-muted-foreground">#{r.orden}</span>
+										<!-- T-4.it7: disciplina del roll (útil en clases mixtas). -->
+										<span class="text-xs text-muted-foreground">{DISCIPLINA_SESION_LABEL[r.disciplina]}</span>
 										{#if r.companero_id && companerosById.has(r.companero_id)}
 											<span class="font-medium">{companerosById.get(r.companero_id)?.nombre}</span>
 										{:else}
@@ -304,6 +318,7 @@
 		<RollEditor
 			bind:open={editorOpen}
 			sesionId={sesion.id}
+			sesionDisciplina={sesion.disciplina}
 			roll={editingRoll}
 			onSave={handleSaveRoll}
 			onDelete={editingRoll ? handleDeleteRoll : undefined}

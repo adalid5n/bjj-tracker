@@ -7,14 +7,21 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
-	import type { TipoSesion } from '$lib/types';
+	import type { Disciplina, TipoSesion } from '$lib/types';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
+	// T-4.it7: paso "Tipo y disciplina". Tipo = Clase / Open mat;
+	// disciplina = BJJ / Grappling / Ambos (clase mixta), por defecto la
+	// activa del mapa. Los dos son selectores obligatorios.
 	const TIPOS: { value: TipoSesion; label: string }[] = [
+		{ value: 'clase', label: 'Clase' },
+		{ value: 'open_mat', label: 'Open mat' }
+	];
+	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
 		{ value: 'bjj', label: 'BJJ' },
 		{ value: 'grappling', label: 'Grappling' },
-		{ value: 'open_mat', label: 'Open mat' }
+		{ value: 'ambos', label: 'Ambos' }
 	];
 
 	// `foco`, `tecnica_clase`, `obs_profesor` siguen en BD por la migración
@@ -24,6 +31,7 @@
 	type SaveData = {
 		fecha: string;
 		tipo: TipoSesion;
+		disciplina: Disciplina;
 		foco?: string;
 		tecnica_clase?: string;
 		obs_profesor?: string;
@@ -50,6 +58,7 @@
 
 	let fecha = $state(today);
 	let tipo = $state<TipoSesion | null>(null);
+	let disciplina = $state<Disciplina>('bjj');
 	// `foco`, `tecnicaClase`, `obsProfesor` (T-3.it6): editables bajo
 	// `settings.modoAvanzado`. En creación (este componente) no hay
 	// `*Original` que preservar — son siempre nuevos.
@@ -67,6 +76,7 @@
 		if (open) {
 			fecha = defaultFecha ?? today;
 			tipo = null;
+			disciplina = settings.disciplinaActiva;
 			foco = '';
 			tecnicaClase = '';
 			obsProfesor = '';
@@ -174,6 +184,7 @@
 			await onSave({
 				fecha,
 				tipo,
+				disciplina,
 				foco: focoFinal,
 				tecnica_clase: tecnicaClaseFinal,
 				obs_profesor: obsProfesorFinal
@@ -239,6 +250,14 @@
 							value={tipo}
 							onChange={handleTipoChange}
 							ariaLabel="Tipo de sesión"
+							required
+						/>
+						<h3 class="pt-1 text-sm font-semibold">Disciplina *</h3>
+						<Chips
+							options={DISCIPLINAS}
+							value={disciplina}
+							onChange={(v) => (disciplina = (v ?? disciplina) as Disciplina)}
+							ariaLabel="Disciplina de la sesión"
 							required
 						/>
 					</div>

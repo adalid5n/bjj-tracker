@@ -1,19 +1,25 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import * as Select from '$lib/components/ui/select';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import DateInput from '$lib/components/DateInput.svelte';
-	import type { Sesion, TipoSesion } from '$lib/types';
+	import Chips from '$lib/components/Chips.svelte';
+	import type { Disciplina, Sesion, TipoSesion } from '$lib/types';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
+	// T-4.it7: el tipo es Clase u Open mat; BJJ / Grappling pasan a ser la
+	// disciplina (BJJ, Grappling o Ambos = clase mixta).
 	const TIPOS: { value: TipoSesion; label: string }[] = [
+		{ value: 'clase', label: 'Clase' },
+		{ value: 'open_mat', label: 'Open mat' }
+	];
+	const DISCIPLINAS: { value: Disciplina; label: string }[] = [
 		{ value: 'bjj', label: 'BJJ' },
 		{ value: 'grappling', label: 'Grappling' },
-		{ value: 'open_mat', label: 'Open mat' }
+		{ value: 'ambos', label: 'Ambos' }
 	];
 
 	type SubmitData = Omit<Sesion, 'id' | 'created_at' | 'updated_at'>;
@@ -32,7 +38,8 @@
 	const init = untrack(() => initial);
 
 	let fecha = $state(init?.fecha ?? today);
-	let tipo = $state<TipoSesion>(init?.tipo ?? 'bjj');
+	let tipo = $state<TipoSesion>(init?.tipo ?? 'clase');
+	let disciplina = $state<Disciplina>(init?.disciplina ?? settings.disciplinaActiva);
 	// `foco`, `tecnicaClase`, `obsProfesor` (T-3.it6): editables bajo
 	// `settings.modoAvanzado`. En hobbyist no se renderizan los inputs pero
 	// `*Original` se sigue cargando para preservar el dato existente al
@@ -72,6 +79,7 @@
 			await onSubmit({
 				fecha,
 				tipo,
+				disciplina,
 				foco: focoFinal,
 				tecnica_clase: tecnicaClaseFinal,
 				obs_profesor: obsProfesorFinal
@@ -91,17 +99,25 @@
 	</div>
 
 	<div class="space-y-1.5">
-		<Label for="tipo">Tipo *</Label>
-		<Select.Root type="single" bind:value={tipo as string}>
-			<Select.Trigger id="tipo" class="w-full">
-				{TIPOS.find((t) => t.value === tipo)?.label ?? 'Selecciona…'}
-			</Select.Trigger>
-			<Select.Content>
-				{#each TIPOS as t (t.value)}
-					<Select.Item value={t.value}>{t.label}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
+		<Label>Tipo *</Label>
+		<Chips
+			options={TIPOS}
+			value={tipo}
+			required
+			onChange={(v) => (tipo = (v ?? tipo) as TipoSesion)}
+			ariaLabel="Tipo de sesión"
+		/>
+	</div>
+
+	<div class="space-y-1.5">
+		<Label>Disciplina *</Label>
+		<Chips
+			options={DISCIPLINAS}
+			value={disciplina}
+			required
+			onChange={(v) => (disciplina = (v ?? disciplina) as Disciplina)}
+			ariaLabel="Disciplina de la sesión"
+		/>
 	</div>
 
 	{#if settings.modoAvanzado}

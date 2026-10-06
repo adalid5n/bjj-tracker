@@ -10,6 +10,7 @@ export type NewSesion = Omit<Sesion, 'id' | 'created_at' | 'updated_at'>;
 export type SesionUpdate = Omit<Sesion, 'created_at' | 'updated_at'>;
 export type SesionWithCount = Sesion & { rolls_count: number };
 
+
 export async function listSesiones(): Promise<SesionWithCount[]> {
 	await init();
 	return query<SesionWithCount>(
@@ -37,12 +38,13 @@ export async function createSesion(data: NewSesion): Promise<Sesion> {
 		updated_at: now
 	};
 	await run(
-		`INSERT INTO sesiones (id, fecha, tipo, foco, tecnica_clase, obs_profesor, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sesiones (id, fecha, tipo, disciplina, foco, tecnica_clase, obs_profesor, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			sesion.id,
 			sesion.fecha,
 			sesion.tipo,
+			sesion.disciplina,
 			sesion.foco ?? null,
 			sesion.tecnica_clase ?? null,
 			sesion.obs_profesor ?? null,
@@ -58,11 +60,12 @@ export async function updateSesion(data: SesionUpdate): Promise<void> {
 	const now = new Date().toISOString();
 	await run(
 		`UPDATE sesiones
-		 SET fecha = ?, tipo = ?, foco = ?, tecnica_clase = ?, obs_profesor = ?, updated_at = ?
+		 SET fecha = ?, tipo = ?, disciplina = ?, foco = ?, tecnica_clase = ?, obs_profesor = ?, updated_at = ?
 		 WHERE id = ?`,
 		[
 			data.fecha,
 			data.tipo,
+			data.disciplina,
 			data.foco ?? null,
 			data.tecnica_clase ?? null,
 			data.obs_profesor ?? null,

@@ -11,13 +11,9 @@
 	import { VERSION } from '$lib/version';
 	import { dayHeaderLabel, todayIso } from '$lib/day-headers';
 	import type { SesionWithCount } from '$lib/sesiones';
-	import type { TipoSesion } from '$lib/types';
+	import type { Disciplina, TipoSesion } from '$lib/types';
+	import { etiquetaSesion } from '$lib/sesion-etiquetas';
 
-	const TIPO_LABEL = {
-		bjj: 'BJJ',
-		grappling: 'Grappling',
-		open_mat: 'Open mat'
-	} as const;
 
 	let api: typeof import('$lib/sesiones') | null = $state(null);
 	let sesiones: SesionWithCount[] = $state([]);
@@ -120,6 +116,7 @@
 	async function handleSesionSave(data: {
 		fecha: string;
 		tipo: TipoSesion;
+		disciplina: Disciplina;
 		foco?: string;
 		tecnica_clase?: string;
 		obs_profesor?: string;
@@ -183,7 +180,7 @@
 								class="block rounded-lg border border-border bg-card p-3 shadow-xs transition-colors hover:bg-accent"
 							>
 								<div class="flex items-baseline justify-between">
-									<span class="font-medium">{TIPO_LABEL[s.tipo]}</span>
+									<span class="font-medium">{etiquetaSesion(s)}</span>
 									<span class="text-xs text-muted-foreground">
 										{s.rolls_count}
 										{s.rolls_count === 1 ? 'roll' : 'rolls'}

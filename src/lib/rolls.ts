@@ -4,7 +4,7 @@
  */
 
 import { init, query, run } from '$lib/db';
-import type { ResultadoRoll, Roll, TipoSesion } from '$lib/types';
+import type { Disciplina, ResultadoRoll, Roll, TipoSesion } from '$lib/types';
 
 export type NewRoll = Omit<Roll, 'id' | 'orden' | 'created_at' | 'updated_at'>;
 export type RollUpdate = Omit<Roll, 'orden' | 'created_at' | 'updated_at'>;
@@ -22,6 +22,7 @@ export type RollWithContext = Roll & {
 	companero_nombre: string | null;
 	sesion_fecha: string;
 	sesion_tipo: TipoSesion;
+	sesion_disciplina: Disciplina;
 };
 
 export type RollFilters = {
@@ -88,7 +89,8 @@ export async function listAllRolls(filters: RollFilters = {}): Promise<RollWithC
 			r.*,
 			c.nombre AS companero_nombre,
 			s.fecha AS sesion_fecha,
-			s.tipo AS sesion_tipo
+			s.tipo AS sesion_tipo,
+			s.disciplina AS sesion_disciplina
 		 FROM rolls r
 		 LEFT JOIN companeros c ON r.companero_id = c.id
 		 LEFT JOIN sesiones s ON r.sesion_id = s.id
@@ -115,15 +117,16 @@ export async function createRoll(data: NewRoll): Promise<Roll> {
 	};
 	await run(
 		`INSERT INTO rolls (
-			id, sesion_id, companero_id, orden, tamano_relativo, duracion_min,
+			id, sesion_id, companero_id, orden, disciplina, tamano_relativo, duracion_min,
 			resultado, que_intente, que_fallo, posiciones_problema,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			roll.id,
 			roll.sesion_id,
 			roll.companero_id ?? null,
 			roll.orden,
+			roll.disciplina,
 			roll.tamano_relativo ?? null,
 			roll.duracion_min ?? null,
 			roll.resultado ?? null,
@@ -142,13 +145,14 @@ export async function updateRoll(data: RollUpdate): Promise<void> {
 	const now = new Date().toISOString();
 	await run(
 		`UPDATE rolls
-		 SET sesion_id = ?, companero_id = ?, tamano_relativo = ?, duracion_min = ?,
+		 SET sesion_id = ?, companero_id = ?, disciplina = ?, tamano_relativo = ?, duracion_min = ?,
 		     resultado = ?, que_intente = ?, que_fallo = ?, posiciones_problema = ?,
 		     updated_at = ?
 		 WHERE id = ?`,
 		[
 			data.sesion_id,
 			data.companero_id ?? null,
+			data.disciplina,
 			data.tamano_relativo ?? null,
 			data.duracion_min ?? null,
 			data.resultado ?? null,
