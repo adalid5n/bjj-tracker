@@ -362,6 +362,13 @@ it.6.
   expansión de scope, no la auditoría original.
 - **Cuándo:** cualquier sesión de pulido posterior. Sin urgencia.
 
+### Bugs de importar clase detectados en la validación de T-2.it7 (2026-10-06)
+
+- **Origen:** Adalid, validando T-2.it7 en preview.
+- **Micrófono que no se apaga:** al dictar en el importador, el micrófono sigue encendido todo el rato si no se pulsa para apagarlo, también al analizar o cerrar. **Esperado:** se apaga solo al pulsar Analizar, al cerrar el diálogo o al salir de la pantalla.
+- **"Refinar con IA" pierde los detalles:** si en la revisión se refina la propuesta, la pantalla siguiente (Añadir detalles) llega sin los detalles de ejecución, aunque estaban en el texto original. Causa probable: los detalles se restauran en el código tras generar la propuesta, pero no tras refinar (relacionado con "Refinar descarta lo editado", en la entrada "Fallos catálogo e importación (baseline)"). **Esperado:** refinar conserva los detalles.
+- **Cuándo:** el owner decide cuándo ("los corregiremos luego"). Al arreglarlos, marcarlos o actualizar el spec `importar-clase` según la convención de bugs.
+
 ### Fallos catálogo e importación (baseline)
 
 - **Origen:** línea base OpenSpec (sesión 50, 2026-10-05). El subagente los encontró al describir la app a partir del código. En el spec van marcados como "⚠️ Bug conocido", con el comportamiento esperado.

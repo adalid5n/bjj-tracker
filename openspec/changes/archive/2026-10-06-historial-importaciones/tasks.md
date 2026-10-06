@@ -37,6 +37,6 @@
 
 ## 6. Verificación y cierre
 
-- [ ] 6.1 `pnpm check`, `pnpm build` y `pnpm preview` con al menos un refresh (toca BD); verificar sin errores en consola
-- [ ] 6.2 Validación manual del owner en `pnpm preview` contra los escenarios de `specs/historial-importaciones/spec.md` y `specs/copia-seguridad/spec.md`
-- [ ] 6.3 Archivar el change (`openspec archive historial-importaciones`) tras la validación; verificar que existen `openspec/specs/historial-importaciones/spec.md` y `openspec/specs/copia-seguridad/spec.md` y que `importar-clase` ya no tiene "Sin historial de importaciones"
+- [x] 6.1 `pnpm check`, `pnpm build` y `pnpm preview` con al menos un refresh (toca BD); verificar sin errores en consola
+- [x] 6.2 Validación manual del owner en `pnpm preview` contra los escenarios de `specs/historial-importaciones/spec.md` y `specs/copia-seguridad/spec.md`
+- [x] 6.3 Archivar el change (`openspec archive historial-importaciones`) tras la validación; verificar que existen `openspec/specs/historial-importaciones/spec.md` y `openspec/specs/copia-seguridad/spec.md` y que `importar-clase` ya no tiene "Sin historial de importaciones"

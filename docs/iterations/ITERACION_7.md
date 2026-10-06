@@ -83,7 +83,7 @@ MODIFIED `catalogo-tecnico` ("Disciplina de cada elemento").
 
 ### T-2.it7 — Historial de importaciones
 
-**Estado:** 🟡 Pendiente. Recomendado tras T-1.
+**Estado:** ✅ Cerrada 2026-10-06 — validada por el owner en preview; change archivado (`openspec/changes/archive/2026-10-06-historial-importaciones`). Nuevas capacidades `historial-importaciones` y `copia-seguridad`.
 **Change OpenSpec:** [`openspec/changes/historial-importaciones/`](../../openspec/changes/historial-importaciones/proposal.md)
 
 **Qué entrega:** registro de cada importación desde "Analizar" que guarda
