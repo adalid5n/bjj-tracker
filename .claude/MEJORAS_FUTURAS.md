@@ -22,6 +22,25 @@ editores reabren los 9 campos opcionales recortados en s36 (notas,
 detalles, errores comunes, foco, técnica clase, obs profesor,
 duración, `s.foco` en cards de home). Default hobbyist.
 
+### Asistentes: botón "Saltar" en pasos opcionales
+
+- **Origen:** Adalid, 2026-10-16 (validación de T-4.it7)
+- **Idea:** en los pasos opcionales de los asistentes, el botón dice "Saltar" mientras el campo esté vacío y pasa a "Continuar" en cuanto se rellena.
+- **Por qué:** deja claro que el paso no es obligatorio y que pulsar no pierde nada; patrón habitual en onboarding/asistentes móviles.
+- **Alcance:** todos los asistentes por pasos (Posicion, Sumision, Tecnica y los editores con pasos), por la regla de fixes consistentes. Ojo a la accesibilidad: el botón cambia de texto, no de sitio.
+- **Cuándo:** pulido de asistentes; barato, puede ir suelto.
+
+### Disciplina preseleccionada + "añadir también a <la otra>" — PENDIENTE DE REFINAR
+
+- **Estado:** idea, no lista para implementar (owner, 2026-10-16). Antes hay que cerrar los riesgos y el alcance de abajo.
+
+- **Origen:** Adalid, 2026-10-16 (validación de T-4.it7)
+- **Idea:** al crear desde el mapa, en vez de elegir BJJ / Grappling / Ambos, la disciplina activa viene dada y hay una casilla "Añadir también a Grappling" (o BJJ). Marcada = lo que hoy es "Ambos" (dos copias); el modelo de datos no cambia.
+- **Por qué:** quita una decisión en el caso típico (crear en la disciplina que estás viendo).
+- **Riesgos / a decidir:** crear en la disciplina equivocada sin darse cuenta → mostrar la disciplina en la cabecera del asistente. Choca con T-1.it7 (chips de disciplina `required`), que quedaría sustituido en los asistentes.
+- **Dónde más afecta:** asistentes de Posición, Sumisión y Técnica abiertos desde el mapa; los mismos abiertos desde el editor de roll (la "actual" sería la del roll); importar clase (selector en el primer paso). **No aplica** a sesiones (BJJ/Grappling/Ambos significa clase mixta, no copias) ni a rolls (solo BJJ o Grappling).
+- **Cuándo:** tras cerrar T-4 (depende del modelo de copias). Necesita change de OpenSpec (cambia `selectores` y `catalogo-tecnico`).
+
 ### Reducir copy / texto inicial en cada pantalla
 
 - **Origen:** Adalid, 2026-05-19 (sesión 26)
