@@ -71,6 +71,20 @@ con A y se rompen los vínculos previos de ambas. Solo se ofrecen
 posiciones de la misma disciplina libres o ya vinculadas a la que se
 edita.
 
+Una posición "Ambos" con complementaria MUST quedar con su complementaria
+en las dos disciplinas, tanto al crearla con "Ambos" como al separar lo
+que ya era "Ambos" (al actualizar la app o al restaurar una copia
+anterior). Si la complementaria solo existe en una disciplina, en la
+otra se vincula con la posición del mismo nombre (sin distinguir
+mayúsculas ni espacios al principio o al final) que no tenga
+complementaria; si no hay ninguna con ese nombre, se crea allí con los
+datos de la complementaria (categoría, rol, notas y etiquetas) y se
+vinculan, y al crear desde el asistente se avisa al usuario de lo
+creado. Si la del mismo nombre ya está vinculada con otra posición, MUST
+NOT crearse un duplicado ni romperse ese vínculo: en esa disciplina la
+copia queda sin complementaria y al crear desde el asistente se avisa al
+usuario.
+
 #### Scenario: Vincular dos posiciones
 - **WHEN** el usuario edita "Mount top" y elige "Mount bottom" como complementaria
 - **THEN** ambas posiciones quedan vinculadas entre sí
@@ -86,6 +100,30 @@ edita.
 #### Scenario: Borrar una de las dos
 - **WHEN** se borra una posición que tenía complementaria
 - **THEN** la otra queda sin complementaria
+
+#### Scenario: Crear Ambos con una complementaria de una sola disciplina
+- **WHEN** con BJJ activo el usuario crea "Dogfight over" eligiendo "Ambos" y como complementaria "Dogfight under", que solo existe en BJJ
+- **THEN** existen "Dogfight over" y "Dogfight under" en BJJ y en Grappling, cada par vinculado en su disciplina, y el usuario ve que "Dogfight under" se creó en Grappling
+
+#### Scenario: Crear Ambos con la complementaria ya presente en la otra disciplina
+- **WHEN** el usuario crea "Dogfight over" eligiendo "Ambos" con complementaria "Dogfight under" de BJJ y en Grappling ya existe "dogfight under" sin complementaria
+- **THEN** la "Dogfight over" de Grappling se vincula con esa "dogfight under" y no se crea ninguna posición más
+
+#### Scenario: La del mismo nombre ya está vinculada con otra
+- **WHEN** el usuario crea "Dogfight over" eligiendo "Ambos" con complementaria "Dogfight under" de BJJ y en Grappling "Dogfight under" ya está vinculada con "Dogfight neutral"
+- **THEN** no se crea otra "Dogfight under" en Grappling, el vínculo con "Dogfight neutral" se mantiene, la "Dogfight over" de Grappling queda sin complementaria y el usuario ve un aviso que lo explica
+
+#### Scenario: Crear Ambos con una complementaria nueva
+- **WHEN** en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y la guarda
+- **THEN** la nueva se crea también como "Ambos" y cada copia queda vinculada con la copia de su misma disciplina
+
+#### Scenario: Ambos existente con complementaria de una sola disciplina
+- **WHEN** existía "Dogfight over" como "Ambos" vinculada con "Dogfight under", solo de BJJ, y en Grappling no había "Dogfight under"
+- **THEN** tras actualizar la app hay una "Dogfight under" de Grappling con los datos de la de BJJ vinculada con la "Dogfight over" de Grappling, y en BJJ el vínculo sigue como estaba
+
+#### Scenario: Ambos existente y la del mismo nombre libre en la otra disciplina
+- **WHEN** existía "Dogfight over" como "Ambos" vinculada con "Dogfight under" de BJJ y en Grappling había una "Dogfight under" sin complementaria
+- **THEN** tras actualizar la app la "Dogfight over" de Grappling queda vinculada con esa "Dogfight under" y no se crea ninguna posición más
 
 ### Requirement: Contras de una técnica
 Una técnica SHALL poder tener contras: otras técnicas de su misma
@@ -174,7 +212,9 @@ Al actualizar la app, cada posición, sumisión o técnica guardada como
 perder datos: cada copia conserva nombre, notas, etiquetas y sitio en el
 grafo, y técnicas, contras y complementarias quedan entre elementos de
 la misma disciplina. Si el origen o destino de una técnica "Ambos" solo
-existe en una disciplina, MUST crearse también en la otra.
+existe en una disciplina, MUST crearse también en la otra; lo mismo con
+la complementaria de una posición "Ambos" (ver "Posiciones
+complementarias").
 
 #### Scenario: Posición Ambos con técnicas
 - **WHEN** existía "Mount" como "Ambos" con un sweep "Ambos" desde "Guardia cerrada" "Ambos" hacia ella

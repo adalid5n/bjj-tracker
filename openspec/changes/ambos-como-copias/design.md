@@ -127,6 +127,21 @@ exactamente lo mismo. Algoritmo, en orden:
    ninguna coincide, se conserva el vínculo original. Como cada posición
    tenía una sola complementaria, cada copia acaba con como mucho una:
    el vínculo sigue siendo mutuo y único.
+   **6b. Completar la complementaria** (decisión del owner 2026-10-16,
+   misma regla "Ambos completo en las dos" que el paso 3). Después del
+   paso 6, para cada par `{P, Q}` con alguno Ambos y una disciplina `D`
+   en que solo uno tiene copia (`P_D`) y `P_D` sigue sin complementaria:
+   - posiciones de `D` con el nombre normalizado de `Q` (paso 3): la más
+     antigua **libre** (sin complementaria) → `P_D ↔ esa`
+     (`resumen.complementariasVinculadas`);
+   - ninguna con ese nombre → copia de `Q` en `D` (mismos campos,
+     etiquetas y sitio) vinculada con `P_D` (`resumen.creadasParaCompletar`);
+   - existen pero todas vinculadas con otra → no se crea duplicado ni se
+     roba el vínculo; `P_D` queda sin complementaria
+     (`resumen.complementariasSinVincular`). Mismo criterio que la
+     creación desde el asistente (§5) y que las copias del paso 3.
+   Funciona en los dos sentidos: P Ambos con Q de una disciplina, o P de
+   una disciplina con Q Ambos (el ensayo del owner).
 7. **Etiquetas** (`posicion_tags`): cada fila de una posición Ambos se
    duplica para la copia Grappling. Las etiquetas no tienen disciplina.
 8. **Organización del grafo** (`grafo_layout`): cada fila de un elemento
@@ -222,8 +237,13 @@ impide estados a medias; `hasColumn` protege los `ALTER`.
 - **Complementaria:** el selector lista posiciones de la misma
   disciplina. Con Ambos, el selector lista las de la disciplina activa;
   la otra copia se vincula a la posición libre del mismo nombre en la
-  otra disciplina si existe, o queda sin complementaria. "Crear nueva
-  complementaria" hereda Ambos y vincula cada copia con la suya.
+  otra disciplina si existe; si no hay ninguna con ese nombre, se crea
+  allí una copia de la complementaria (nombre, categoría, rol, notas,
+  etiquetas) y se vinculan, con aviso de lo creado (decisión del owner
+  2026-10-16); si las del mismo nombre están vinculadas con otra, queda
+  sin complementaria y se avisa (sin duplicar ni robar el vínculo).
+  "Crear nueva complementaria" hereda Ambos y vincula cada copia con la
+  suya.
 - **Técnica:** la disciplina es la del origen. El selector de disciplina
   muestra esa disciplina y "Ambos" (la otra no se ofrece). Destinos
   filtrados a esa disciplina; crear destino al vuelo hereda la disciplina

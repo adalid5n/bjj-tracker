@@ -22,6 +22,11 @@
  *     técnica existente ("fusionada").
  *  5–8. Contras, complementarias, etiquetas y organización del grafo se
  *     reparten por disciplina.
+ *  6b. Complementaria de una posición "Ambos" que solo existe en una
+ *     disciplina (o posición de una disciplina cuya complementaria es
+ *     "Ambos") → en la otra se vincula con la del mismo nombre normalizado
+ *     libre (la más antigua) o se crea una copia; si las del mismo nombre
+ *     ya tienen pareja, la copia queda sin complementaria (sin duplicar).
  *  9–10. (solo `inferirEntrenos`) disciplina de rolls y sesiones, y tipo de
  *     sesión bjj/grappling → clase.
  *
@@ -125,8 +130,19 @@ export interface ResumenSeparacion {
 	renombradas: { de: string; a: string; disciplina: Lado }[];
 	/** Posiciones con el mismo nombre repetido en una disciplina tras separar. */
 	duplicadas: { nombre: string; disciplina: Lado }[];
-	/** Elementos creados en la otra disciplina para completar técnicas "Ambos". */
+	/**
+	 * Elementos creados en la otra disciplina para completar técnicas
+	 * "Ambos" (extremos) o posiciones "Ambos" (complementaria, paso 6b).
+	 */
 	creadasParaCompletar: { kind: 'posicion' | 'sumision'; nombre: string; disciplina: Lado }[];
+	/** Paso 6b: complementaria resuelta con una posición libre del mismo nombre ya existente. */
+	complementariasVinculadas: { posicion: string; complementaria: string; disciplina: Lado }[];
+	/**
+	 * Paso 6b: la complementaria no se pudo completar porque las posiciones
+	 * del mismo nombre en esa disciplina ya tienen otra pareja. La copia
+	 * queda sin complementaria en esa disciplina (no se duplica ni se roba).
+	 */
+	complementariasSinVincular: { posicion: string; complementaria: string; disciplina: Lado }[];
 	/** Copias de técnicas no creadas porque ya existía una igual (índice único). */
 	fusionadas: { nombre: string; disciplina: Lado; con: string }[];
 	/** Técnicas "Ambos" con un extremo inexistente: quedan solo como BJJ. */
@@ -177,6 +193,8 @@ export function separarAmbos(
 		renombradas: [],
 		duplicadas: [],
 		creadasParaCompletar: [],
+		complementariasVinculadas: [],
+		complementariasSinVincular: [],
 		fusionadas: [],
 		huerfanas: [],
 		recuentos: {} as ResumenSeparacion['recuentos']
@@ -491,6 +509,71 @@ export function separarAmbos(
 		if (filaQ.posicion_complementaria_id && filaQ.posicion_complementaria_id !== copia) continue;
 		filaCopia.posicion_complementaria_id = qCopia;
 		filaQ.posicion_complementaria_id = copia;
+	}
+
+	// 6b. Completar la complementaria en la disciplina donde falta (decisión
+	// del owner 2026-10-16: "Ambos" existe completo en las dos, igual que los
+	// extremos de las técnicas del paso 3). Va después de los vínculos entre
+	// copias para que "libre" refleje el estado final de esos vínculos.
+	// Cubre los dos sentidos: P "Ambos" con Q de una disciplina y P de una
+	// disciplina con Q "Ambos" (en un par mutuo, la segunda vuelta ve el
+	// vínculo ya puesto y no hace nada).
+	const completarComplementaria = (presenteId: string, faltaId: string, lado: Lado): void => {
+		const presente = posPorId.get(presenteId)!;
+		const cFalta = copiasPos.get(faltaId)!;
+		const original = posPorId.get(cFalta[otro(lado)] ?? faltaId);
+		if (!original) return;
+		const n = normalizarNombre(original.nombre);
+		const mismoNombre = posiciones
+			.filter((f) => f.disciplina === lado && normalizarNombre(f.nombre) === n && f.id !== presenteId)
+			.sort(compararAntiguedad);
+		if (mismoNombre.length > 0) {
+			const libre = mismoNombre.find(
+				(f) => !f.posicion_complementaria_id || f.posicion_complementaria_id === presenteId
+			);
+			if (!libre) {
+				resumen.complementariasSinVincular.push({
+					posicion: presente.nombre,
+					complementaria: original.nombre,
+					disciplina: lado
+				});
+				return;
+			}
+			libre.posicion_complementaria_id = presenteId;
+			presente.posicion_complementaria_id = libre.id;
+			contrapartesPos.set(faltaId, { ...contrapartesPos.get(faltaId), [lado]: libre.id });
+			resumen.complementariasVinculadas.push({
+				posicion: presente.nombre,
+				complementaria: libre.nombre,
+				disciplina: lado
+			});
+			return;
+		}
+		const copia: PosicionFila = {
+			...original,
+			id: opts.nuevoId(),
+			disciplina: lado,
+			posicion_complementaria_id: presenteId
+		};
+		posiciones.push(copia);
+		posPorId.set(copia.id, copia);
+		presente.posicion_complementaria_id = copia.id;
+		cFalta[lado] = copia.id;
+		clonesPos.push({ origen: original.id, copia: copia.id });
+		resumen.creadasParaCompletar.push({ kind: 'posicion', nombre: copia.nombre, disciplina: lado });
+	};
+	for (const p of datos.posiciones) {
+		const q = p.posicion_complementaria_id;
+		if (!q || q === p.id || !copiasPos.has(q)) continue;
+		if (!posAmbos.has(p.id) && !posAmbos.has(q)) continue;
+		for (const lado of LADOS) {
+			const pL = copiasPos.get(p.id)?.[lado];
+			const qL = copiasPos.get(q)?.[lado];
+			if ((pL && qL) || (!pL && !qL)) continue;
+			const [presente, falta] = pL ? [pL, q] : [qL!, p.id];
+			if (posPorId.get(presente)!.posicion_complementaria_id) continue; // ya vinculada
+			completarComplementaria(presente, falta, lado);
+		}
 	}
 
 	// ---------------------------------------------------------------------

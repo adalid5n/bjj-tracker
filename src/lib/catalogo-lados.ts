@@ -9,7 +9,8 @@
  *  - buscar la contraparte de un elemento en la otra disciplina por nombre
  *    normalizado (`trim` + minúsculas; si hay varias, la más antigua), y
  *  - crear en la otra disciplina lo que le falte a una técnica "Ambos"
- *    (origen o destino), devolviendo lo creado para avisar al usuario.
+ *    (origen o destino) o a una posición "Ambos" (su complementaria),
+ *    devolviendo lo creado para avisar al usuario.
  *
  * Cliente only — depende de `$lib/db`.
  */
@@ -69,6 +70,27 @@ export function textoAvisoCreados(creados: CreadoParaCompletar[]): string {
 	return `Para completar la otra disciplina se creó: ${partes.join(', ')}.`;
 }
 
+/**
+ * Complementaria que no se pudo completar en una disciplina porque las
+ * posiciones con su nombre ya tienen otra pareja (no se duplica ni se roba
+ * el vínculo; la copia queda sin complementaria allí).
+ */
+export type ComplementariaSinVincular = {
+	posicion: string;
+	complementaria: string;
+	disciplina: Lado;
+};
+
+/** Texto del aviso de las complementarias que quedaron sin vincular. */
+export function textoAvisoSinVincular(sinVincular: ComplementariaSinVincular[]): string {
+	return sinVincular
+		.map(
+			(s) =>
+				`En ${DISCIPLINA_LABEL[s.disciplina]} "${s.posicion}" quedó sin complementaria: "${s.complementaria}" ya está vinculada con otra posición.`
+		)
+		.join(' ');
+}
+
 function masAntiguo<T extends { created_at: string; id: string }>(a: T, b: T): number {
 	if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
 	return a.id < b.id ? -1 : 1;
@@ -112,39 +134,51 @@ export type DatosPosicion = Omit<NewPosicion, 'disciplina' | 'posicion_complemen
  * Crea la posición en la disciplina `d` (dos copias si es "Ambos").
  *
  * Complementaria: `complementariaId` se eligió en la lista de `ladoLista`
- * (la disciplina elegida o, con "Ambos", la preferida). La copia de la otra
- * disciplina se vincula con la posición LIBRE del mismo nombre que esa
- * complementaria en su disciplina, si existe; si no, queda sin
- * complementaria (design §5).
+ * (la disciplina elegida o, con "Ambos", la preferida). Con "Ambos", la
+ * copia de la otra disciplina también tiene complementaria (decisión del
+ * owner 2026-10-16, design §5):
+ *  - la posición LIBRE del mismo nombre normalizado en esa disciplina (la
+ *    más antigua), si existe;
+ *  - si no hay ninguna con ese nombre, una copia de la complementaria
+ *    (nombre, categoría, rol, notas y etiquetas) → `creados`;
+ *  - si las hay pero todas tienen otra pareja, queda sin complementaria
+ *    (sin duplicar ni romper ese vínculo) → `sinVincular`.
  */
 export async function crearPosicionEnLados(
 	data: DatosPosicion,
 	d: Disciplina,
 	opts: { preferido: Lado; tagIds: string[]; complementariaId: string | null }
-): Promise<Partial<Record<Lado, Posicion>>> {
+): Promise<{
+	posiciones: Partial<Record<Lado, Posicion>>;
+	creados: CreadoParaCompletar[];
+	sinVincular: ComplementariaSinVincular[];
+}> {
 	await init();
 	const lados = ladosDe(d, opts.preferido);
 	const ladoLista = lados[0];
-	let nombreComplementaria: string | null = null;
+	let complementariaOriginal: Posicion | null = null;
 	if (opts.complementariaId && lados.length > 1) {
 		const rows = await query<Posicion>('SELECT * FROM posiciones WHERE id = ?', [
 			opts.complementariaId
 		]);
-		nombreComplementaria = rows[0]?.nombre ?? null;
+		complementariaOriginal = rows[0] ?? null;
 	}
 	return conSavepoint(async () => {
-		const creadas: Partial<Record<Lado, Posicion>> = {};
+		const posiciones: Partial<Record<Lado, Posicion>> = {};
+		const creados: CreadoParaCompletar[] = [];
+		const sinVincular: ComplementariaSinVincular[] = [];
 		for (const lado of lados) {
 			let complementaria: string | null = null;
 			if (lado === ladoLista) {
 				complementaria = opts.complementariaId;
-			} else if (nombreComplementaria) {
-				const libre = await buscarPosicionPorNombre(
-					nombreComplementaria,
+			} else if (complementariaOriginal) {
+				complementaria = await complementariaEnLado(
+					complementariaOriginal,
+					data.nombre,
 					lado,
-					(p) => !p.posicion_complementaria_id
+					creados,
+					sinVincular
 				);
-				complementaria = libre?.id ?? null;
 			}
 			const p = await createPosicion({
 				...data,
@@ -152,10 +186,42 @@ export async function crearPosicionEnLados(
 				posicion_complementaria_id: complementaria
 			});
 			if (opts.tagIds.length > 0) await setTagsForPosicion(p.id, opts.tagIds);
-			creadas[lado] = p;
+			posiciones[lado] = p;
 		}
-		return creadas;
+		return { posiciones, creados, sinVincular };
 	});
+}
+
+/**
+ * Complementaria en `lado` para la copia de una posición "Ambos" cuya
+ * complementaria elegida (`q`) es de la otra disciplina. Ver
+ * `crearPosicionEnLados`. Devuelve el id a vincular o null.
+ */
+async function complementariaEnLado(
+	q: Posicion,
+	nombrePosicion: string,
+	lado: Lado,
+	creados: CreadoParaCompletar[],
+	sinVincular: ComplementariaSinVincular[]
+): Promise<string | null> {
+	const libre = await buscarPosicionPorNombre(q.nombre, lado, (p) => !p.posicion_complementaria_id);
+	if (libre) return libre.id;
+	if (await buscarPosicionPorNombre(q.nombre, lado)) {
+		sinVincular.push({ posicion: nombrePosicion, complementaria: q.nombre, disciplina: lado });
+		return null;
+	}
+	const copia = await createPosicion({
+		nombre: q.nombre,
+		categoria: q.categoria,
+		tipo: q.tipo,
+		notas: q.notas,
+		disciplina: lado,
+		posicion_complementaria_id: null
+	});
+	const tags = await getTagsForPosicion(q.id);
+	if (tags.length > 0) await setTagsForPosicion(copia.id, tags.map((t) => t.id));
+	creados.push({ kind: 'posicion', nombre: copia.nombre, disciplina: lado });
+	return copia.id;
 }
 
 // ---------------------------------------------------------------------------

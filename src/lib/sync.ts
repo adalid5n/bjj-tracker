@@ -242,7 +242,9 @@ function convertirPayload(payload: ExportPayload): ExportPayload {
 	if (
 		resumen.creadasParaCompletar.length > 0 ||
 		resumen.renombradas.length > 0 ||
-		resumen.fusionadas.length > 0
+		resumen.fusionadas.length > 0 ||
+		resumen.complementariasVinculadas.length > 0 ||
+		resumen.complementariasSinVincular.length > 0
 	) {
 		console.info('[import] "Ambos" separado en copias por disciplina', resumen);
 	}

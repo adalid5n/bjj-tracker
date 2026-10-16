@@ -77,6 +77,7 @@
 	} from './mapa-modal-stack.svelte';
 	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
 	import { settings } from '$lib/settings.svelte';
+	import { avisoCatalogo } from '$lib/aviso-catalogo.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
 	// Identificador del item "Sin complementaria" en el Combobox. Cuando el
@@ -784,18 +785,32 @@
 					currentStep = 1;
 					return;
 				}
-				const { crearPosicionEnLados } = await import('$lib/catalogo-lados');
+				const { crearPosicionEnLados, textoAvisoCreados, textoAvisoSinVincular } =
+					await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En
 				// hobbyist persistimos cadena vacía.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
 				// "Ambos" crea dos posiciones independientes (misma
 				// etiquetas); se abre / devuelve la de `preferido`.
-				const creadas = await crearPosicionEnLados(
+				// Con "Ambos" y complementaria, la copia de la otra disciplina
+				// también queda con la suya (creándola si falta) → aviso.
+				const {
+					posiciones: creadas,
+					creados,
+					sinVincular
+				} = await crearPosicionEnLados(
 					{ nombre: nombreFinal, categoria: categoriaFinal, tipo, notas: notasFinal },
 					disciplina,
 					{ preferido, tagIds: tagsSeleccionados, complementariaId }
 				);
 				const nueva = (creadas[ladoLista] ?? Object.values(creadas)[0])!;
+				if (creados.length > 0 || sinVincular.length > 0) {
+					avisoCatalogo.set(
+						[textoAvisoCreados(creados), textoAvisoSinVincular(sinVincular)]
+							.filter(Boolean)
+							.join(' ')
+					);
+				}
 				if (mode === 'stack') {
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.

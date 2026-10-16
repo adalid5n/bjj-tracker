@@ -46,6 +46,10 @@ mensaje que explica la incompatibilidad.
 - **WHEN** el usuario importa un fichero exportado antes de este cambio con una posición "Ambos" y rolls sin disciplina
 - **THEN** la posición queda como una de BJJ y otra de Grappling, y cada sesión y roll tiene disciplina, igual que si hubiera actualizado la app con esos datos
 
+#### Scenario: Copia con una complementaria de una sola disciplina
+- **WHEN** el usuario importa un fichero anterior a este cambio en el que "Dogfight over" es "Ambos" y su complementaria "Dogfight under" solo es de BJJ
+- **THEN** quedan "Dogfight over" y "Dogfight under" en BJJ y en Grappling, cada par vinculado en su disciplina, igual que si hubiera actualizado la app con esos datos
+
 #### Scenario: Fichero de una versión más nueva
 - **WHEN** el usuario importa un fichero generado por una versión más nueva de la app
 - **THEN** la importación se rechaza con un mensaje de versión incompatible y los datos actuales no cambian

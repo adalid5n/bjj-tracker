@@ -51,6 +51,13 @@
 - [x] 5.3 `confirmar()` por lado (mapas, técnicas idénticas y "no se creó" por lado, exclusiones por error con lado, aviso de lo creado solo en un lado); verificar los escenarios "Inserción de Ambos", "Lo que falta en un lado se crea y se avisa" y "Técnica idéntica en un solo lado"
 - [x] 5.4 Vista previa por lado: fantasma solo de lo nuevo en el lado, ids fantasma con el lado, `ghostToReal` de los dos pasos; verificar que en el paso BJJ "Kimura" (existente en BJJ) no se resalta y en Grappling sí, y que tras aceptar cada copia aparece donde se vio en su paso
 
+## 5b. Complementarias "Ambos" en las dos disciplinas (decisión del owner 2026-10-16)
+
+- [x] 5b.1 Specs: "Posiciones complementarias" (catalogo-tecnico) con la regla, vinculación por nombre, creación con aviso y caso "ya vinculada con otra"; escenario en copia-seguridad; design §2 paso 6b y §5; `openspec validate --strict`
+- [x] 5b.2 `separar-ambos.ts`: paso 6b (en los dos sentidos) con `complementariasVinculadas` y `complementariasSinVincular` en el resumen; log en `sync.ts`/v12; verificar con `pnpm check`
+- [x] 5b.3 `catalogo-lados.ts` + `PosicionWizard`: crear la complementaria que falte en la otra disciplina al crear una posición Ambos, aviso de lo creado y de lo que quedó sin vincular; verificar con `pnpm check` y `pnpm build`
+- [ ] 5b.4 Verificación manual del owner: importar `bjj-tracker-export-20261016.json` en el 4173 (BD vacía) y comprobar "Dog fight under" en Grappling vinculada con la "Dog fight over" de Grappling; crear desde el asistente los tres escenarios de creación
+
 ## 6. Verificación y cierre
 
 - [x] 6.1 `grep -rn "'ambos'" src` solo en sesiones, importación y opción de creación de asistentes; `grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|gray)-[0-9]" src` sin resultados nuevos
