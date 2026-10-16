@@ -90,7 +90,9 @@
 - Supuestos (a)(b)(c) de `d13170a` siguen abiertos (ver arriba), igual que las 4 desviaciones de T-4.
 - Entorno portátil: `127.0.0.1` no llega desde Windows a WSL; para BD limpia, ventana de incógnito en `localhost:4173`.
 
-**Próximo paso concreto:** (1) reestructurar MEJORAS_FUTURAS con el esquema nuevo + skill de backlog (subagente); (2) decidir supuestos (a)(b)(c) y las 4 desviaciones de T-4; (3) bloque C: sesiones y rolls con disciplina, backup v8 exportar→importar, importar v6; (4) CHANGELOG + archivar `ambos-como-copias` + fusionar en main → cerrar la it.7.
+**Backlog reestructurado (commit `60a5682`):** MEJORAS_FUTURAS con IDs `MF-NNN`, Tipo/Impacto/Esfuerzo/Prioridad/Estado e índice; 42 IDs (28 abiertas, 14 hechas; el subagente cerró MF-010/011/014/015/038 tras comprobarlas en código). P1 del owner: MF-040 (ficha no se cierra al tocar fuera — **choca con ADR-006**, que decidió `interactOutsideBehavior="ignore"` a propósito; hay que decidir qué cierra y qué navega) y MF-041 (barra Guardar/Cancelar). MF-042 = decisión público/privado (disparador: antes de compartir). Skill nueva `backlog-item`. CLAUDE.md: preferencia "comandos/skills para todo flujo repetible". Pendiente del owner: aceptar prioridades sugeridas, MF-037 (¿cerrar?), trocear MF-028. ROADMAP desfasado (no tocado).
+
+**Próximo paso concreto:** (1) owner: prioridades sugeridas + MF-040 vs ADR-006; posibles skills `validar`, `cerrar-tarea`, `arranque`; (2) decidir supuestos (a)(b)(c) y las 4 desviaciones de T-4; (3) bloque C: sesiones y rolls con disciplina, backup v8 exportar→importar, importar v6; (4) CHANGELOG + archivar `ambos-como-copias` + fusionar en main → cerrar la it.7.
 
 ---
 
