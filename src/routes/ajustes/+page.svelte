@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { version } from '$app/environment';
 	import { Switch } from 'bits-ui';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -7,6 +8,14 @@
 	import { settings } from '$lib/settings.svelte';
 
 	let schemaVersion = $state<number | null>(null);
+	// `version` de SvelteKit = marca de tiempo del build (por defecto); sirve
+	// para saber si el SW está sirviendo la versión anterior.
+	const buildFecha = /^\d+$/.test(version)
+		? new Date(Number(version)).toLocaleString('es-ES', {
+				dateStyle: 'short',
+				timeStyle: 'short'
+			})
+		: version;
 	let busy = $state<'export' | 'import' | null>(null);
 	let message = $state<{ kind: 'ok' | 'err'; text: string } | null>(null);
 	let fileInput: HTMLInputElement | null = $state(null);
@@ -330,6 +339,7 @@
 
 	<section class="text-xs text-muted-foreground">
 		<p>Versión BD: {schemaVersion ?? '…'}</p>
+		<p>Build: {buildFecha}</p>
 	</section>
 </main>
 
