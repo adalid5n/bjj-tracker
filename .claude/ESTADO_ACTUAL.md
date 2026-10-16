@@ -85,7 +85,12 @@
 - **Idea del owner en discusión:** que casi toda posición tenga complementaria. Datos: en los backups casi ninguna la tiene, y "Mount top"/"Mount bottom" existen sin emparejar. Recomendación del orquestador: no obligatoria (simétricas, variantes tipo High mount con complementaria 1:1, captura rápida); sí sugerencia automática top↔bottom/over↔under + panel de alertas (it.8). Pendiente de respuesta del owner.
 - MEJORAS: nuevas entradas "Saltar en pasos opcionales" y "Disciplina preseleccionada + añadir también a la otra" (esta, pendiente de refinar).
 
-**Próximo paso concreto:** (1) el owner valida en `http://localhost:4173/bjj-tracker/` importando `bjj-tracker-export-20261016.json` + checklist del informe (complementarias) y decide los 4 supuestos; (2) revisar las 4 desviaciones de T-4 (técnica Ambos ya existente no se guarda; contras solo en su disciplina; importación enlaza por nombre; borradores conservan disciplina); (3) resto del checklist de T-4 (asistentes, sesiones, rolls, importación Ambos, backup v8); (4) CHANGELOG + archivar + fusionar en main → cerrar la it.7.
+**Validación del owner (2026-10-16, portátil, incógnito en `localhost:4173`):** ✅ bloque A (importar JSON v7: "Dog fight under" creada en Grappling y emparejada; selector Ambos con "solo en Grappling"; "+ Crear nueva" con nombre existente; mensajes que dicen dónde existe), ✅ bloque B (desde el editor de rolls y TecnicaWizard), ✅ avisos rediseñados (commit `83db519`: texto corto, token `--info`, icono (i) con Popover al tocar). "Dog fight under" no tenía sitio guardado en el backup → las copias se colocan solas (correcto). Fecha del build visible en Ajustes (commit `f41ea85`) para detectar el SW con versión vieja.
+- Decisiones del owner: supuesto 1 confirmado (no romper vínculos existentes). Repo público/privado: **no se hace nada hasta empezar a compartir la app** (va al backlog como decisión con disparador). Backlog: esquema Tipo/Impacto/Esfuerzo/Prioridad (prioridad solo el owner) + índice, clasificando también las entradas existentes, y una skill para dar de alta bugs/mejoras/refactors (preferencia nueva: comandos/skills para todo flujo repetible, delegables a subagentes).
+- Supuestos (a)(b)(c) de `d13170a` siguen abiertos (ver arriba), igual que las 4 desviaciones de T-4.
+- Entorno portátil: `127.0.0.1` no llega desde Windows a WSL; para BD limpia, ventana de incógnito en `localhost:4173`.
+
+**Próximo paso concreto:** (1) reestructurar MEJORAS_FUTURAS con el esquema nuevo + skill de backlog (subagente); (2) decidir supuestos (a)(b)(c) y las 4 desviaciones de T-4; (3) bloque C: sesiones y rolls con disciplina, backup v8 exportar→importar, importar v6; (4) CHANGELOG + archivar `ambos-como-copias` + fusionar en main → cerrar la it.7.
 
 ---
 

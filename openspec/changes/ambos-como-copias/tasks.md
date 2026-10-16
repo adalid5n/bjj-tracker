@@ -56,7 +56,7 @@
 - [x] 5b.1 Specs: "Posiciones complementarias" (catalogo-tecnico) con la regla, vinculación por nombre, creación con aviso y caso "ya vinculada con otra"; escenario en copia-seguridad; design §2 paso 6b y §5; `openspec validate --strict`
 - [x] 5b.2 `separar-ambos.ts`: paso 6b (en los dos sentidos) con `complementariasVinculadas` y `complementariasSinVincular` en el resumen; log en `sync.ts`/v12; verificar con `pnpm check`
 - [x] 5b.3 `catalogo-lados.ts` + `PosicionWizard`: crear la complementaria que falte en la otra disciplina al crear una posición Ambos, aviso de lo creado y de lo que quedó sin vincular; verificar con `pnpm check` y `pnpm build`
-- [ ] 5b.4 Verificación manual del owner: importar `bjj-tracker-export-20261016.json` en el 4173 (BD vacía) y comprobar "Dog fight under" en Grappling vinculada con la "Dog fight over" de Grappling; crear desde el asistente los tres escenarios de creación
+- [x] 5b.4 Verificación manual del owner: importar `bjj-tracker-export-20261016.json` en el 4173 (BD vacía) y comprobar "Dog fight under" en Grappling vinculada con la "Dog fight over" de Grappling; crear desde el asistente los tres escenarios de creación
 
 ## 5c. Complementaria en "Ambos" desde la otra disciplina (bug del owner 2026-10-16)
 
@@ -64,14 +64,14 @@
 - [x] 5c.2 `catalogo-lados.ts`: `crearPosicionEnLados` vincula directamente la complementaria en su disciplina (sea la preferida o la otra) y completa la otra por nombre
 - [x] 5c.3 `PosicionWizard`: selector en "Ambos" con las de la otra disciplina y su indicación; al cambiar de disciplina se descarta una elección inválida; "Crear nueva" en "Ambos" (complementaria, técnica y roll, mapa y diálogo) usa la existente o crea solo en la disciplina que falta, con aviso; mensajes de nombre repetido distinguibles; mismo criterio en `SumisionWizard` ("+ Crear nueva sumisión" de una técnica "Ambos")
 - [x] 5c.4 Aviso de lo creado acumulable (`avisoCatalogo.append`) para no perder el aviso del sub-asistente al guardar el asistente padre; `pnpm check` y `pnpm build`
-- [ ] 5c.5 Validación manual del owner en el 4173: P3 "Ambos" con complementaria P2 que solo existe en Grappling, por el selector y por "Crear nueva"
+- [x] 5c.5 Validación manual del owner en el 4173: P3 "Ambos" con complementaria P2 que solo existe en Grappling, por el selector y por "Crear nueva"
 
 ## 5d. Avisos de lo creado más claros (feedback del owner 2026-10-16)
 
 - [x] 5d.1 Spec "Aviso de lo hecho en la otra disciplina" (catalogo-tecnico): una línea corta por evento, informativa o de atención, detalle al tocar el icono; escenarios con la redacción nueva; `openspec validate --strict`
 - [x] 5d.2 Token semántico `--info` / `--info-foreground` (claro y oscuro) en `layout.css` y componente `ui/popover` (shadcn-svelte sobre bits-ui)
 - [x] 5d.3 `aviso-catalogo.svelte.ts` con líneas estructuradas (texto, detalle, tono); `catalogo-lados.ts` registra también las complementarias enlazadas con una existente y para qué se creó cada elemento; `AvisoCatalogo.svelte` con lista, color por tono y Popover accesible; asistentes de posición, sumisión y técnica; `pnpm check` y `pnpm build`
-- [ ] 5d.4 Validación manual del owner en el 4173: mapa (posición "Ambos" con complementaria creada / enlazada / sin complementaria), asistente de técnica ("Ambos" sin contraparte) y editor de rolls (crear posición "Ambos")
+- [x] 5d.4 Validación manual del owner en el 4173: mapa (posición "Ambos" con complementaria creada / enlazada / sin complementaria), asistente de técnica ("Ambos" sin contraparte) y editor de rolls (crear posición "Ambos")
 
 ## 6. Verificación y cierre
 
