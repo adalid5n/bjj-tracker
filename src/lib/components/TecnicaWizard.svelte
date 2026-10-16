@@ -895,7 +895,7 @@
 			const sumisionDestinoFinal = tipo === 'sumision' ? (sumisionDestinoId ?? undefined) : undefined;
 
 			if (modo === 'crear') {
-				const { crearTecnicaEnLados, textoAvisoCreados } = await import('$lib/catalogo-lados');
+				const { crearTecnicaEnLados, avisosCreados } = await import('$lib/catalogo-lados');
 				// Detalles + errores comunes (T-3.it6): editables solo en modo
 				// avanzado. En hobbyist persistimos cadena vacía.
 				const detallesFinal = settings.modoAvanzado ? detalles.trim() : '';
@@ -921,7 +921,7 @@
 					ambos
 				);
 				const nueva = creadas[ladoTecnica]!;
-				if (creados.length > 0) avisoCatalogo.append(textoAvisoCreados(creados));
+				avisoCatalogo.append(avisosCreados(creados));
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
 					mapaModalStack.setDirtyHandler(null);

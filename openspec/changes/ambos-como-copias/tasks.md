@@ -66,6 +66,13 @@
 - [x] 5c.4 Aviso de lo creado acumulable (`avisoCatalogo.append`) para no perder el aviso del sub-asistente al guardar el asistente padre; `pnpm check` y `pnpm build`
 - [ ] 5c.5 Validación manual del owner en el 4173: P3 "Ambos" con complementaria P2 que solo existe en Grappling, por el selector y por "Crear nueva"
 
+## 5d. Avisos de lo creado más claros (feedback del owner 2026-10-16)
+
+- [x] 5d.1 Spec "Aviso de lo hecho en la otra disciplina" (catalogo-tecnico): una línea corta por evento, informativa o de atención, detalle al tocar el icono; escenarios con la redacción nueva; `openspec validate --strict`
+- [x] 5d.2 Token semántico `--info` / `--info-foreground` (claro y oscuro) en `layout.css` y componente `ui/popover` (shadcn-svelte sobre bits-ui)
+- [x] 5d.3 `aviso-catalogo.svelte.ts` con líneas estructuradas (texto, detalle, tono); `catalogo-lados.ts` registra también las complementarias enlazadas con una existente y para qué se creó cada elemento; `AvisoCatalogo.svelte` con lista, color por tono y Popover accesible; asistentes de posición, sumisión y técnica; `pnpm check` y `pnpm build`
+- [ ] 5d.4 Validación manual del owner en el 4173: mapa (posición "Ambos" con complementaria creada / enlazada / sin complementaria), asistente de técnica ("Ambos" sin contraparte) y editor de rolls (crear posición "Ambos")
+
 ## 6. Verificación y cierre
 
 - [x] 6.1 `grep -rn "'ambos'" src` solo en sesiones, importación y opción de creación de asistentes; `grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|gray)-[0-9]" src` sin resultados nuevos

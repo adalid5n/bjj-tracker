@@ -921,8 +921,13 @@
 				}
 				// Existe solo en la otra disciplina: se crea solo en la que falta.
 				const disciplinaFinal: Disciplina = r.tipo === 'soloEn' ? r.lado : disciplina;
-				const { crearPosicionEnLados, textoAvisoCreados, textoAvisoSinVincular } =
-					await import('$lib/catalogo-lados');
+				const {
+					crearPosicionEnLados,
+					avisoSoloEn,
+					avisosCreados,
+					avisosEnlazadas,
+					avisosSinVincular
+				} = await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En
 				// hobbyist persistimos cadena vacía.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
@@ -933,6 +938,7 @@
 				const {
 					posiciones: creadas,
 					creados,
+					enlazadas,
 					sinVincular
 				} = await crearPosicionEnLados(
 					{ nombre: nombreFinal, categoria: categoriaFinal, tipo, notas: notasFinal },
@@ -943,17 +949,13 @@
 				// `append`: no pisar el aviso que dejó un sub-asistente del mismo
 				// flujo (p. ej. la complementaria creada solo en una disciplina).
 				if (r.tipo === 'soloEn') {
-					avisoCatalogo.append(
-						`"${nueva.nombre}" ya existía en ${DISCIPLINA_LABEL[r.existenteEn]}: se creó solo en ${DISCIPLINA_LABEL[r.lado]}.`
-					);
+					avisoCatalogo.append(avisoSoloEn('posicion', nueva.nombre, r.lado, r.existenteEn));
 				}
-				if (creados.length > 0 || sinVincular.length > 0) {
-					avisoCatalogo.append(
-						[textoAvisoCreados(creados), textoAvisoSinVincular(sinVincular)]
-							.filter(Boolean)
-							.join(' ')
-					);
-				}
+				avisoCatalogo.append([
+					...avisosCreados(creados),
+					...avisosEnlazadas(enlazadas),
+					...avisosSinVincular(sinVincular)
+				]);
 				if (mode === 'stack') {
 					// Tras guardar ya no hay cambios pendientes: desactiva el dirty
 					// handler antes de cerrar para no disparar el prompt.

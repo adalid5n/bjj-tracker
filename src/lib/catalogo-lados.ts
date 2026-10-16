@@ -22,6 +22,7 @@ import { createTecnica, type NewTecnica } from '$lib/tecnicas';
 import { getTagsForPosicion, setTagsForPosicion } from '$lib/tags';
 import { conSavepoint } from '$lib/transaccion';
 import { normalizarNombre } from '$lib/separar-ambos';
+import type { LineaAviso } from '$lib/aviso-catalogo.svelte';
 import type {
 	Disciplina,
 	DisciplinaCatalogo,
@@ -58,17 +59,24 @@ export type CreadoParaCompletar = {
 	kind: 'posicion' | 'sumision';
 	nombre: string;
 	disciplina: Lado;
+	/**
+	 * Para qué se creó: la complementaria de la posición `posicion`, o el
+	 * origen / destino de la técnica `tecnica` (para el detalle del aviso).
+	 */
+	para:
+		| { tipo: 'complementaria'; posicion: string }
+		| { tipo: 'tecnica'; tecnica: string; extremo: 'origen' | 'destino' };
 };
 
-/** Texto del aviso: `"Mount" (posición) se creó también en Grappling.` */
-export function textoAvisoCreados(creados: CreadoParaCompletar[]): string {
-	if (creados.length === 0) return '';
-	const partes = creados.map(
-		(c) =>
-			`"${c.nombre}" (${c.kind === 'posicion' ? 'posición' : 'sumisión'}) en ${DISCIPLINA_LABEL[c.disciplina]}`
-	);
-	return `Para completar la otra disciplina se creó: ${partes.join(', ')}.`;
-}
+/**
+ * Complementaria de la copia de una posición "Ambos" resuelta con una
+ * posición libre del mismo nombre que ya existía en esa disciplina.
+ */
+export type ComplementariaEnlazada = {
+	posicion: string;
+	complementaria: string;
+	disciplina: Lado;
+};
 
 /**
  * Complementaria que no se pudo completar en una disciplina porque las
@@ -81,14 +89,84 @@ export type ComplementariaSinVincular = {
 	disciplina: Lado;
 };
 
-/** Texto del aviso de las complementarias que quedaron sin vincular. */
-export function textoAvisoSinVincular(sinVincular: ComplementariaSinVincular[]): string {
-	return sinVincular
-		.map(
-			(s) =>
-				`En ${DISCIPLINA_LABEL[s.disciplina]} "${s.posicion}" quedó sin complementaria: "${s.complementaria}" ya está vinculada con otra posición.`
-		)
-		.join(' ');
+// ---------------------------------------------------------------------------
+// Avisos de lo hecho para completar la otra disciplina (T-4.it7, tarea 5d):
+// una línea corta por evento + el detalle (qué pasó y por qué) que se abre
+// al tocar el icono de info. `warning` = el usuario puede querer actuar.
+// ---------------------------------------------------------------------------
+
+const KIND_LABEL = { posicion: 'Posición', sumision: 'Sumisión' } as const;
+
+function comillas(nombre: string): string {
+	return `"${nombre}"`;
+}
+
+/** Líneas de aviso de lo creado en la otra disciplina. */
+export function avisosCreados(creados: CreadoParaCompletar[]): LineaAviso[] {
+	return creados.map((c) => {
+		const en = DISCIPLINA_LABEL[c.disciplina];
+		const otra = DISCIPLINA_LABEL[otroLado(c.disciplina)];
+		if (c.para.tipo === 'complementaria') {
+			return {
+				tono: 'info',
+				texto: `Posición complementaria ${comillas(c.nombre)} creada en ${en}`,
+				detalle: `Como elegiste "Ambos", ${comillas(c.para.posicion)} existe en BJJ y en Grappling, y cada copia lleva su complementaria. En ${en} no había ninguna posición llamada ${comillas(c.nombre)}, así que se creó una copia de la de ${otra} (con sus datos y etiquetas) y se emparejó con ${comillas(c.para.posicion)} de ${en}.`
+			};
+		}
+		const kind = c.kind === 'posicion' ? 'posición' : 'sumisión';
+		const datos =
+			c.kind === 'posicion' ? 'categoría, rol, notas y etiquetas' : 'nombre y notas';
+		return {
+			tono: 'info',
+			texto: `${KIND_LABEL[c.kind]} ${comillas(c.nombre)} creada en ${en}`,
+			detalle: `Como elegiste "Ambos", la técnica ${comillas(c.para.tecnica)} existe en BJJ y en Grappling. En ${en} no había ninguna ${kind} llamada ${comillas(c.nombre)} para usar como ${c.para.extremo}, así que se creó una copia de la de ${otra} (${datos}).`
+		};
+	});
+}
+
+/** Líneas de aviso de las complementarias enlazadas con una ya existente. */
+export function avisosEnlazadas(enlazadas: ComplementariaEnlazada[]): LineaAviso[] {
+	return enlazadas.map((e) => {
+		const en = DISCIPLINA_LABEL[e.disciplina];
+		return {
+			tono: 'info',
+			texto: `${comillas(e.complementaria)} enlazada con la existente en ${en}`,
+			detalle: `Como elegiste "Ambos", ${comillas(e.posicion)} existe en BJJ y en Grappling, y cada copia lleva su complementaria. En ${en} ya había una posición ${comillas(e.complementaria)} sin pareja, así que se emparejó con ${comillas(e.posicion)} de ${en} en lugar de crear otra.`
+		};
+	});
+}
+
+/** Líneas de aviso de las copias que quedaron sin complementaria. */
+export function avisosSinVincular(sinVincular: ComplementariaSinVincular[]): LineaAviso[] {
+	return sinVincular.map((s) => {
+		const en = DISCIPLINA_LABEL[s.disciplina];
+		return {
+			tono: 'warning',
+			texto: `${comillas(s.posicion)} sin complementaria en ${en}`,
+			detalle: `Como elegiste "Ambos", ${comillas(s.posicion)} existe en BJJ y en Grappling. En ${en} ya hay una posición ${comillas(s.complementaria)}, pero está emparejada con otra, así que no se tocó ni se duplicó: ${comillas(s.posicion)} de ${en} quedó sin complementaria. Si quieres, edítala y elige una.`
+		};
+	});
+}
+
+/**
+ * Línea de aviso cuando "Ambos" se creó solo en una disciplina porque en la
+ * otra ya había un elemento con ese nombre ("+ Crear nueva" desde un
+ * asistente que lo recibe).
+ */
+export function avisoSoloEn(
+	kind: 'posicion' | 'sumision',
+	nombre: string,
+	lado: Lado,
+	existenteEn: Lado
+): LineaAviso {
+	const en = DISCIPLINA_LABEL[lado];
+	const otra = DISCIPLINA_LABEL[existenteEn];
+	const kindMin = kind === 'posicion' ? 'posición' : 'sumisión';
+	return {
+		tono: 'info',
+		texto: `${KIND_LABEL[kind]} ${comillas(nombre)} creada solo en ${en} (ya existía en ${otra})`,
+		detalle: `Elegiste "Ambos", pero en ${otra} ya había una ${kindMin} llamada ${comillas(nombre)}. Para no duplicarla, solo se creó la de ${en}; en ${otra} se usa la que ya existía.`
+	};
 }
 
 function masAntiguo<T extends { created_at: string; id: string }>(a: T, b: T): number {
@@ -140,7 +218,7 @@ export type DatosPosicion = Omit<NewPosicion, 'disciplina' | 'posicion_complemen
  * copia de la otra disciplina también tiene complementaria (decisión del
  * owner 2026-10-16, design §5):
  *  - la posición LIBRE del mismo nombre normalizado en esa disciplina (la
- *    más antigua), si existe;
+ *    más antigua), si existe → `enlazadas`;
  *  - si no hay ninguna con ese nombre, una copia de la complementaria
  *    (nombre, categoría, rol, notas y etiquetas) → `creados`;
  *  - si las hay pero todas tienen otra pareja, queda sin complementaria
@@ -153,6 +231,7 @@ export async function crearPosicionEnLados(
 ): Promise<{
 	posiciones: Partial<Record<Lado, Posicion>>;
 	creados: CreadoParaCompletar[];
+	enlazadas: ComplementariaEnlazada[];
 	sinVincular: ComplementariaSinVincular[];
 }> {
 	await init();
@@ -167,6 +246,7 @@ export async function crearPosicionEnLados(
 	return conSavepoint(async () => {
 		const posiciones: Partial<Record<Lado, Posicion>> = {};
 		const creados: CreadoParaCompletar[] = [];
+		const enlazadas: ComplementariaEnlazada[] = [];
 		const sinVincular: ComplementariaSinVincular[] = [];
 		for (const lado of lados) {
 			let complementaria: string | null = null;
@@ -182,6 +262,7 @@ export async function crearPosicionEnLados(
 					data.nombre,
 					lado,
 					creados,
+					enlazadas,
 					sinVincular
 				);
 			}
@@ -193,7 +274,7 @@ export async function crearPosicionEnLados(
 			if (opts.tagIds.length > 0) await setTagsForPosicion(p.id, opts.tagIds);
 			posiciones[lado] = p;
 		}
-		return { posiciones, creados, sinVincular };
+		return { posiciones, creados, enlazadas, sinVincular };
 	});
 }
 
@@ -207,10 +288,14 @@ async function complementariaEnLado(
 	nombrePosicion: string,
 	lado: Lado,
 	creados: CreadoParaCompletar[],
+	enlazadas: ComplementariaEnlazada[],
 	sinVincular: ComplementariaSinVincular[]
 ): Promise<string | null> {
 	const libre = await buscarPosicionPorNombre(q.nombre, lado, (p) => !p.posicion_complementaria_id);
-	if (libre) return libre.id;
+	if (libre) {
+		enlazadas.push({ posicion: nombrePosicion, complementaria: libre.nombre, disciplina: lado });
+		return libre.id;
+	}
 	if (await buscarPosicionPorNombre(q.nombre, lado)) {
 		sinVincular.push({ posicion: nombrePosicion, complementaria: q.nombre, disciplina: lado });
 		return null;
@@ -225,7 +310,12 @@ async function complementariaEnLado(
 	});
 	const tags = await getTagsForPosicion(q.id);
 	if (tags.length > 0) await setTagsForPosicion(copia.id, tags.map((t) => t.id));
-	creados.push({ kind: 'posicion', nombre: copia.nombre, disciplina: lado });
+	creados.push({
+		kind: 'posicion',
+		nombre: copia.nombre,
+		disciplina: lado,
+		para: { tipo: 'complementaria', posicion: nombrePosicion }
+	});
 	return copia.id;
 }
 
@@ -260,7 +350,8 @@ export async function crearSumisionEnLados(
 async function posicionEnLado(
 	id: string,
 	lado: Lado,
-	creados: CreadoParaCompletar[]
+	creados: CreadoParaCompletar[],
+	para: CreadoParaCompletar['para']
 ): Promise<string> {
 	const rows = await query<Posicion>('SELECT * FROM posiciones WHERE id = ?', [id]);
 	const p = rows[0];
@@ -278,14 +369,15 @@ async function posicionEnLado(
 	});
 	const tags = await getTagsForPosicion(p.id);
 	if (tags.length > 0) await setTagsForPosicion(copia.id, tags.map((t) => t.id));
-	creados.push({ kind: 'posicion', nombre: copia.nombre, disciplina: lado });
+	creados.push({ kind: 'posicion', nombre: copia.nombre, disciplina: lado, para });
 	return copia.id;
 }
 
 async function sumisionEnLado(
 	id: string,
 	lado: Lado,
-	creados: CreadoParaCompletar[]
+	creados: CreadoParaCompletar[],
+	para: CreadoParaCompletar['para']
 ): Promise<string> {
 	const rows = await query<SumisionTerminal>('SELECT * FROM sumisiones_terminales WHERE id = ?', [
 		id
@@ -296,7 +388,7 @@ async function sumisionEnLado(
 	const existente = await buscarSumisionPorNombre(s.nombre, lado);
 	if (existente) return existente.id;
 	const copia = await createSumision({ nombre: s.nombre, notas: s.notas, disciplina: lado });
-	creados.push({ kind: 'sumision', nombre: copia.nombre, disciplina: lado });
+	creados.push({ kind: 'sumision', nombre: copia.nombre, disciplina: lado, para });
 	return copia.id;
 }
 
@@ -344,7 +436,9 @@ export async function crearTecnicaEnLados(
 		tecnicas[ladoOrigen] = await createTecnica({ ...data, disciplina: ladoOrigen });
 		if (ambos) {
 			const lado = otroLado(ladoOrigen);
-			const origen = await posicionEnLado(data.posicion_origen_id, lado, creados);
+			const para = (extremo: 'origen' | 'destino') =>
+				({ tipo: 'tecnica', tecnica: data.nombre, extremo }) as const;
+			const origen = await posicionEnLado(data.posicion_origen_id, lado, creados, para('origen'));
 			if (await existeTecnicaIdentica(data.nombre, origen, data.variante)) {
 				throw new TecnicaDuplicadaError(lado);
 			}
@@ -353,10 +447,10 @@ export async function crearTecnicaEnLados(
 				disciplina: lado,
 				posicion_origen_id: origen,
 				posicion_destino_id: data.posicion_destino_id
-					? await posicionEnLado(data.posicion_destino_id, lado, creados)
+					? await posicionEnLado(data.posicion_destino_id, lado, creados, para('destino'))
 					: undefined,
 				sumision_destino_id: data.sumision_destino_id
-					? await sumisionEnLado(data.sumision_destino_id, lado, creados)
+					? await sumisionEnLado(data.sumision_destino_id, lado, creados, para('destino'))
 					: undefined
 			});
 		}

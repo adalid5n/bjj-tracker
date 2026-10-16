@@ -113,10 +113,10 @@
 		}
 	});
 
-	// T-4.it7: el aviso de "se creó en la otra disciplina" vive mientras el
+	// T-4.it7: el aviso de lo hecho en la otra disciplina vive mientras el
 	// stack esté abierto; al cerrarlo del todo se descarta.
 	$effect(() => {
-		if (stack.length === 0 && avisoCatalogo.texto !== null) avisoCatalogo.clear();
+		if (stack.length === 0 && avisoCatalogo.hayAviso) avisoCatalogo.clear();
 	});
 
 	// Mismo patrón para el draft del wizard de posición (T-1.it2): sobrevive

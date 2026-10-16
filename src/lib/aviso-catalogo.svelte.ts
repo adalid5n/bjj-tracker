@@ -1,7 +1,8 @@
 /**
- * Aviso tras guardar en el catálogo (T-4.it7, P2): p. ej. "Para completar
- * la otra disciplina se creó: "Mount" (posición) en Grappling." cuando una
- * técnica "Ambos" necesitó crear su origen o destino en la otra disciplina.
+ * Aviso tras guardar en el catálogo (T-4.it7): lo que la app hizo para
+ * completar la otra disciplina al crear algo "Ambos" (p. ej. `Posición
+ * complementaria "P4" creada en BJJ`). Una línea corta por evento, con su
+ * detalle (qué pasó y por qué) para mostrarlo al tocar el icono de info.
  *
  * El asistente se cierra al guardar, así que el aviso vive aquí y lo pinta
  * `AvisoCatalogo.svelte` (en el host de modales del mapa y en el editor de
@@ -9,29 +10,42 @@
  *
  * Patrón canónico del proyecto: runa dentro de class field.
  */
-class AvisoCatalogoState {
-	#texto = $state<string | null>(null);
 
-	get texto(): string | null {
-		return this.#texto;
+/** `info`: solo informa. `warning`: el usuario puede querer actuar. */
+export type TonoAviso = 'info' | 'warning';
+
+export type LineaAviso = {
+	/** Una línea corta y llana: `"P4" enlazada con la existente en Grappling`. */
+	texto: string;
+	/** Explicación completa (qué pasó y por qué), al tocar el icono de info. */
+	detalle: string;
+	tono: TonoAviso;
+};
+
+class AvisoCatalogoState {
+	#lineas = $state<LineaAviso[]>([]);
+
+	get lineas(): LineaAviso[] {
+		return this.#lineas;
 	}
 
-	set(texto: string | null): void {
-		this.#texto = texto && texto.trim() ? texto : null;
+	get hayAviso(): boolean {
+		return this.#lineas.length > 0;
 	}
 
 	/**
-	 * Añade al aviso actual (si lo hay). Lo usan los asistentes al guardar
-	 * para no pisar el aviso que dejó un sub-asistente ("+ Crear nueva")
-	 * del mismo flujo. El host lo limpia al cerrar el stack / abrir el roll.
+	 * Añade líneas al aviso actual. Lo usan los asistentes al guardar para
+	 * no pisar el aviso que dejó un sub-asistente ("+ Crear nueva") del
+	 * mismo flujo. El host lo limpia al cerrar el stack / abrir el roll.
 	 */
-	append(texto: string | null): void {
-		if (!texto || !texto.trim()) return;
-		this.#texto = this.#texto ? `${this.#texto} ${texto}` : texto;
+	append(lineas: LineaAviso | LineaAviso[]): void {
+		const nuevas = (Array.isArray(lineas) ? lineas : [lineas]).filter((l) => l.texto.trim());
+		if (nuevas.length === 0) return;
+		this.#lineas = [...this.#lineas, ...nuevas];
 	}
 
 	clear(): void {
-		this.#texto = null;
+		if (this.#lineas.length > 0) this.#lineas = [];
 	}
 }
 

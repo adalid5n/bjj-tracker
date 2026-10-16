@@ -438,7 +438,7 @@
 				}
 				// Existe solo en la otra disciplina: se crea solo en la que falta.
 				const disciplinaFinal: Disciplina = r.tipo === 'soloEn' ? r.lado : disciplina;
-				const { crearSumisionEnLados } = await import('$lib/catalogo-lados');
+				const { crearSumisionEnLados, avisoSoloEn } = await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
 				// persistimos cadena vacía.
 				const notasFinal = settings.modoAvanzado ? notas.trim() : '';
@@ -451,9 +451,7 @@
 				const nueva = (creadas[disciplinaFinal === 'ambos' ? preferido : disciplinaFinal] ??
 					Object.values(creadas)[0])!;
 				if (r.tipo === 'soloEn') {
-					avisoCatalogo.append(
-						`"${nueva.nombre}" ya existía en ${DISCIPLINA_LABEL[r.existenteEn]}: se creó solo en ${DISCIPLINA_LABEL[r.lado]}.`
-					);
+					avisoCatalogo.append(avisoSoloEn('sumision', nueva.nombre, r.lado, r.existenteEn));
 				}
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');

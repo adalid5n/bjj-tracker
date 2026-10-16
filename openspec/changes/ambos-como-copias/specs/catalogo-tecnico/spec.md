@@ -122,15 +122,15 @@ propone elegir solo la otra disciplina.
 
 #### Scenario: Crear Ambos con una complementaria de una sola disciplina
 - **WHEN** con BJJ activo el usuario crea "Dogfight over" eligiendo "Ambos" y como complementaria "Dogfight under", que solo existe en BJJ
-- **THEN** existen "Dogfight over" y "Dogfight under" en BJJ y en Grappling, cada par vinculado en su disciplina, y el usuario ve que "Dogfight under" se creó en Grappling
+- **THEN** existen "Dogfight over" y "Dogfight under" en BJJ y en Grappling, cada par vinculado en su disciplina, y el usuario ve el aviso informativo `Posición complementaria "Dogfight under" creada en Grappling`
 
 #### Scenario: Crear Ambos con la complementaria ya presente en la otra disciplina
 - **WHEN** el usuario crea "Dogfight over" eligiendo "Ambos" con complementaria "Dogfight under" de BJJ y en Grappling ya existe "dogfight under" sin complementaria
-- **THEN** la "Dogfight over" de Grappling se vincula con esa "dogfight under" y no se crea ninguna posición más
+- **THEN** la "Dogfight over" de Grappling se vincula con esa "dogfight under", no se crea ninguna posición más y el usuario ve el aviso informativo `"dogfight under" enlazada con la existente en Grappling`
 
 #### Scenario: La del mismo nombre ya está vinculada con otra
 - **WHEN** el usuario crea "Dogfight over" eligiendo "Ambos" con complementaria "Dogfight under" de BJJ y en Grappling "Dogfight under" ya está vinculada con "Dogfight neutral"
-- **THEN** no se crea otra "Dogfight under" en Grappling, el vínculo con "Dogfight neutral" se mantiene, la "Dogfight over" de Grappling queda sin complementaria y el usuario ve un aviso que lo explica
+- **THEN** no se crea otra "Dogfight under" en Grappling, el vínculo con "Dogfight neutral" se mantiene, la "Dogfight over" de Grappling queda sin complementaria y el usuario ve el aviso de atención `"Dogfight over" sin complementaria en Grappling`, cuyo detalle explica que "Dogfight under" ya está emparejada con otra y que puede editarla para elegirle una
 
 #### Scenario: Crear Ambos con una complementaria nueva
 - **WHEN** en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y la guarda
@@ -138,7 +138,7 @@ propone elegir solo la otra disciplina.
 
 #### Scenario: Elegir en Ambos una complementaria que solo existe en la otra disciplina
 - **WHEN** con BJJ activo el usuario crea "Dogfight over" eligiendo "Ambos" y abre el paso de complementaria, y "Dogfight under" solo existe en Grappling, sin complementaria
-- **THEN** "Dogfight under" aparece en la lista una sola vez con la indicación "solo en Grappling"; al elegirla y guardar, la "Dogfight over" de Grappling queda vinculada con esa "Dogfight under", se crea "Dogfight under" en BJJ con sus datos vinculada con la "Dogfight over" de BJJ, y el usuario ve que se creó en BJJ
+- **THEN** "Dogfight under" aparece en la lista una sola vez con la indicación "solo en Grappling"; al elegirla y guardar, la "Dogfight over" de Grappling queda vinculada con esa "Dogfight under", se crea "Dogfight under" en BJJ con sus datos vinculada con la "Dogfight over" de BJJ, y el usuario ve el aviso `Posición complementaria "Dogfight under" creada en BJJ`
 
 #### Scenario: Cambiar la disciplina tras elegir una complementaria de la otra
 - **WHEN** el usuario eligió en "Ambos" una complementaria que solo existe en Grappling y vuelve atrás para elegir BJJ como disciplina
@@ -146,7 +146,7 @@ propone elegir solo la otra disciplina.
 
 #### Scenario: Crear al vuelo con un nombre que solo existe en la otra disciplina
 - **WHEN** con BJJ activo, en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y escribe "Dogfight under", que solo existe en Grappling
-- **THEN** no aparece ningún error; el asistente indica que ya existe en Grappling y que se creará solo en BJJ; al guardar se crea solo la de BJJ, el usuario ve el aviso de lo creado y cada copia de la posición "Ambos" queda vinculada con la "Dogfight under" de su disciplina
+- **THEN** no aparece ningún error; el asistente indica que ya existe en Grappling y que se creará solo en BJJ; al guardar se crea solo la de BJJ, el usuario ve los avisos `Posición "Dogfight under" creada solo en BJJ (ya existía en Grappling)` y `"Dogfight under" enlazada con la existente en Grappling`, y cada copia de la posición "Ambos" queda vinculada con la "Dogfight under" de su disciplina
 
 #### Scenario: Crear al vuelo con un nombre libre en la disciplina preferida
 - **WHEN** con BJJ activo, en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y escribe "Dogfight under", que solo existe en BJJ, sin complementaria
@@ -208,6 +208,43 @@ guardar se abre la ficha del de la disciplina activa.
 - **WHEN** el usuario mueve el nodo "Dogfight" en el grafo de BJJ y guarda la organización
 - **THEN** el nodo "Dogfight" del grafo de Grappling sigue donde estaba
 
+### Requirement: Aviso de lo hecho en la otra disciplina
+Cuando al guardar un elemento "Ambos" la app crea, enlaza o deja sin
+completar algo en la otra disciplina, SHALL mostrar un aviso con una
+línea corta y llana por cada cosa hecha, en el orden en que ocurrió
+(si un asistente abierto desde otro ya dejó su aviso, se añaden debajo,
+sin perderlo). Las líneas que solo informan se distinguen visualmente
+de las que piden atención (algo quedó sin completar y el usuario puede
+querer arreglarlo). Cada línea MUST tener un botón de información que,
+al tocarlo o hacer clic (no solo al pasar el ratón, para que funcione en
+la tablet) y también con el teclado, muestra la explicación completa:
+qué pasó, por qué ("como elegiste Ambos…") y, si procede, qué puede
+hacer el usuario. El aviso se cierra entero con su botón de cerrar o al
+cerrar el mapa o el roll.
+
+Formas de cada línea:
+- Complementaria creada: `Posición complementaria "<nombre>" creada en <disciplina>`.
+- Complementaria enlazada con una existente: `"<nombre>" enlazada con la existente en <disciplina>`.
+- Copia sin complementaria (pide atención): `"<posición>" sin complementaria en <disciplina>`.
+- Origen o destino creado para completar una técnica: `Posición "<nombre>" creada en <disciplina>` o `Sumisión "<nombre>" creada en <disciplina>`.
+- "Ambos" creado solo en una disciplina porque en la otra ya existía: `Posición "<nombre>" creada solo en <disciplina> (ya existía en <otra>)` (o `Sumisión …`).
+
+#### Scenario: Una línea por cosa hecha
+- **WHEN** el usuario crea un sweep "Ambos" de "Guardia cerrada" a "Mount" de BJJ y en Grappling no existen ni "Guardia cerrada" ni "Mount"
+- **THEN** el aviso muestra dos líneas, `Posición "Guardia cerrada" creada en Grappling` y `Posición "Mount" creada en Grappling`
+
+#### Scenario: Ver el detalle tocando el icono
+- **WHEN** en la tablet el usuario toca el icono de información de la línea `Posición complementaria "Dogfight under" creada en Grappling`
+- **THEN** se abre un recuadro que explica que, como eligió "Ambos", "Dogfight over" existe en BJJ y en Grappling, que en Grappling no había ninguna "Dogfight under" y que por eso se creó una copia y se emparejó con la "Dogfight over" de Grappling
+
+#### Scenario: Distinguir lo que pide atención
+- **WHEN** el aviso tiene una línea de complementaria creada y otra de copia sin complementaria
+- **THEN** la de copia sin complementaria se ve con el estilo de atención y la otra con el informativo
+
+#### Scenario: Cerrar el aviso
+- **WHEN** el usuario pulsa cerrar en el aviso
+- **THEN** desaparecen todas sus líneas
+
 ### Requirement: Conexiones dentro de la misma disciplina
 Una técnica SHALL tener la disciplina de su posición de origen, y el
 asistente MUST ofrecer como destino solo posiciones o sumisiones de esa
@@ -226,7 +263,7 @@ usuario de lo creado.
 
 #### Scenario: Técnica Ambos sin contraparte
 - **WHEN** el usuario crea un sweep "Ambos" de "Guardia cerrada" a "Mount" de BJJ y en Grappling no existe "Mount"
-- **THEN** se crean los dos sweeps y una posición "Mount" de Grappling con los datos de la de BJJ, y el usuario ve que esa posición se creó
+- **THEN** se crean los dos sweeps y una posición "Mount" de Grappling con los datos de la de BJJ, y el usuario ve el aviso informativo `Posición "Mount" creada en Grappling`
 
 #### Scenario: Conexiones antiguas entre disciplinas
 - **WHEN** una técnica guardada antes de esta regla sale de una posición de otra disciplina

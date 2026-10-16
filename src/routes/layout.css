@@ -30,6 +30,12 @@ body {
 	--success-foreground: oklch(0.985 0 0);
 	--warning: oklch(0.76 0.16 80);
 	--warning-foreground: oklch(0.205 0 0);
+	/* T-4.it7: avisos informativos (lo que la app hizo por el usuario, sin
+	   que tenga que actuar). Azul tranquilo (hue 240, croma medio): distinto
+	   de primary (índigo saturado, hue 264, = selección/acción) y de
+	   --warning (ámbar, = el usuario puede querer actuar). */
+	--info: oklch(0.55 0.12 240);
+	--info-foreground: oklch(0.985 0 0);
 	/* T-3.it7: resaltado de lo nuevo en la vista previa de importación.
 	   Amarillo apagado (crema / mostaza suave, hue 95, croma bajo): visible
 	   pero tranquilo, distinto de --warning (ámbar saturado, hue 80), de
@@ -82,6 +88,8 @@ body {
 	--success-foreground: oklch(0.145 0 0);
 	--warning: oklch(0.82 0.17 80);
 	--warning-foreground: oklch(0.145 0 0);
+	--info: oklch(0.72 0.11 240);
+	--info-foreground: oklch(0.145 0 0);
 	--highlight: oklch(0.87 0.18 95);
 	--highlight-foreground: oklch(0.145 0 0);
 	--cinturon-blanco: oklch(0.94 0 0);
@@ -130,6 +138,8 @@ body {
 	--color-highlight: var(--highlight);
 	--color-warning-foreground: var(--warning-foreground);
 	--color-warning: var(--warning);
+	--color-info-foreground: var(--info-foreground);
+	--color-info: var(--info);
 	--color-success-foreground: var(--success-foreground);
 	--color-success: var(--success);
 	--color-destructive: var(--destructive);
