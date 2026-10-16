@@ -230,6 +230,10 @@ cualquier máquina) las herede.
   qué gestor está instalado (`command -v nvm`, `command -v fnm`,
   `echo $CODESPACES`). Notas "desactualizadas" sobre entorno pueden
   referirse a otra máquina.
+- **Comandos/skills para todo flujo repetible.** Cuando un flujo se
+  repite (alta de backlog, validación, cierre de tarea…), convertirlo en
+  skill o comando versionado en `.claude/` para que sea determinista y
+  delegable a subagentes; proponerlo al owner cuando se detecte uno nuevo.
 - **Sin confirmaciones vacías.** Tras un OK explícito sobre un plan,
   ejecutar los pasos evidentes (incluido commit + push rutinario de ese
   plan) sin volver a preguntar "¿procedo?" / "¿paramos aquí?". Anunciar
@@ -282,6 +286,9 @@ cualquier máquina) las herede.
   - Convenciones de código del proyecto y restricciones de stack →
     secciones superiores de este mismo fichero.
   - Backlog interno detallado → [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md).
+    Entradas con ID `MF-NNN` y Tipo / Impacto / Esfuerzo / Prioridad
+    (prioridad solo la fija el owner); altas y cierres con la skill
+    [`backlog-item`](.claude/skills/backlog-item/SKILL.md).
     Vista pública filtrada → [ROADMAP.md](ROADMAP.md).
   - Planes de iteración → [`docs/iterations/`](docs/iterations/);
     resúmenes públicos por release → [CHANGELOG.md](CHANGELOG.md).
