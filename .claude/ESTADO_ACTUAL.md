@@ -1,7 +1,7 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-10-05 (sesión 50 — Codespaces para tablet + config de agente + fix modelo IA + piloto SDD con OpenSpec)
-**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 ✅, T-2 ✅, T-3 ✅ (2026-10-06). Siguiente: T-4 (`ambos-como-copias`).
+**Última actualización:** 2026-10-16 (T-4: ensayo de migración OK + regla de complementarias Ambos implementada en rama)
+**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 ✅, T-2 ✅, T-3 ✅ (2026-10-06). T-4 (`ambos-como-copias`) implementada en la rama `it7/t4-ambos-copias`, en validación.
 **Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
 
 ---
@@ -74,7 +74,13 @@
 - **Bug de la v11 detectado (lo arregla T-4):** al crear una complementaria desde el asistente ("+ Crear nueva"), la disciplina elegida se perdía.
 - **DECISIÓN DEL OWNER (nueva regla):** si un elemento Ambos tiene una **complementaria** que solo existe en una disciplina, **se crea la complementaria en la otra** y se emparejan (la misma regla "Ambos completo en las dos" que ya aplicaba a los extremos de las técnicas). Aplica a la migración/conversión de backups Y al crear (avisando de lo creado). **PENDIENTE DE IMPLEMENTAR** en `ambos-como-copias` (spec catalogo-tecnico "Posiciones complementarias" + `separar-ambos.ts` + `catalogo-lados.ts` + tasks).
 
-**Próximo paso concreto (el owner sigue en el portátil):** (1) implementar la regla de complementarias en la rama `it7/t4-ambos-copias` (spec + código), (2) en local: `pnpm build && pnpm preview --port 4173 --strictPort` → `http://localhost:4173/bjj-tracker/` (BD vacía en ese origen) → importar el JSON v7 exportado → esto prueba la conversión de backups antiguos con la regla nueva (debe crear P en la otra disciplina emparejada con Dogfight over), (3) resto del checklist de T-4 (asistentes, sesiones, rolls, importación Ambos, backup v8), (4) CHANGELOG + archivar + fusionar en main → cerrar la it.7.
+**Regla de complementarias Ambos IMPLEMENTADA (2026-10-16, portátil local, commit `2283685`, sin validar en navegador):** spec `catalogo-tecnico` (6 escenarios nuevos) + `copia-seguridad`; `separar-ambos.ts` paso 6b (migración v12 y conversión de backups, en las dos direcciones); `catalogo-lados.ts` + `PosicionWizard` (aviso de lo creado). Check y build en verde, change válido. Informe: `.claude/agent-reports/20261016-complementarias-ambos/implementation.md` (gitignoreado, solo en el portátil).
+- **DECISIÓN DEL OWNER (2026-10-16):** si en la otra disciplina ya existe una posición con el mismo nombre y **libre** (sin complementaria), se **enlaza** en vez de crear un duplicado.
+- **Supuestos del subagente pendientes de OK del owner:** (1) si la del mismo nombre ya está emparejada con otra, no se duplica ni se rompe ese vínculo: la copia Ambos queda sin complementaria en esa disciplina (aviso en el asistente; en migración/importación solo en consola); (2) con varias del mismo nombre se usa la más antigua libre; (3) migración e importación no avisan en pantalla (igual que los extremos de técnicas hoy); (4) sin cascada: una posición copiada solo para completar el extremo de una técnica no arrastra su complementaria.
+- **Corrección del caso de ensayo:** en el JSON del 16/10 la posición single es "Dog fight under" (BJJ) emparejada con "Dog fight over" (Ambos), y la técnica Ambos Uchimata sale de "Dog fight over". Esperado tras importar: "Dog fight under" creada en Grappling y emparejada con la "Dog fight over" de Grappling.
+- Entorno del portátil: Node 22 vía `nvm use 22` (el default es 20); OpenSpec 1.14.0 instalado global sin telemetría. No se puede abrir la app desde el móvil (portátil de empresa): se valida en `http://localhost:4173/bjj-tracker/`.
+
+**Próximo paso concreto:** (1) el owner valida en `http://localhost:4173/bjj-tracker/` importando `bjj-tracker-export-20261016.json` + checklist del informe (complementarias) y decide los 4 supuestos; (2) revisar las 4 desviaciones de T-4 (técnica Ambos ya existente no se guarda; contras solo en su disciplina; importación enlaza por nombre; borradores conservan disciplina); (3) resto del checklist de T-4 (asistentes, sesiones, rolls, importación Ambos, backup v8); (4) CHANGELOG + archivar + fusionar en main → cerrar la it.7.
 
 ---
 
