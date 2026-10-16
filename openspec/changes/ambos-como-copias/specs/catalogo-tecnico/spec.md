@@ -69,7 +69,10 @@ su complementaria (la misma situación vista desde el otro practicante).
 El vínculo MUST ser mutuo y único: al vincular A con B, B queda vinculada
 con A y se rompen los vínculos previos de ambas. Solo se ofrecen
 posiciones de la misma disciplina libres o ya vinculadas a la que se
-edita.
+edita. Al crear con "Ambos", el selector SHALL ofrecer además las
+posiciones libres que solo existen en la otra disciplina, una sola vez
+por nombre y con una indicación visible de en qué disciplina están
+("solo en Grappling", "solo en BJJ").
 
 Una posición "Ambos" con complementaria MUST quedar con su complementaria
 en las dos disciplinas, tanto al crearla con "Ambos" como al separar lo
@@ -84,6 +87,22 @@ creado. Si la del mismo nombre ya está vinculada con otra posición, MUST
 NOT crearse un duplicado ni romperse ese vínculo: en esa disciplina la
 copia queda sin complementaria y al crear desde el asistente se avisa al
 usuario.
+
+Al crear al vuelo la complementaria de una posición "Ambos" ("Crear nueva
+posición"), un nombre que ya existe en una sola disciplina MUST NOT
+bloquear: si existe en la otra disciplina, la nueva se crea solo en la
+que falta y se vincula como cualquier complementaria elegida; si existe
+en la disciplina preferida y está libre, se usa esa en vez de crear otra.
+En ambos casos se avisa al usuario de lo que pasará. Si el nombre ya
+existe en las dos disciplinas, o solo en la preferida pero vinculada con
+otra posición, el asistente MUST indicarlo con un mensaje que diga en
+qué disciplina(s) está y que la elija en la lista. Los mismos criterios
+se aplican al crear al vuelo una posición "Ambos" desde el asistente de
+técnica o desde un roll, y una sumisión "Ambos" desde el asistente de
+técnica. Fuera de esos flujos (crear desde el mapa sin nadie que reciba
+la posición), un nombre que ya existe en una de las dos disciplinas
+sigue bloqueando "Ambos", con un mensaje que dice dónde existe y
+propone elegir solo la otra disciplina.
 
 #### Scenario: Vincular dos posiciones
 - **WHEN** el usuario edita "Mount top" y elige "Mount bottom" como complementaria
@@ -116,6 +135,26 @@ usuario.
 #### Scenario: Crear Ambos con una complementaria nueva
 - **WHEN** en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y la guarda
 - **THEN** la nueva se crea también como "Ambos" y cada copia queda vinculada con la copia de su misma disciplina
+
+#### Scenario: Elegir en Ambos una complementaria que solo existe en la otra disciplina
+- **WHEN** con BJJ activo el usuario crea "Dogfight over" eligiendo "Ambos" y abre el paso de complementaria, y "Dogfight under" solo existe en Grappling, sin complementaria
+- **THEN** "Dogfight under" aparece en la lista una sola vez con la indicación "solo en Grappling"; al elegirla y guardar, la "Dogfight over" de Grappling queda vinculada con esa "Dogfight under", se crea "Dogfight under" en BJJ con sus datos vinculada con la "Dogfight over" de BJJ, y el usuario ve que se creó en BJJ
+
+#### Scenario: Cambiar la disciplina tras elegir una complementaria de la otra
+- **WHEN** el usuario eligió en "Ambos" una complementaria que solo existe en Grappling y vuelve atrás para elegir BJJ como disciplina
+- **THEN** la complementaria elegida se descarta y la lista vuelve a ofrecer solo posiciones de BJJ
+
+#### Scenario: Crear al vuelo con un nombre que solo existe en la otra disciplina
+- **WHEN** con BJJ activo, en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y escribe "Dogfight under", que solo existe en Grappling
+- **THEN** no aparece ningún error; el asistente indica que ya existe en Grappling y que se creará solo en BJJ; al guardar se crea solo la de BJJ, el usuario ve el aviso de lo creado y cada copia de la posición "Ambos" queda vinculada con la "Dogfight under" de su disciplina
+
+#### Scenario: Crear al vuelo con un nombre libre en la disciplina preferida
+- **WHEN** con BJJ activo, en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y escribe "Dogfight under", que solo existe en BJJ, sin complementaria
+- **THEN** el asistente indica que se usará la existente; al continuar no se crea otra, queda elegida como complementaria y al guardar se completa la de Grappling como en cualquier complementaria de una sola disciplina
+
+#### Scenario: Crear al vuelo con un nombre que existe en las dos disciplinas
+- **WHEN** en el paso de complementaria de una posición "Ambos" el usuario pulsa "Crear nueva posición" y escribe un nombre que ya existe en BJJ y en Grappling
+- **THEN** el asistente no deja continuar y muestra "Ya existe en BJJ y en Grappling: elígela en la lista.", distinto del mensaje de nombre repetido en una sola disciplina
 
 #### Scenario: Ambos existente con complementaria de una sola disciplina
 - **WHEN** existía "Dogfight over" como "Ambos" vinculada con "Dogfight under", solo de BJJ, y en Grappling no había "Dogfight under"

@@ -921,7 +921,7 @@
 					ambos
 				);
 				const nueva = creadas[ladoTecnica]!;
-				if (creados.length > 0) avisoCatalogo.set(textoAvisoCreados(creados));
+				if (creados.length > 0) avisoCatalogo.append(textoAvisoCreados(creados));
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
 					mapaModalStack.setDirtyHandler(null);

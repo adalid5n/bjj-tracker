@@ -58,6 +58,14 @@
 - [x] 5b.3 `catalogo-lados.ts` + `PosicionWizard`: crear la complementaria que falte en la otra disciplina al crear una posición Ambos, aviso de lo creado y de lo que quedó sin vincular; verificar con `pnpm check` y `pnpm build`
 - [ ] 5b.4 Verificación manual del owner: importar `bjj-tracker-export-20261016.json` en el 4173 (BD vacía) y comprobar "Dog fight under" en Grappling vinculada con la "Dog fight over" de Grappling; crear desde el asistente los tres escenarios de creación
 
+## 5c. Complementaria en "Ambos" desde la otra disciplina (bug del owner 2026-10-16)
+
+- [x] 5c.1 Spec "Posiciones complementarias": selector en "Ambos" con las que solo existen en la otra disciplina (una por nombre, con indicación), crear al vuelo con nombre existente en una disciplina, nombre en las dos; `openspec validate --strict`
+- [x] 5c.2 `catalogo-lados.ts`: `crearPosicionEnLados` vincula directamente la complementaria en su disciplina (sea la preferida o la otra) y completa la otra por nombre
+- [x] 5c.3 `PosicionWizard`: selector en "Ambos" con las de la otra disciplina y su indicación; al cambiar de disciplina se descarta una elección inválida; "Crear nueva" en "Ambos" (complementaria, técnica y roll, mapa y diálogo) usa la existente o crea solo en la disciplina que falta, con aviso; mensajes de nombre repetido distinguibles; mismo criterio en `SumisionWizard` ("+ Crear nueva sumisión" de una técnica "Ambos")
+- [x] 5c.4 Aviso de lo creado acumulable (`avisoCatalogo.append`) para no perder el aviso del sub-asistente al guardar el asistente padre; `pnpm check` y `pnpm build`
+- [ ] 5c.5 Validación manual del owner en el 4173: P3 "Ambos" con complementaria P2 que solo existe en Grappling, por el selector y por "Crear nueva"
+
 ## 6. Verificación y cierre
 
 - [x] 6.1 `grep -rn "'ambos'" src` solo en sesiones, importación y opción de creación de asistentes; `grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|gray)-[0-9]" src` sin resultados nuevos

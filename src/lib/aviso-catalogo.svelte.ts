@@ -20,6 +20,16 @@ class AvisoCatalogoState {
 		this.#texto = texto && texto.trim() ? texto : null;
 	}
 
+	/**
+	 * Añade al aviso actual (si lo hay). Lo usan los asistentes al guardar
+	 * para no pisar el aviso que dejó un sub-asistente ("+ Crear nueva")
+	 * del mismo flujo. El host lo limpia al cerrar el stack / abrir el roll.
+	 */
+	append(texto: string | null): void {
+		if (!texto || !texto.trim()) return;
+		this.#texto = this.#texto ? `${this.#texto} ${texto}` : texto;
+	}
+
 	clear(): void {
 		this.#texto = null;
 	}

@@ -36,7 +36,8 @@
 	import Chips from '$lib/components/Chips.svelte';
 	import type { Disciplina, DisciplinaCatalogo, SumisionTerminal } from '$lib/types';
 	import { mapaModalStack, type OpcionesDisciplina } from './mapa-modal-stack.svelte';
-	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
+	import { DISCIPLINA_LABEL, otroLado } from '$lib/catalogo-lados';
+	import { avisoCatalogo } from '$lib/aviso-catalogo.svelte';
 	import { settings } from '$lib/settings.svelte';
 	import { capitalizeFirst } from '$lib/utils';
 
@@ -99,7 +100,7 @@
 	let visitedSteps = $state<Set<number>>(new Set([1]));
 
 	// Inicializa en 'loading'; en modo crear pasa a 'ready' en `onMount`.
-	let status: 'loading' | 'ready' | 'error' = $state('loading');
+	let status = $state<'loading' | 'ready' | 'error'>('loading');
 	let loadError = $state('');
 	let saving = $state(false);
 	let errorMsg = $state('');
@@ -210,26 +211,92 @@
 	// Schema v11 (T-3.it7): el nombre es único POR DISCIPLINA — "Kimura"
 	// de BJJ y "Kimura" de Grappling pueden convivir. Solo es repetido si
 	// coincide nombre (sin distinguir mayúsculas) y disciplina.
-	// T-4.it7: con "Ambos" el nombre no puede existir en ninguna de las dos;
-	// devuelve la disciplina donde ya existe (o null).
-	function nombreYaExiste(n: string): DisciplinaCatalogo | null {
-		const norm = n.trim().toLowerCase();
-		if (!norm) return null;
-		const lados: DisciplinaCatalogo[] =
-			disciplina === 'ambos' ? ['bjj', 'grappling'] : [disciplina];
-		const choque = existentes.find(
-			(s) =>
-				s.nombre.trim().toLowerCase() === norm &&
-				lados.includes(s.disciplina) &&
-				(modo === 'crear' || s.id !== sumisionId)
-		);
-		return choque ? choque.disciplina : null;
+	// T-4.it7: con "Ambos", si el asistente devuelve la sumisión a quien lo
+	// abrió ("+ Crear nueva sumisión" de una técnica), un nombre que ya
+	// existe en una sola disciplina no bloquea (mismo criterio que
+	// PosicionWizard):
+	//  - solo en la preferida → `usarExistente` (se devuelve esa);
+	//  - solo en la otra → `soloEn` (se crea solo en la preferida; la
+	//    técnica "Ambos" enlaza la otra por nombre al guardar).
+	// En las dos disciplinas, o sin llamador, es error.
+	type ResolucionNombre =
+		| { tipo: 'libre' }
+		| { tipo: 'error'; mensaje: string }
+		| { tipo: 'usarExistente'; sumision: SumisionTerminal }
+		| { tipo: 'soloEn'; lado: DisciplinaCatalogo; existenteEn: DisciplinaCatalogo };
+
+	function devuelveAlLlamador(): boolean {
+		return mode === 'standalone' || mapaModalStack.hasReturnHandler();
 	}
 
-	function mensajeNombreRepetido(lado: DisciplinaCatalogo): string {
-		return disciplina === 'ambos'
-			? `Ya existe una sumisión con ese nombre en ${DISCIPLINA_LABEL[lado]}.`
-			: 'Ya existe una sumisión con ese nombre.';
+	function resolverNombre(n: string): ResolucionNombre {
+		const norm = n.trim().toLowerCase();
+		if (!norm) return { tipo: 'libre' };
+		const nom = n.trim();
+		const mismas = existentes
+			.filter(
+				(s) =>
+					s.nombre.trim().toLowerCase() === norm && (modo === 'crear' || s.id !== sumisionId)
+			)
+			.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+		if (disciplina !== 'ambos') {
+			return mismas.some((s) => s.disciplina === disciplina)
+				? {
+						tipo: 'error',
+						mensaje: `Ya existe una sumisión "${nom}" en ${DISCIPLINA_LABEL[disciplina]}.`
+					}
+				: { tipo: 'libre' };
+		}
+		const otro = otroLado(preferido);
+		const enPref = mismas.filter((s) => s.disciplina === preferido);
+		const enOtro = mismas.filter((s) => s.disciplina === otro);
+		if (enPref.length === 0 && enOtro.length === 0) return { tipo: 'libre' };
+		const llamador = devuelveAlLlamador();
+		if (enPref.length > 0 && enOtro.length > 0) {
+			return {
+				tipo: 'error',
+				mensaje: llamador
+					? 'Ya existe en BJJ y en Grappling: elígela en la lista.'
+					: `"${nom}" ya existe en BJJ y en Grappling.`
+			};
+		}
+		const ladoExistente = enPref.length > 0 ? preferido : otro;
+		if (!llamador) {
+			return {
+				tipo: 'error',
+				mensaje: `"${nom}" ya existe en ${DISCIPLINA_LABEL[ladoExistente]}. Con "Ambos" se duplicaría allí: elige solo ${DISCIPLINA_LABEL[otroLado(ladoExistente)]} o cambia el nombre.`
+			};
+		}
+		if (enOtro.length > 0) return { tipo: 'soloEn', lado: preferido, existenteEn: otro };
+		return { tipo: 'usarExistente', sumision: enPref[0] };
+	}
+
+	const resolucionNombre = $derived(
+		modo === 'crear' && status === 'ready' ? resolverNombre(nombre) : ({ tipo: 'libre' } as const)
+	);
+	const avisoNombre = $derived.by<string>(() => {
+		const r = resolucionNombre;
+		if (r.tipo === 'usarExistente') {
+			return `"${r.sumision.nombre}" ya existe en ${DISCIPLINA_LABEL[r.sumision.disciplina]}: al continuar se usará esa (no se crea otra).`;
+		}
+		if (r.tipo === 'soloEn') {
+			return `"${nombre.trim()}" ya existe en ${DISCIPLINA_LABEL[r.existenteEn]}: se creará solo en ${DISCIPLINA_LABEL[r.lado]}.`;
+		}
+		return '';
+	});
+
+	/** Devuelve una sumisión existente al llamador sin crear nada. */
+	function usarExistente(s: SumisionTerminal) {
+		nombreError = '';
+		if (mode === 'stack') {
+			mapaModalStack.setDirtyHandler(null);
+			onSaved?.(s.id, 'crear');
+			mapaModalStack.pop();
+			mapaModalStack.invokeReturnHandler(s.id, 'sumision');
+		} else {
+			onDirtyChange?.(false);
+			onSaved?.(s.id, 'crear');
+		}
 	}
 
 	function goToStep(step: number) {
@@ -252,9 +319,13 @@
 		// carreras entre pestañas.
 		const n = nombre.trim();
 		if (!n) return;
-		const choque = nombreYaExiste(n);
-		if (choque) {
-			nombreError = mensajeNombreRepetido(choque);
+		const r = resolverNombre(n);
+		if (r.tipo === 'error') {
+			nombreError = r.mensaje;
+			return;
+		}
+		if (r.tipo === 'usarExistente') {
+			usarExistente(r.sumision);
 			return;
 		}
 		nombreError = '';
@@ -355,12 +426,18 @@
 		errorMsg = '';
 		try {
 			if (modo === 'crear') {
-				const choque = nombreYaExiste(nombreFinal);
-				if (choque) {
-					nombreError = mensajeNombreRepetido(choque);
+				const r = resolverNombre(nombreFinal);
+				if (r.tipo === 'error') {
+					nombreError = r.mensaje;
 					currentStep = 1;
 					return;
 				}
+				if (r.tipo === 'usarExistente') {
+					usarExistente(r.sumision);
+					return;
+				}
+				// Existe solo en la otra disciplina: se crea solo en la que falta.
+				const disciplinaFinal: Disciplina = r.tipo === 'soloEn' ? r.lado : disciplina;
 				const { crearSumisionEnLados } = await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En hobbyist
 				// persistimos cadena vacía.
@@ -368,11 +445,16 @@
 				// "Ambos" crea dos sumisiones; se abre / devuelve la de `preferido`.
 				const creadas = await crearSumisionEnLados(
 					{ nombre: nombreFinal, notas: notasFinal },
-					disciplina,
+					disciplinaFinal,
 					{ preferido }
 				);
-				const nueva = (creadas[disciplina === 'ambos' ? preferido : disciplina] ??
+				const nueva = (creadas[disciplinaFinal === 'ambos' ? preferido : disciplinaFinal] ??
 					Object.values(creadas)[0])!;
+				if (r.tipo === 'soloEn') {
+					avisoCatalogo.append(
+						`"${nueva.nombre}" ya existía en ${DISCIPLINA_LABEL[r.existenteEn]}: se creó solo en ${DISCIPLINA_LABEL[r.lado]}.`
+					);
+				}
 				if (mode === 'stack') {
 					onSaved?.(nueva.id, 'crear');
 					mapaModalStack.setDirtyHandler(null);
@@ -498,6 +580,8 @@
 				/>
 				{#if nombreError}
 					<p id="sumision-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+				{:else if avisoNombre}
+					<p class="text-sm text-muted-foreground" role="status">{avisoNombre}</p>
 				{/if}
 				<p class="text-xs text-muted-foreground">
 					{settings.modoAvanzado
@@ -559,7 +643,11 @@
 				<!-- Con un solo paso, currentStep siempre vale 1 = totalSteps:
 				     mostramos directamente Guardar. -->
 				<Button size="sm" onclick={tryAdvanceFromStep1} disabled={saving || !canAdvanceFromStep1}>
-					{saving ? 'Guardando…' : 'Guardar'}
+					{saving
+						? 'Guardando…'
+						: resolucionNombre.tipo === 'usarExistente'
+							? 'Usar la existente'
+							: 'Guardar'}
 				</Button>
 			</div>
 		</div>

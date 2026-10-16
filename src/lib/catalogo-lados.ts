@@ -133,8 +133,10 @@ export type DatosPosicion = Omit<NewPosicion, 'disciplina' | 'posicion_complemen
 /**
  * Crea la posición en la disciplina `d` (dos copias si es "Ambos").
  *
- * Complementaria: `complementariaId` se eligió en la lista de `ladoLista`
- * (la disciplina elegida o, con "Ambos", la preferida). Con "Ambos", la
+ * Complementaria: `complementariaId` es una posición de la disciplina
+ * elegida o, con "Ambos", de cualquiera de las dos (el selector ofrece
+ * también las que solo existen en la otra disciplina). Con "Ambos", la
+ * copia de la disciplina de la complementaria se vincula con ella y la
  * copia de la otra disciplina también tiene complementaria (decisión del
  * owner 2026-10-16, design §5):
  *  - la posición LIBRE del mismo nombre normalizado en esa disciplina (la
@@ -155,7 +157,6 @@ export async function crearPosicionEnLados(
 }> {
 	await init();
 	const lados = ladosDe(d, opts.preferido);
-	const ladoLista = lados[0];
 	let complementariaOriginal: Posicion | null = null;
 	if (opts.complementariaId && lados.length > 1) {
 		const rows = await query<Posicion>('SELECT * FROM posiciones WHERE id = ?', [
@@ -169,9 +170,13 @@ export async function crearPosicionEnLados(
 		const sinVincular: ComplementariaSinVincular[] = [];
 		for (const lado of lados) {
 			let complementaria: string | null = null;
-			if (lado === ladoLista) {
+			if (lados.length === 1) {
 				complementaria = opts.complementariaId;
-			} else if (complementariaOriginal) {
+			} else if (!complementariaOriginal) {
+				complementaria = null;
+			} else if (complementariaOriginal.disciplina === lado) {
+				complementaria = complementariaOriginal.id;
+			} else {
 				complementaria = await complementariaEnLado(
 					complementariaOriginal,
 					data.nombre,

@@ -75,7 +75,7 @@
 		posicionWizardDraft,
 		type OpcionesDisciplina
 	} from './mapa-modal-stack.svelte';
-	import { DISCIPLINA_LABEL } from '$lib/catalogo-lados';
+	import { DISCIPLINA_LABEL, otroLado } from '$lib/catalogo-lados';
 	import { settings } from '$lib/settings.svelte';
 	import { avisoCatalogo } from '$lib/aviso-catalogo.svelte';
 	import { capitalizeFirst } from '$lib/utils';
@@ -234,7 +234,7 @@
 	// Inicializa siempre en 'loading'; en modo crear lo movemos a 'ready'
 	// dentro de `onMount`. Así evitamos `state_referenced_locally` al
 	// leer `modo` en la inicialización del runa.
-	let status: 'loading' | 'ready' | 'error' = $state('loading');
+	let status = $state<'loading' | 'ready' | 'error'>('loading');
 	let loadError = $state('');
 	let saving = $state(false);
 	let errorMsg = $state('');
@@ -457,22 +457,55 @@
 	// "tenga complementaria" (es la actual de A); por simetría, B.complementaria
 	// === A.id.
 	const complementariasDisponibles = $derived.by<ComboboxItem[]>(() => {
-		const items: ComboboxItem[] = existentes
-			.filter((p) => {
-				if (p.id === posicionId) return false;
-				// T-4.it7: solo de la misma disciplina (la actual se conserva
-				// aunque sea de otra, para vínculos antiguos).
-				if (p.disciplina !== ladoLista && p.id !== complementariaId) return false;
-				const otraPareja = p.posicion_complementaria_id ?? null;
-				if (otraPareja === null) return true;
-				if (posicionId && otraPareja === posicionId) return true;
-				return false;
-			})
-			.map((p) => ({
-				id: p.id,
-				label: p.nombre,
-				sublabel: CATEGORIA_LABEL[p.categoria]
-			}));
+		const disponible = (p: Posicion) => {
+			if (p.id === posicionId) return false;
+			const otraPareja = p.posicion_complementaria_id ?? null;
+			if (otraPareja === null) return true;
+			if (posicionId && otraPareja === posicionId) return true;
+			return false;
+		};
+		const ambosAlCrear = modo === 'crear' && disciplina === 'ambos';
+		// T-4.it7: solo de la misma disciplina (la actual se conserva
+		// aunque sea de otra, para vínculos antiguos; con "Ambos" la de la
+		// otra disciplina se lista abajo, con su indicación).
+		const propias = existentes.filter(
+			(p) =>
+				(p.disciplina === ladoLista || (p.id === complementariaId && !ambosAlCrear)) &&
+				disponible(p)
+		);
+		const items: ComboboxItem[] = propias.map((p) => ({
+			id: p.id,
+			label: p.nombre,
+			sublabel: CATEGORIA_LABEL[p.categoria]
+		}));
+		// Con "Ambos" (solo al crear): también las libres que solo están
+		// en la otra disciplina, una por nombre y con la indicación de dónde
+		// están. Al guardar, `crearPosicionEnLados` vincula cada copia con
+		// la de su disciplina (creándola en la que falte).
+		if (ambosAlCrear) {
+			const otro = otroLado(ladoLista);
+			const yaListados = new Set(propias.map((p) => normNombre(p.nombre)));
+			const enLista = new Set(
+				existentes.filter((p) => p.disciplina === ladoLista).map((p) => normNombre(p.nombre))
+			);
+			const deLaOtra = existentes
+				.filter((p) => p.disciplina === otro && disponible(p))
+				.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+			for (const p of deLaOtra) {
+				const n = normNombre(p.nombre);
+				if (yaListados.has(n) && p.id !== complementariaId) continue;
+				yaListados.add(n);
+				items.push({
+					id: p.id,
+					label: p.nombre,
+					sublabel: `${CATEGORIA_LABEL[p.categoria]} · ${
+						enLista.has(n)
+							? `libre solo en ${DISCIPLINA_LABEL[otro]} (en ${DISCIPLINA_LABEL[ladoLista]} ya tiene pareja)`
+							: `solo en ${DISCIPLINA_LABEL[otro]}`
+					}`
+				});
+			}
+		}
 		// Item especial para limpiar el vínculo. Va al principio para
 		// destacarlo y para que un primer "intento de cambiar" no obligue
 		// a recordar el id.
@@ -501,8 +534,9 @@
 
 	function handleDisciplinaChange(v: string | null) {
 		disciplina = (v ?? disciplina) as Disciplina;
-		// La complementaria elegida debe ser de la nueva disciplina.
-		if (complementariaId) {
+		// La complementaria elegida debe ser de la nueva disciplina (con
+		// "Ambos" vale de cualquiera de las dos).
+		if (complementariaId && disciplina !== 'ambos') {
 			const c = existentes.find((p) => p.id === complementariaId);
 			if (c && c.disciplina !== ladoLista) complementariaId = null;
 		}
@@ -574,36 +608,132 @@
 		return idx > 0 ? visibleSteps[idx - 1] : null;
 	}
 
-	/**
-	 * T-4.it7: nombre repetido POR DISCIPLINA. Devuelve la disciplina donde
-	 * ya existe (con "Ambos", cualquiera de las dos) o null.
-	 */
-	function nombreYaExiste(n: string): DisciplinaCatalogo | null {
-		const norm = n.trim().toLowerCase();
-		if (!norm) return null;
-		const lados: DisciplinaCatalogo[] =
-			disciplina === 'ambos' ? ['bjj', 'grappling'] : [disciplina];
-		const choque = existentes.find(
-			(p) =>
-				lados.includes(p.disciplina) &&
-				p.nombre.trim().toLowerCase() === norm &&
-				(modo === 'crear' || p.id !== posicionId)
-		);
-		return choque ? choque.disciplina : null;
+	function normNombre(n: string): string {
+		return n.trim().toLowerCase();
 	}
 
-	function mensajeNombreRepetido(lado: DisciplinaCatalogo): string {
-		return disciplina === 'ambos'
-			? `Ya existe una posición con ese nombre en ${DISCIPLINA_LABEL[lado]}.`
-			: 'Ya existe una posición con ese nombre.';
+	/**
+	 * ¿Este asistente devuelve la posición a quien lo abrió? ("+ Crear
+	 * nueva" desde la complementaria, una técnica o un roll). En el stack,
+	 * si hay return handler; en `standalone`, siempre (diálogo del roll o
+	 * sub-diálogo de técnica / complementaria).
+	 */
+	function devuelveAlLlamador(): boolean {
+		if (mode === 'standalone') return true;
+		return isComplementariaSubWizard || mapaModalStack.hasReturnHandler();
+	}
+
+	/**
+	 * T-4.it7: qué hacer con el nombre escrito (nombre repetido POR
+	 * DISCIPLINA).
+	 *  - `libre`: se crea normal.
+	 *  - `error`: no se puede crear (mensaje).
+	 *  - `usarExistente` (solo "Ambos" y devolviendo al llamador): existe
+	 *    solo en la disciplina preferida (libre, si es complementaria) →
+	 *    se devuelve esa en vez de crear otra; el llamador completa la otra
+	 *    disciplina por nombre al guardar.
+	 *  - `soloEn` (ídem): existe solo en la otra disciplina → se crea solo
+	 *    en la preferida; el llamador vincula / enlaza la otra por nombre.
+	 */
+	type ResolucionNombre =
+		| { tipo: 'libre' }
+		| { tipo: 'error'; mensaje: string }
+		| { tipo: 'usarExistente'; posicion: Posicion }
+		| { tipo: 'soloEn'; lado: DisciplinaCatalogo; existenteEn: DisciplinaCatalogo };
+
+	function resolverNombre(n: string): ResolucionNombre {
+		const norm = normNombre(n);
+		if (!norm) return { tipo: 'libre' };
+		const mismas = existentes
+			.filter(
+				(p) => normNombre(p.nombre) === norm && (modo === 'crear' || p.id !== posicionId)
+			)
+			.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+		const nom = n.trim();
+		if (disciplina !== 'ambos') {
+			return mismas.some((p) => p.disciplina === disciplina)
+				? {
+						tipo: 'error',
+						mensaje: `Ya existe una posición "${nom}" en ${DISCIPLINA_LABEL[disciplina]}.`
+					}
+				: { tipo: 'libre' };
+		}
+		const otro = otroLado(preferido);
+		const enPref = mismas.filter((p) => p.disciplina === preferido);
+		const enOtro = mismas.filter((p) => p.disciplina === otro);
+		if (enPref.length === 0 && enOtro.length === 0) return { tipo: 'libre' };
+		const llamador = devuelveAlLlamador();
+		if (enPref.length > 0 && enOtro.length > 0) {
+			return {
+				tipo: 'error',
+				mensaje: llamador
+					? `Ya existe en BJJ y en Grappling: elígela en la lista.`
+					: `"${nom}" ya existe en BJJ y en Grappling.`
+			};
+		}
+		const ladoExistente = enPref.length > 0 ? preferido : otro;
+		if (!llamador) {
+			return {
+				tipo: 'error',
+				mensaje: `"${nom}" ya existe en ${DISCIPLINA_LABEL[ladoExistente]}. Con "Ambos" se duplicaría allí: elige solo ${DISCIPLINA_LABEL[otroLado(ladoExistente)]} o cambia el nombre.`
+			};
+		}
+		if (enOtro.length > 0) return { tipo: 'soloEn', lado: preferido, existenteEn: otro };
+		const candidata = isComplementariaSubWizard
+			? enPref.find((p) => !p.posicion_complementaria_id)
+			: enPref[0];
+		if (candidata) return { tipo: 'usarExistente', posicion: candidata };
+		return {
+			tipo: 'error',
+			mensaje: `"${nom}" ya existe en ${DISCIPLINA_LABEL[preferido]} y está vinculada con otra posición: cambia el nombre.`
+		};
+	}
+
+	// Indicación previa (sin bloquear) cuando "+ Crear nueva" en "Ambos"
+	// va a usar la existente o a crear solo en una disciplina.
+	const resolucionNombre = $derived(
+		modo === 'crear' && status === 'ready' ? resolverNombre(nombre) : ({ tipo: 'libre' } as const)
+	);
+	const avisoNombre = $derived.by<string>(() => {
+		const r = resolucionNombre;
+		const nom = nombre.trim();
+		if (r.tipo === 'usarExistente') {
+			return `"${r.posicion.nombre}" ya existe en ${DISCIPLINA_LABEL[r.posicion.disciplina]}: al continuar se usará esa (no se crea otra).`;
+		}
+		if (r.tipo === 'soloEn') {
+			return `"${nom}" ya existe en ${DISCIPLINA_LABEL[r.existenteEn]}: se creará solo en ${DISCIPLINA_LABEL[r.lado]}.`;
+		}
+		return '';
+	});
+
+	/**
+	 * Devuelve una posición existente al llamador sin crear nada (caso
+	 * `usarExistente`), igual que si la hubiera elegido en su lista.
+	 */
+	function usarExistente(p: Posicion) {
+		nombreError = '';
+		if (mode === 'stack') {
+			mapaModalStack.setDirtyHandler(null);
+			if (!isSubWizard) posicionWizardDraft.clear();
+			onSaved?.(p.id, 'crear');
+			mapaModalStack.pop();
+			mapaModalStack.invokeReturnHandler(p.id, 'posicion');
+		} else {
+			onDirtyChange?.(false);
+			onSaved?.(p.id, 'crear');
+		}
 	}
 
 	function tryAdvanceFromStep1() {
 		const n = nombre.trim();
 		if (!n) return;
-		const choque = nombreYaExiste(n);
-		if (choque) {
-			nombreError = mensajeNombreRepetido(choque);
+		const r = resolverNombre(n);
+		if (r.tipo === 'error') {
+			nombreError = r.mensaje;
+			return;
+		}
+		if (r.tipo === 'usarExistente') {
+			usarExistente(r.posicion);
 			return;
 		}
 		nombreError = '';
@@ -779,12 +909,18 @@
 			if (modo === 'crear') {
 				// T-4.it7: el nombre se valida en el paso 1, pero la
 				// disciplina se elige después (paso 2) → re-validar aquí.
-				const choque = nombreYaExiste(nombreFinal);
-				if (choque) {
-					nombreError = mensajeNombreRepetido(choque);
+				const r = resolverNombre(nombreFinal);
+				if (r.tipo === 'error') {
+					nombreError = r.mensaje;
 					currentStep = 1;
 					return;
 				}
+				if (r.tipo === 'usarExistente') {
+					usarExistente(r.posicion);
+					return;
+				}
+				// Existe solo en la otra disciplina: se crea solo en la que falta.
+				const disciplinaFinal: Disciplina = r.tipo === 'soloEn' ? r.lado : disciplina;
 				const { crearPosicionEnLados, textoAvisoCreados, textoAvisoSinVincular } =
 					await import('$lib/catalogo-lados');
 				// Notas (T-3.it6): editable solo en modo avanzado. En
@@ -800,12 +936,19 @@
 					sinVincular
 				} = await crearPosicionEnLados(
 					{ nombre: nombreFinal, categoria: categoriaFinal, tipo, notas: notasFinal },
-					disciplina,
+					disciplinaFinal,
 					{ preferido, tagIds: tagsSeleccionados, complementariaId }
 				);
 				const nueva = (creadas[ladoLista] ?? Object.values(creadas)[0])!;
+				// `append`: no pisar el aviso que dejó un sub-asistente del mismo
+				// flujo (p. ej. la complementaria creada solo en una disciplina).
+				if (r.tipo === 'soloEn') {
+					avisoCatalogo.append(
+						`"${nueva.nombre}" ya existía en ${DISCIPLINA_LABEL[r.existenteEn]}: se creó solo en ${DISCIPLINA_LABEL[r.lado]}.`
+					);
+				}
 				if (creados.length > 0 || sinVincular.length > 0) {
-					avisoCatalogo.set(
+					avisoCatalogo.append(
 						[textoAvisoCreados(creados), textoAvisoSinVincular(sinVincular)]
 							.filter(Boolean)
 							.join(' ')
@@ -960,6 +1103,8 @@
 				/>
 				{#if nombreError}
 					<p id="posicion-nombre-error" class="text-sm text-destructive">{nombreError}</p>
+				{:else if avisoNombre}
+					<p class="text-sm text-muted-foreground" role="status">{avisoNombre}</p>
 				{/if}
 				<p class="text-xs text-muted-foreground">Pulsa Enter o "Continuar" para avanzar.</p>
 			</div>
@@ -984,6 +1129,9 @@
 					Si saltas la categoría, queda como "Otro". La disciplina no se puede cambiar
 					después; "Ambos" crea una posición en cada disciplina, independientes entre sí.
 				</p>
+				{#if avisoNombre && resolucionNombre.tipo === 'soloEn'}
+					<p class="text-sm text-muted-foreground" role="status">{avisoNombre}</p>
+				{/if}
 			</div>
 
 			<div class="space-y-3" class:hidden={currentStep !== 3}>
@@ -1018,6 +1166,10 @@
 					Otra vista de la misma situación (p. ej. "Mount top" ↔ "Mount bottom").
 					Solo aparecen posiciones libres o ya vinculadas a esta. Para liberar una
 					que esté vinculada a otra distinta, edítala primero.
+					{#if disciplina === 'ambos'}
+						Con "Ambos" también aparecen las que solo existen en la otra disciplina;
+						al guardar se vincula cada copia con la de su disciplina.
+					{/if}
 				</p>
 			</div>
 
@@ -1152,7 +1304,7 @@
 				</Button>
 			{:else if currentStep === 1}
 				<Button size="sm" onclick={tryAdvanceFromStep1} disabled={!canAdvanceFromStep1}
-					>Continuar</Button
+					>{resolucionNombre.tipo === 'usarExistente' ? 'Usar la existente' : 'Continuar'}</Button
 				>
 			{/if}
 			</div>
