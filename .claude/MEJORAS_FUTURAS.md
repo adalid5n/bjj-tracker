@@ -53,6 +53,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-034 | [FOUC inicial con tema oscuro persistido](#mf-034) | Bug | Bajo | S | P3 | Abierta |
 | MF-035 | [CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicados](#mf-035) | Refactor | Bajo | S | P3 | Abierta |
 | MF-042 | [Repo público vs privado](#mf-042) | Decisión | Medio | M | — | Abierta |
+| MF-047 | [Posiciones complementarias: sugerir siempre y detectar parejas sin emparejar](#mf-047) | Mejora | Medio | M | — | Abierta |
 
 **Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos, [MF-037](#mf-037) Loop de refresh tras deploy.
 
@@ -545,7 +546,7 @@ it.6.
   - La miga de navegación del mapa descarta los cambios sin guardar de un asistente sin preguntar (`MapaModalHost.svelte:376`).
 - **Decisiones pendientes (no son bugs; el spec las describe tal cual):**
   - **it.7:** "Refinar" descarta lo editado a mano y parte del texto original; "Volver" desde la revisión vuelve al paso 1 y obliga a llamar otra vez a la IA; la IA no recibe las técnicas existentes; se pueden crear posiciones duplicadas renombrando en la revisión; las correcciones de la validación no se muestran; el paso de detalles ignora el modo hobbyist.
-  - **it.8:** origen = destino permitido sin aviso (también en el asistente manual); la comparación de nombres es exacta.
+  - **it.9:** origen = destino permitido sin aviso (también en el asistente manual); la comparación de nombres es exacta.
   - **Sueltas:** la ficha de posición no filtra por disciplina. ("Borrar una técnica usada en rolls borra esos vínculos sin avisar" se separó a su propia entrada: [MF-043](#mf-043).)
 - **Cuándo:** fuera de la it.7 por decisión del owner (solo entra lo que él ha pedido). P1 (owner, 2026-10-16).
 
@@ -572,7 +573,7 @@ it.6.
 - **Origen:** Adalid, 2026-10-05 (sesión 50).
 - **Idea:** apartado de alertas en `/mapa` que señale técnicas con origen = destino, nombres casi duplicados ("Guarda K" vs "Guardia K", ignorando tildes/mayúsculas) y otros huecos. Al importar, avisar de nombres parecidos en la revisión ("¿es la misma que Guardia K?") sin fusionar automáticamente.
 - **Por qué:** la regla "usa el mismo nombre" solo vive en el prompt de la IA; el código compara nombre exacto. Las alertas hacen visible lo que hoy se cuela.
-- **Cuándo:** candidata a **it.8** (tras Importar clase 2.0). Sin cambio de esquema.
+- **Cuándo:** **it.9** (owner, 2026-10-19: la it.8 pasa a ser pulido de los P1 del backlog). Sin cambio de esquema. Incluirá la alerta "pareja probable sin emparejar" de [MF-047](#mf-047).
 
 <a id="mf-031"></a>
 ### Técnicas "sin acabar" (sin destino conocido) — APLAZADA
@@ -582,7 +583,7 @@ it.6.
 - **Origen:** Adalid, 2026-10-05 (sesión 50).
 - **Idea:** permitir guardar una técnica sin saber aún a dónde lleva y listarla como pendiente en el panel de alertas.
 - **Decisión vigente:** **se mantiene la regla de que toda técnica lleva a algún sitio.** Implicaría migración nueva (hoy la BD obliga a destino) y decidir cómo dibujar una arista sin destino (p. ej. nodo fantasma "?").
-- **Cuándo:** revisar tras el panel de alertas (it.8), si el uso real lo pide.
+- **Cuándo:** revisar tras el panel de alertas (it.9), si el uso real lo pide.
 
 <a id="mf-032"></a>
 ### Visualización de contras en el grafo — F3 sub-grafo filtrado (F1 y F2 rechazadas)
@@ -738,6 +739,26 @@ it.6.
 - **Por qué:** quita un callejón sin salida y unifica el comportamiento de "Ambos" en todos los flujos.
 - **Cuándo:** P2 (owner, 2026-10-19).
 - **Notas técnicas:** `catalogo-lados.ts` (`crearTecnicaEnLados` lanza `TecnicaDuplicadaError`; lógica de "solo donde falta" ya existe para los sub-asistentes), `PosicionWizard`/`SumisionWizard`/`TecnicaWizard`. Cambia `catalogo-tecnico` ("Nombre de posición sin duplicados en el asistente", "Sumisión terminal", "Posiciones complementarias", "Conexiones dentro de la misma disciplina") → requiere change de OpenSpec. Relacionada con [MF-003](#mf-003) y [MF-027](#mf-027).
+
+<a id="mf-047"></a>
+### Posiciones complementarias: sugerir siempre y detectar parejas sin emparejar
+
+**MF-047** · Mejora · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+
+- **Origen:** owner, 2026-10-16/19 (idea: "casi toda posición debería tener complementaria; debería ser el estándar").
+- **Qué pasa hoy:** en los backups del owner casi ninguna posición tiene complementaria y hay parejas evidentes sin emparejar ("Mount top" / "Mount bottom", "Guardia cerrada top" / "Guardia cerrada bottom"). El paso de complementaria del asistente es opcional y no propone nada.
+- **Qué se propone:**
+  1. **Sugerencia automática al crear:** a partir del nombre (top ↔ bottom, over ↔ under, arriba ↔ abajo…) y/o del `tipo` opuesto (ofensiva / defensiva), proponer la complementaria: preseleccionarla si ya existe; si no existe, ofrecer crearla en el mismo paso.
+  2. **Alerta "pareja probable sin emparejar"** en el panel de alertas ([MF-030](#mf-030), it.9), para las posiciones ya existentes.
+  3. **Decisión de modelo — por qué hoy no puede ser obligatoria:**
+     - (i) posiciones simétricas (50/50, doble guardia, clinch neutro) necesitarían ser complementarias de sí mismas, cosa que hoy no se permite;
+     - (ii) variantes (High mount, S-mount, Technical mount tienen todas "Mount bottom" debajo) chocan con la complementaria 1:1 — harían falta relaciones de varios a uno;
+     - (iii) transiciones / scrambles sin contraparte con nombre propio;
+     - (iv) captura rápida tras la clase: un paso obligatorio más frena el alta.
+     - El owner se inclina por "estándar". **Recomendación del orquestador:** no obligatoria; sugerencia por defecto (1) + alerta (2), y revisar el modelo para (i) y (ii) antes de plantear que sea obligatoria.
+- **Por qué:** la complementaria da el "otro lado" de cada posición (qué hacer arriba / abajo); hoy el dato existe pero casi no se rellena, así que no aporta.
+- **Cuándo:** parte 2 junto al panel de alertas (it.9); parte 1 a decidir por el owner; parte 3 antes de cualquier "obligatoria".
+- **Notas técnicas:** la complementaria es `posicion_complementaria_id`, simétrica vía `syncComplementaria` (`src/lib/posiciones.ts:101`); paso 4 del asistente en `src/lib/components/PosicionWizard.svelte`. Esfuerzo M cubre las partes 1-2 (la 2 asumiendo el panel de MF-030 ya hecho); la parte 3, si cambia el modelo (auto-pareja, varios a uno), sería L con migración nueva. Cambio de comportamiento visible → change de OpenSpec sobre `catalogo-tecnico` ("Posiciones complementarias"). Relacionada con [MF-016](#mf-016) y [MF-030](#mf-030).
 
 ## Performance / build
 

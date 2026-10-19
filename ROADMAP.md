@@ -2,19 +2,21 @@
 
 Vista pública del backlog de mejoras del proyecto, derivada del documento interno [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md). Las entradas aquí son las ideas y deuda **activas** — las ya entregadas viven en [CHANGELOG.md](CHANGELOG.md).
 
-Última iteración cerrada: **it.7 "Importar clase 2.0"** (v0.7.0, 2026-10-19) — historial de importaciones, vista previa en el mapa, "Ambos" como dos copias independientes y disciplina en sesiones y rolls (ver [CHANGELOG](CHANGELOG.md)). Siguiente: por decidir entre el panel de alertas (it.8) y el pulido prioritario del mapa.
+Última iteración cerrada: **it.7 "Importar clase 2.0"** (v0.7.0, 2026-10-19) — historial de importaciones, vista previa en el mapa, "Ambos" como dos copias independientes y disciplina en sesiones y rolls (ver [CHANGELOG](CHANGELOG.md)). Siguiente: **it.8** pulido prioritario (fallos y mejoras más urgentes del backlog); después, **it.9** panel de alertas.
 
 ## Próximo en cola
 
 Trabajo identificado como prioridad alta para la próxima iteración o sub-tarea inmediata.
 
-### Pulido prioritario del mapa
+### it.8 — Pulido prioritario
 
-- **Ficha del mapa como hoja inferior arrastrable** — en móvil se podrá plegar a solo la cabecera, dejarla a media altura o desplegarla, para mirar el grafo sin cerrarla. Se cerrará sola al cambiar de disciplina o al entrar a mover nodos.
-- **Barra de edición del grafo con "Guardar" y "Cancelar"** — un único botón principal y una salida explícita que descarta los cambios.
-- **Fallos conocidos del catálogo y la importación** — avisar antes de borrar una técnica usada en rolls, mensajes de error comprensibles.
+Iteración corta, en este orden:
 
-### Panel de alertas en el grafo (candidata a it.8)
+1. **Avisar antes de borrar una técnica usada en rolls** — hoy se borran esos vínculos sin aviso y el roll pierde información.
+2. **Barra de edición del grafo con "Guardar" y "Cancelar"** — un único botón principal y una salida explícita que descarta los cambios.
+3. **Ficha del mapa como hoja inferior arrastrable** (a decidir al planificar la it.8 si entra al final o va aparte) — en móvil se podrá plegar a solo la cabecera, dejarla a media altura o desplegarla, para mirar el grafo sin cerrarla. Se cerrará sola al cambiar de disciplina o al entrar a mover nodos.
+
+### it.9 — Panel de alertas en el grafo
 
 Señalar técnicas con origen = destino y nombres casi duplicados (también entre las dos disciplinas); aviso de nombres parecidos al importar.
 
@@ -22,7 +24,7 @@ Señalar técnicas con origen = destino y nombres casi duplicados (también entr
 
 Deshacer una importación ya confirmada (pendiente de la it.7).
 
-### Visualización de contras — F3 sub-grafo filtrado (tras it.8)
+### Visualización de contras — F3 sub-grafo filtrado (tras it.9)
 
 Los contras siguen invisibles en el grafo principal. Dos approaches (mini-grafo en el modal; técnicas como nodos satélite) se probaron y se rechazaron; la siguiente propuesta es un sub-grafo filtrado con los contras como aristas.
 

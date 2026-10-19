@@ -2,7 +2,7 @@
 
 **Última actualización:** 2026-10-19 (cierre de T-4 y de la it.7; `v0.7-it7`)
 **Fase activa:** pausa entre iteraciones tras la it.7 "Importar clase 2.0" (cerrada 2026-10-19, v0.7.0, BD v12, copia v8).
-**Próxima iteración:** por decidir (owner). Candidatas: **it.8 Panel de alertas** (MF-030) o pulido prioritario con los P1 del backlog **MF-040** (ficha como hoja inferior), **MF-041** (barra Guardar/Cancelar), **MF-043** (borrar técnica usada en rolls). Otras vivas: contras F3 (MF-032), MF-046 (P2).
+**Próxima iteración:** **it.8 pulido P1** (owner, 2026-10-19): MF-043 (borrar técnica usada en rolls) → MF-041 (barra Guardar/Cancelar); MF-040 (ficha como hoja inferior) a decidir al planificar. Después **it.9 Panel de alertas** (MF-030). Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047 (complementarias, sin prioridad).
 
 ---
 
@@ -19,11 +19,12 @@
 - Aceptados: (a) "+ Crear nueva" en Ambos con nombre que solo existe en la otra disciplina → la copia lleva los datos tecleados; (c) nombre en la preferida ya vinculado → error; contras nuevas solo en la disciplina de la técnica; la importación enlaza por nombre en cada lado y lista "No se creó: ya existía" (→ quitada la marca de bug de "Confirmar e insertar" en `importar-clase`, MF-028 actualizada); borradores de asistentes conservan la disciplina. Supuestos 2-4 de complementarias quedan como están implementados.
 - Al backlog: (b) asistente Ambos desde el mapa bloquea nombre existente en una disciplina + técnica Ambos ya existente en la otra no se guarda → **MF-046** (P2). Specs describen el comportamiento actual.
 - Repo público/privado: nada hasta compartir la app (MF-042).
-- Abierto: idea del owner "casi toda posición con complementaria" (recomendación: no obligatoria; sugerencia automática + panel de alertas).
+- Orden de iteraciones: **it.8 = pulido P1** (MF-043 → MF-041; MF-040 a decidir: dependencia nueva `vaul-svelte` vs arrastre propio sobre el `Sheet`), **panel de alertas (MF-030) pasa a it.9**. ROADMAP, CLAUDE.md y MF-030 actualizados; prioridades sin cambios.
+- Idea "casi toda posición con complementaria" → **MF-047** (Prioridad —): sugerencia automática al crear + alerta "pareja probable sin emparejar" en el panel (it.9); obligatoria descartada por ahora (simétricas, variantes 1:N, scrambles, captura rápida).
 
 **Verificación:** `pnpm check` 0/0, `pnpm build` limpio, `pnpm test:unit` proyecto `server` 13 OK (el de navegador se cuelga en WSL y `Welcome.svelte.spec.ts` falla en `server`: configuración previa).
 
-**Próximo paso concreto:** el owner elige la siguiente iteración (it.8 Panel de alertas) o un bloque de P1 (MF-040/041/043); decidir si sigue el piloto OpenSpec (recomendación: continuar con changes ≤10 deltas y resumen corto por change).
+**Próximo paso concreto:** planificar la it.8 (pulido P1: MF-043 → MF-041; MF-040 a decidir): primero `docs/iterations/ITERACION_8.md` y el change de OpenSpec de MF-043. Sin cambios de prioridad en MF-030 (P3) ni MF-047 (—): el owner puede querer subir MF-030 ahora que es la it.9. Pendiente también decidir si sigue el piloto OpenSpec (recomendación: continuar con changes ≤10 deltas y resumen corto por change).
 
 ---
 

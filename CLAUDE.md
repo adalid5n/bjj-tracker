@@ -91,9 +91,9 @@ Codespace de la tablet).
 - Histórico completo de iteraciones en
   [`docs/iterations/`](docs/iterations/); resúmenes públicos por
   release en [CHANGELOG.md](CHANGELOG.md).
-- **Siguiente iteración por decidir** (owner): candidata it.8 "Panel de
-  alertas"; backlog P1 pendiente: MF-040, MF-041, MF-043 (ver
-  [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md)).
+- **Siguiente: it.8 "Pulido P1"** (owner, 2026-10-19): MF-043 → MF-041;
+  MF-040 a decidir al planificar. Después, **it.9 "Panel de alertas"**
+  (MF-030). Ver [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md).
 - Para el estado de detalle día a día, ver [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md).
 
 ## Entorno y herramientas
