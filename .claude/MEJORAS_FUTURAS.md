@@ -51,6 +51,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-034 | [FOUC inicial con tema oscuro persistido](#mf-034) | Bug | Bajo | S | P3 | Abierta |
 | MF-035 | [CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicados](#mf-035) | Refactor | Bajo | S | P3 | Abierta |
 | MF-042 | [Repo público vs privado](#mf-042) | Decisión | Medio | M | — | Abierta |
+| MF-045 | [Roll: crear compañero inline no se puede deshacer](#mf-045) | Bug | Medio | M | — | Abierta |
 
 **Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos, [MF-037](#mf-037) Loop de refresh tras deploy.
 
@@ -703,6 +704,27 @@ it.6.
 - **Por qué:** pérdida silenciosa de datos de entreno del usuario.
 - **Cuándo:** P1 (owner, 2026-10-16).
 - **Notas técnicas:** confirmar en el spec `catalogo-tecnico` si está marcada como "⚠️ Bug conocido" y apuntarla a esta entrada. Cambio de comportamiento visible → change de OpenSpec.
+
+<a id="mf-045"></a>
+### Roll: crear un compañero desde el asistente no se puede deshacer y deja compañeros sueltos
+
+**MF-045** · Bug · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+
+- **Origen:** owner, 2026-10-19 (validación de T-4.it7). Comportamiento previo: T-4 no tocó esta parte del asistente de roll.
+- **Qué pasa hoy:** en el paso 1 del asistente de roll ("¿Con quién?"), al escribir un nombre nuevo y pulsar "+ Crear nuevo", el compañero se guarda en ese mismo momento y se despliega el bloque de datos extra (cinturón, peso, notas). El buscador sigue activo y deja crear **otro** compañero nuevo; el anterior se queda creado. Cancelar el roll tampoco lo borra. Resultado: compañeros basura o duplicados y ninguna forma clara de deshacer.
+- **Esperado:** la creación desde el asistente se puede deshacer de forma evidente, sin perder la sensación de que ocurre en el mismo momento y dentro del flujo.
+- **Propuesta (orquestador, a validar con el owner):** mientras se crea, sustituir el buscador por un chip "Nuevo: <nombre>" con ✕ / Deshacer; no permitir una segunda creación hasta confirmar o deshacer la primera; idealmente guardar el compañero solo al guardar el roll (o borrarlo si se cancela), para que cancelar no deje restos.
+- **Copy del mismo bloque:** la etiqueta "+ Añadir más datos (opcional)" se lee rara y no parece una sección de campos opcionales → "Datos adicionales (opcional)" como encabezado de sección, visualmente claro que son campos opcionales.
+- **Por qué:** ensucia la lista de compañeros (y las estadísticas por compañero) con entradas que el usuario no quería, y obliga a ir a /companeros a limpiarlas a mano.
+- **Cuándo:** a decidir por el owner (prioridad sin asignar).
+- **Notas técnicas:**
+  - Persistencia inmediata: `CompaneroCombobox.svelte:46-50` llama a `onCreate(nombre)` al elegir la opción `__create__:`; `RollEditor.svelte:503-517` (`handleCompaneroCreate`) hace `await createCompanero({ nombre })` → `INSERT INTO companeros` (`src/lib/companeros.ts:16-32`), lo selecciona y pone `showExtraData = true`. Los extras se guardan después con `updateCompanero` en `handleExtraDataContinue` (`RollEditor.svelte:519-560`), que además salta el paso Tamaño. El roll se guarda aparte en `handleSave` (`RollEditor.svelte:675`). `RollEditor` no importa `deleteCompanero`: ni cancelar ni deshacer revierten el alta.
+  - El combobox sigue renderizado con el bloque de extras abierto (`RollEditor.svelte:784-789` y `800-833`), así que se puede lanzar otra creación; cada una vuelve a ejecutar `handleCompaneroCreate` y deja la anterior en BD.
+  - El modo edición (no asistente) también usa `onCreate={handleCompaneroCreate}` (`RollEditor.svelte:1113-1118`): crea al momento y pone `showExtraData = true`, pero ese bloque solo se pinta en el paso 1 del asistente — revisar en el mismo arreglo.
+  - Copy: `RollEditor.svelte:802`.
+  - Consistencia: `CompaneroCombobox` solo se usa en `RollEditor`. Los "+ Crear nueva" de posición / técnica / sumisión (`mapa-modal-stack.svelte.ts`, `TecnicaModalContent.svelte`) abren un sub-asistente apilado con su propio Cancelar — patrón distinto, no presentan este problema de la misma forma; no hace falta tocarlos, pero conviene que la solución elegida sea coherente con ellos (p. ej. cancelar = no queda nada creado).
+  - Relacionada: [MF-008](#mf-008) (sugerir compañero por defecto en el mismo paso).
+  - Cambio de comportamiento visible → requiere change de OpenSpec (spec de rolls / compañeros).
 
 ## Performance / build
 
