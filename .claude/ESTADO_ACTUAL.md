@@ -1,8 +1,29 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-10-16 (T-4: ensayo de migración OK + regla de complementarias Ambos implementada en rama)
-**Fase activa:** it.7 "Importar clase 2.0" abierta (2026-10-05), primera con flujo SDD/OpenSpec. T-1 ✅, T-2 ✅, T-3 ✅ (2026-10-06). T-4 (`ambos-como-copias`) implementada en la rama `it7/t4-ambos-copias`, en validación.
-**Próxima iteración:** Candidatos vivos: **F3 de visualización de contras** (sub-grafo filtrado, contras como aristas, rojo apagado — ramas F1+F2 parqueadas en remoto como spikes); reducir copy en pantallas; sugerencia automática de compañero; "Forzar actualización" en `/ajustes`; Node 24 en workflow.
+**Última actualización:** 2026-10-19 (cierre de T-4 y de la it.7; `v0.7-it7`)
+**Fase activa:** pausa entre iteraciones tras la it.7 "Importar clase 2.0" (cerrada 2026-10-19, v0.7.0, BD v12, copia v8).
+**Próxima iteración:** por decidir (owner). Candidatas: **it.8 Panel de alertas** (MF-030) o pulido prioritario con los P1 del backlog **MF-040** (ficha como hoja inferior), **MF-041** (barra Guardar/Cancelar), **MF-043** (borrar técnica usada en rolls). Otras vivas: contras F3 (MF-032), MF-046 (P2).
+
+---
+
+## Sesión 51 (2026-10-16 → 2026-10-19) — cierre de T-4 y de la it.7 (portátil)
+
+**Hecho:**
+- Ensayo de la migración v11→v12 (2026-10-16, Codespace) OK. Regla nueva del owner: "Ambos" completo en las dos disciplinas **también para complementarias** (se enlaza con la del mismo nombre libre o se crea; si ya está vinculada con otra, no se rompe el vínculo y se avisa). Implementada en migración, conversión de backups y asistentes (`2283685`).
+- Arreglos tras validación: complementaria "Ambos" desde la otra disciplina y "+ Crear nueva" con nombre existente (`d13170a`); avisos rediseñados — una línea por evento, token `--info`, detalle en Popover (`83db519`); fecha del build en Ajustes (`f41ea85`).
+- Validación del owner (2026-10-16 y 2026-10-19, `localhost:4173` en incógnito): complementarias, selector Ambos / crear nueva, avisos, editor de rolls y asistente de técnica, bloque C (sesiones Clase/Open mat + disciplina, rolls con disciplina y selectores filtrados, backup v8 exportar→importar, importar v6). Todo OK.
+- Backlog reestructurado con IDs MF-NNN + skill `backlog-item` (`60a5682`); prioridades del owner (P1: MF-026, 028, 029, 040, 041, 043); MF-040 redefinida como hoja inferior con snap points; MF-045 (compañero inline en el roll) sin prioridad.
+- Cierre (2026-10-19): change `ambos-como-copias` archivado (nueva capacidad `sesiones-y-rolls`), CHANGELOG 0.7.0, `package.json` 0.7.0, cierre en `ITERACION_7.md` con evaluación del piloto OpenSpec, ROADMAP y CLAUDE.md al día. **Fusionado en main y desplegado; tag `v0.7-it7`.**
+
+**Decisiones del owner (2026-10-19):**
+- Aceptados: (a) "+ Crear nueva" en Ambos con nombre que solo existe en la otra disciplina → la copia lleva los datos tecleados; (c) nombre en la preferida ya vinculado → error; contras nuevas solo en la disciplina de la técnica; la importación enlaza por nombre en cada lado y lista "No se creó: ya existía" (→ quitada la marca de bug de "Confirmar e insertar" en `importar-clase`, MF-028 actualizada); borradores de asistentes conservan la disciplina. Supuestos 2-4 de complementarias quedan como están implementados.
+- Al backlog: (b) asistente Ambos desde el mapa bloquea nombre existente en una disciplina + técnica Ambos ya existente en la otra no se guarda → **MF-046** (P2). Specs describen el comportamiento actual.
+- Repo público/privado: nada hasta compartir la app (MF-042).
+- Abierto: idea del owner "casi toda posición con complementaria" (recomendación: no obligatoria; sugerencia automática + panel de alertas).
+
+**Verificación:** `pnpm check` 0/0, `pnpm build` limpio, `pnpm test:unit` proyecto `server` 13 OK (el de navegador se cuelga en WSL y `Welcome.svelte.spec.ts` falla en `server`: configuración previa).
+
+**Próximo paso concreto:** el owner elige la siguiente iteración (it.8 Panel de alertas) o un bloque de P1 (MF-040/041/043); dar prioridad a MF-045; decidir si sigue el piloto OpenSpec (recomendación: continuar con changes ≤10 deltas y resumen corto por change).
 
 ---
 
@@ -70,6 +91,8 @@
 
 **T-4 IMPLEMENTADA en la rama `it7/t4-ambos-copias` (2026-10-06), SIN VALIDAR y no en main:** 9 commits wip (specs alineados con T-3; módulo `separar-ambos.ts` + migración v12; backup v8 que convierte v6/v7; creación doble con `catalogo-lados.ts` + aviso de lo creado; catálogo y conexiones por disciplina; sesiones Clase/Open mat + disciplina; rolls con disciplina y selectores filtrados; importación Ambos; notas). Check y build en verde, change válido. Nada probado en el navegador. Desviaciones a revisar con el owner: una técnica "Ambos" que ya existe igual en la otra disciplina no se guarda (sale un mensaje); las contras nuevas solo en la disciplina de la técnica; la importación enlaza los nombres existentes en cada lado y lista "No se creó: ya existía" (corrige en parte el bug conocido de importar; quitar la marca si se confirma); los borradores de los asistentes conservan la disciplina.
 
+### Notas de trabajo de T-4 (2026-10-16 → 19; resumen y decisiones finales en la sesión 51)
+
 **Ensayo de la migración v11→v12 (2026-10-16, en el móvil del owner contra el 4173 del Codespace):** BD de prueba creada en la versión de main (v11) importando un JSON del 06/10 y añadiendo a mano una posición single P, su complementaria "Dogfight over" como Ambos, una técnica Ambos desde P hacia "Mount top" (que solo existía en BJJ) y un roll que usa P. Exportado como JSON v7 (lo tiene el owner). Resultado al abrir la versión de T-4: ✅ Versión BD 12; ✅ "Mount top" creada en Grappling y la técnica visible en los dos grafos; ✅ la copia de "Dogfight over" en cada disciplina; ✅ el roll con disciplina y apuntando a P; ✅ la sesión con Clase/Open mat y su disciplina aparte; ✅ el vínculo P ↔ Dogfight over se conserva en la disciplina de P.
 - **Bug de la v11 detectado (lo arregla T-4):** al crear una complementaria desde el asistente ("+ Crear nueva"), la disciplina elegida se perdía.
 - **DECISIÓN DEL OWNER (nueva regla):** si un elemento Ambos tiene una **complementaria** que solo existe en una disciplina, **se crea la complementaria en la otra** y se emparejan (la misma regla "Ambos completo en las dos" que ya aplicaba a los extremos de las técnicas). Aplica a la migración/conversión de backups Y al crear (avisando de lo creado). **PENDIENTE DE IMPLEMENTAR** en `ambos-como-copias` (spec catalogo-tecnico "Posiciones complementarias" + `separar-ambos.ts` + `catalogo-lados.ts` + tasks).
@@ -94,7 +117,7 @@
 
 **Decisiones del owner sobre el backlog (2026-10-16, commit `70b9eb4`):** MF-040 redefinida: la ficha se cierra SOLO al cambiar BJJ↔Grappling o al entrar en "Mover nodos" (confirmación si hay edición); el resto mantiene ADR-006, y la ficha pasa a ser una hoja inferior con alturas fijas (snap points). Esfuerzo L: el `Sheet` actual no tiene snap points; el `Drawer` de shadcn necesita `vaul-svelte` (dependencia nueva, pendiente de OK del owner) o construirlo sobre `Sheet`. Prioridades sugeridas aceptadas (P1: 026, 028, 029, 040, 041, 043; P2: 012, 032, 039; resto P3; MF-042 "—"). MF-043 = bug "borrar técnica usada en rolls" separado de MF-028. MF-037 cerrada. MF-044 = skills `validar`/`cerrar-tarea`/`arranque` (aplazadas). ROADMAP público actualizado (it.7 en curso, cola it.8 → contras F3, pulido prioritario del mapa).
 
-**Próximo paso concreto:** (1) owner: OK a las decisiones (a)(b)(c) + 4 desviaciones (propuesta: aceptar todas salvo (b)+desviación 1 → backlog P2 "Ambos con elemento ya existente: crear solo donde falta") y bloque C; (2) decidir supuestos (a)(b)(c) y las 4 desviaciones de T-4; (3) bloque C: sesiones y rolls con disciplina, backup v8 exportar→importar, importar v6; (4) CHANGELOG + archivar `ambos-como-copias` + fusionar en main → cerrar la it.7.
+**Próximo paso concreto (superado, ver sesión 51):** (1) owner: OK a las decisiones (a)(b)(c) + 4 desviaciones (propuesta: aceptar todas salvo (b)+desviación 1 → backlog P2 "Ambos con elemento ya existente: crear solo donde falta") y bloque C; (2) decidir supuestos (a)(b)(c) y las 4 desviaciones de T-4; (3) bloque C: sesiones y rolls con disciplina, backup v8 exportar→importar, importar v6; (4) CHANGELOG + archivar `ambos-como-copias` + fusionar en main → cerrar la it.7.
 
 ---
 

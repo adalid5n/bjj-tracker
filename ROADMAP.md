@@ -2,25 +2,25 @@
 
 Vista pública del backlog de mejoras del proyecto, derivada del documento interno [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md). Las entradas aquí son las ideas y deuda **activas** — las ya entregadas viven en [CHANGELOG.md](CHANGELOG.md).
 
-Iteración en curso: **it.7 "Importar clase 2.0"**. Hechos: selector de disciplina coherente, historial de importaciones y vista previa en el mapa. En validación: "Ambos" como copias independientes y disciplina en sesiones y rolls.
+Última iteración cerrada: **it.7 "Importar clase 2.0"** (v0.7.0, 2026-10-19) — historial de importaciones, vista previa en el mapa, "Ambos" como dos copias independientes y disciplina en sesiones y rolls (ver [CHANGELOG](CHANGELOG.md)). Siguiente: por decidir entre el panel de alertas (it.8) y el pulido prioritario del mapa.
 
 ## Próximo en cola
 
 Trabajo identificado como prioridad alta para la próxima iteración o sub-tarea inmediata.
 
-### Importar clase 2.0 (it.7, en curso)
-
-Historial de importaciones de clase (sirve de diario y permite reintentar sin volver a dictar), vista previa en el grafo antes de confirmar (lo nuevo resaltado), disciplina propia de cada importación y "Ambos" como dos copias independientes (BJJ y Grappling). Revertir una importación ya confirmada queda fuera de esta iteración. Primera iteración con flujo spec-driven ([OpenSpec](openspec/)).
-
 ### Pulido prioritario del mapa
 
 - **Ficha del mapa como hoja inferior arrastrable** — en móvil se podrá plegar a solo la cabecera, dejarla a media altura o desplegarla, para mirar el grafo sin cerrarla. Se cerrará sola al cambiar de disciplina o al entrar a mover nodos.
 - **Barra de edición del grafo con "Guardar" y "Cancelar"** — un único botón principal y una salida explícita que descarta los cambios.
-- **Fallos conocidos del catálogo y la importación** — avisar antes de borrar una técnica usada en rolls, explicar lo que una importación no pudo crear, mensajes de error comprensibles.
+- **Fallos conocidos del catálogo y la importación** — avisar antes de borrar una técnica usada en rolls, mensajes de error comprensibles.
 
-### Panel de alertas en el grafo (it.8)
+### Panel de alertas en el grafo (candidata a it.8)
 
-Señalar técnicas con origen = destino y nombres casi duplicados; aviso de nombres parecidos al importar.
+Señalar técnicas con origen = destino y nombres casi duplicados (también entre las dos disciplinas); aviso de nombres parecidos al importar.
+
+### Importar clase — revertir
+
+Deshacer una importación ya confirmada (pendiente de la it.7).
 
 ### Visualización de contras — F3 sub-grafo filtrado (tras it.8)
 
@@ -28,6 +28,7 @@ Los contras siguen invisibles en el grafo principal. Dos approaches (mini-grafo 
 
 ## UX
 
+- **"Ambos" con un elemento que ya existe en una disciplina** — crearlo solo donde falta y avisar, en vez de bloquear (hoy pasa al crear desde el mapa y con técnicas ya existentes en la otra disciplina).
 - **Reducir copy / texto inicial en cada pantalla** — auditar pantalla por pantalla qué se puede eliminar, acortar, o mover a tooltip. Pantalla ancla: `/rolls`.
 - **Roll editor — sugerir compañero por defecto + selector inteligente** — frecuente / reciente / del día arriba.
 - **Botón "Forzar actualización" en `/ajustes`** — para forzar fetch del SW cuando el toast no aparece.

@@ -6,30 +6,47 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-19
+
+Tag: `v0.7-it7` · [Iteración 7](docs/iterations/ITERACION_7.md) — Importar clase 2.0. Incluye también el pulido entregado entre la it.6 y la it.7 (etiquetas, disciplina, importación de clase con IA). Base de datos v12; copia de seguridad v8.
+
+> **Al actualizar:** cada elemento del catálogo que estaba como "Ambos" se separa automáticamente en dos copias independientes, una de BJJ y otra de Grappling, con sus técnicas, contras, complementarias, etiquetas y sitio en el mapa. Las sesiones y los rolls reciben una disciplina deducida de lo que contienen. Las copias de seguridad de versiones anteriores (v6 y v7) se siguen pudiendo importar y se convierten con las mismas reglas.
+
 ### Added
-- **Vista previa de la importación en el mapa** (it.7, T-3): antes de insertar, el diálogo se cierra y el grafo real muestra lo nuevo resaltado (borde y halo amarillos que respiran; fijo con "reducir movimiento"), con una barra fija Aceptar/Cancelar. La importación tiene ahora disciplina propia (BJJ/Grappling/Ambos), compara solo con el catálogo de esa disciplina, y las de "Ambos" se revisan en dos pasos (BJJ y luego Grappling).
+- **"Ambos" = dos copias independientes** (T-4): elegir "Ambos" al crear una posición, sumisión o técnica crea una de BJJ y otra de Grappling con los mismos datos; editar una no cambia la otra y cada una tiene su sitio en el mapa. Si a una técnica o a una complementaria "Ambos" le falta su posición en una disciplina, se crea allí (o se enlaza con la del mismo nombre) y se avisa.
+- **Disciplina en sesiones y rolls** (T-4): la sesión tiene tipo Clase / Open mat y disciplina BJJ / Grappling / Ambos (clase mixta); el roll es de BJJ o de Grappling (por defecto el de su sesión) y sus selectores solo ofrecen el catálogo de su disciplina. Cambiar la disciplina de un roll con elementos elegidos pide confirmación.
+- **Avisos claros de lo hecho en la otra disciplina** (T-4): una línea corta por cada cosa creada o enlazada, en color informativo o de atención, con el detalle al tocar el icono.
+- **Vista previa de la importación en el mapa** (T-3): antes de insertar, el diálogo se cierra y el grafo real muestra lo nuevo resaltado (borde y halo amarillos que respiran; fijo con "reducir movimiento"), con una barra fija Aceptar/Cancelar. La importación tiene disciplina propia (BJJ/Grappling/Ambos) y compara solo con el catálogo de esa disciplina; las de "Ambos" se revisan en dos pasos (BJJ y luego Grappling) e indican en qué disciplina se creará cada elemento.
 - Sumisiones con el mismo nombre en BJJ y en Grappling (antes el nombre era único en todo el catálogo).
-- **Historial de importaciones de clase** (it.7, T-2): cada importación se guarda en cuanto se pulsa Analizar, con título, texto y lo aceptado, y estado Importada / Sin terminar / Falló. Se consulta desde un icono en el mapa, con tarjetas desplegables, bloques copiables, Reintentar (misma tarjeta, lo aceptado se acumula) y borrar.
+- **Historial de importaciones de clase** (T-2): cada importación se guarda en cuanto se pulsa Analizar, con título, texto y lo aceptado, y estado Importada / Sin terminar / Falló. Se consulta desde un icono en el mapa, con tarjetas desplegables, bloques copiables, Reintentar (misma tarjeta, lo aceptado se acumula) y borrar.
+- Fecha del build visible en Ajustes, para saber si el navegador está mostrando una versión antigua guardada en caché.
 - **Importación de clase vía IA** (Groq; modelo `openai/gpt-oss-120b` desde 2026-10-05): pipeline de 3 fases — normalización de texto dictado por voz (corrige términos, resalta cambios), extracción de posiciones/técnicas/sumisiones, validación automática con rúbrica. Dialog paso a paso con revisión y edición de detalles de ejecución.
 - **Tags para posiciones**: sistema de etiquetas con colores preset. Nuevo paso en `PosicionWizard`; gestión bulk (añadir/quitar) en modo edición del mapa.
 - **Filtro por disciplina** (BJJ / Grappling): campo `disciplina` en posiciones, técnicas y sumisiones. Toggle en `/ajustes` y en la barra del mapa. El grafo y la lista filtran según la disciplina activa.
 - Selected state en grafo + reorden de chips + Origen/Destino navegables en mapa.
 - "+ Crear nueva" en wizards standalone.
 
+### Changed
+- **La disciplina de un elemento se elige al crearlo y ya no se cambia** (T-4): al editar se muestra como dato de solo lectura. Destinos, complementarias y contras solo ofrecen elementos de la misma disciplina.
+- Tipo de sesión: Clase / Open mat (la disciplina va aparte); las sesiones antiguas de tipo BJJ o Grappling pasan a Clase con esa disciplina.
+- **Copia de seguridad v8**: incluye la disciplina de sesiones y rolls.
+- Modelo de IA de la importación: `openai/gpt-oss-120b` (Groq retiró el anterior).
+- Notas (posición, sumisión) y detalles/errores comunes (técnica) siempre visibles en modales cuando tienen contenido, sin requerir vista avanzada.
+- Categorías de posición simplificadas: `control_superior` + `espalda` → `control` (4 valores: guardia, control, transicion, otro).
+- Pulido UX en rolls, mapa y wizards (post-it.6).
+
 ### Fixed
+- **La importación avisa de lo que no creó** y por qué (ya existía, depende de algo que no se creó, origen o destino no disponible); antes se omitía sin avisar.
+- Al crear la complementaria desde el asistente ("+ Crear nueva"), la disciplina elegida ya no se pierde; y en "Ambos" se puede elegir o crear una complementaria que solo existe en la otra disciplina.
+- Las posiciones "Ambos" ya no comparten sitio en el mapa entre disciplinas (cada copia tiene el suyo).
 - "Reorganizar" el grafo ya no borra la organización guardada de la otra disciplina.
-- **Copia de seguridad**: ahora incluye etiquetas, sus asignaciones y el historial de importaciones, y al restaurar conserva la disciplina de posiciones, técnicas y sumisiones (antes se perdían). Formato de fichero v7; se siguen aceptando ficheros v6.
-- Selectores coherentes (it.7, T-1): tocar la opción ya activa no cambia nada (BJJ/Grappling del mapa, disciplina en los asistentes, tipo de sesión y resultado de roll). Antes, en los asistentes volvía a BJJ sin avisar.
+- **Copia de seguridad**: ahora incluye etiquetas, sus asignaciones y el historial de importaciones, y al restaurar conserva la disciplina de posiciones, técnicas y sumisiones (antes se perdían).
+- Selectores coherentes (T-1): tocar la opción ya activa no cambia nada (BJJ/Grappling del mapa, disciplina en los asistentes, tipo de sesión y resultado de roll). Antes, en los asistentes volvía a BJJ sin avisar.
 - Importación de clase vía IA rota: Groq retiró `llama-3.3-70b-versatile`; sustituido por `openai/gpt-oss-120b`.
 - Toast de actualización PWA: feedback visual y fallback de reload al pulsar Recargar.
 - Bug z-index AlertDialog en mapa.
 - Bug de complementaria en flujos de roll.
 - Scroll en mapa roto al añadir toggle de disciplina como fila extra (movido a la misma fila que tabs Grafo/Lista).
-
-### Changed
-- Notas (posición, sumisión) y detalles/errores comunes (técnica) siempre visibles en modales cuando tienen contenido, sin requerir vista avanzada.
-- Categorías de posición simplificadas: `control_superior` + `espalda` → `control` (4 valores: guardia, control, transicion, otro).
-- Pulido UX en rolls, mapa y wizards (post-it.6).
 
 ## [0.6.0] — 2026-05-20
 

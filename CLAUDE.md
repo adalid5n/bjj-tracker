@@ -85,14 +85,15 @@ Codespace de la tablet).
 
 ## Estado del proyecto
 
-- Iteraciones 0 a 6 cerradas. Última: `v0.6-it6` (2026-05-20, modo
-  hobbyist vs avanzado). App PWA desplegada en GitHub Pages.
+- Iteraciones 0 a 7 cerradas. Última: `v0.7-it7` (2026-10-19,
+  "Importar clase 2.0", primera con flujo SDD/OpenSpec). App PWA
+  desplegada en GitHub Pages.
 - Histórico completo de iteraciones en
   [`docs/iterations/`](docs/iterations/); resúmenes públicos por
   release en [CHANGELOG.md](CHANGELOG.md).
-- **It.7 "Importar clase 2.0" abierta** (2026-10-05): primera iteración
-  con flujo SDD/OpenSpec. Plan en
-  [`docs/iterations/ITERACION_7.md`](docs/iterations/ITERACION_7.md).
+- **Siguiente iteración por decidir** (owner): candidata it.8 "Panel de
+  alertas"; backlog P1 pendiente: MF-040, MF-041, MF-043 (ver
+  [`.claude/MEJORAS_FUTURAS.md`](.claude/MEJORAS_FUTURAS.md)).
 - Para el estado de detalle día a día, ver [`.claude/ESTADO_ACTUAL.md`](.claude/ESTADO_ACTUAL.md).
 
 ## Entorno y herramientas

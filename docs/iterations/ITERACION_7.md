@@ -1,7 +1,7 @@
 # Iteración 7 — Importar clase 2.0
 
 **Versión:** 1.0 (sesión 50, 2026-10-05)
-**Estado:** 📝 Abierta — plan
+**Estado:** ✅ Cerrada 2026-10-19 — tag `v0.7-it7`, versión 0.7.0 (ver [Cierre](#cierre-2026-10-19))
 **Predecesor:** Iteración 6 (cerrada con `v0.6-it6`, 2026-05-20) + pulido entre iteraciones (cambio de modelo de IA a `openai/gpt-oss-120b`, línea base OpenSpec de `importar-clase`, `catalogo-tecnico` y `mapa`).
 
 ---
@@ -163,8 +163,7 @@ bloqueadas, salir del mapa).
 
 ### T-4.it7 — "Ambos" como copias y disciplina en sesiones y rolls
 
-**Estado:** 📝 Planificada (2026-10-06) — change propuesto; P1–P3
-resueltas por el owner. Se aplica después de archivar T-3.
+**Estado:** ✅ Cerrada 2026-10-19 — validada por el owner (2026-10-16 y 2026-10-19); change archivado (`openspec/changes/archive/2026-10-19-ambos-como-copias`). Nueva capacidad `sesiones-y-rolls`; BD v12, copia de seguridad v8.
 **Change OpenSpec:** [`openspec/changes/ambos-como-copias/`](../../openspec/changes/ambos-como-copias/proposal.md)
 
 **Qué entrega:**
@@ -357,6 +356,87 @@ T-3**: sus deltas copian las versiones de T-3 de varios requisitos.
   copia primero, sin cambio de UI.
 - **Toca BD, layout del grafo y CSS:** verificación obligatoria con
   `pnpm preview` + refresh antes de cada push (CLAUDE.md).
+
+---
+
+## CIERRE (2026-10-19)
+
+**Entregado** (detalle público en [CHANGELOG 0.7.0](../../CHANGELOG.md)):
+
+- **T-1 Selector coherente** — tocar elige, tocar la activa no hace nada;
+  ampliado a tipo de sesión y resultado de roll. Spec `selectores`.
+- **T-2 Historial de importaciones** — guardado desde Analizar,
+  reintentar en la misma entrada, panel en el mapa; copia de seguridad
+  arreglada (etiquetas, disciplina, historial). BD v10. Specs
+  `historial-importaciones` y `copia-seguridad`.
+- **T-3 Vista previa en el mapa** — disciplina de la importación,
+  comparación por disciplina, vista previa en el grafo real (borde y halo
+  amarillos), dos pasos para "Ambos"; sumisiones únicas por disciplina
+  (BD v11).
+- **T-4 "Ambos" como copias** — dos elementos independientes; separación
+  automática de lo existente (BD v12) y conversión de copias v6/v7 (copia
+  v8); "Ambos" completo en las dos disciplinas, también para
+  complementarias (regla nueva del owner, 2026-10-16); disciplina fija
+  tras crear; sesiones Clase/Open mat + disciplina; rolls con disciplina
+  y selectores filtrados; importación de "Ambos" por lado; avisos de lo
+  creado rediseñados (token `--info`, detalle en Popover).
+- **Fuera de tarea:** modelo de IA `openai/gpt-oss-120b`; fecha del build
+  en Ajustes; arreglo de la complementaria creada al vuelo que perdía la
+  disciplina.
+
+**Decisiones de cierre (owner, 2026-10-19):**
+
+- Aceptadas tal cual: "+ Crear nueva" en "Ambos" con un nombre que solo
+  existe en la otra disciplina crea la copia con los datos tecleados; un
+  nombre ya vinculado en la disciplina preferida da error; contras nuevas
+  solo en la disciplina de la técnica; los borradores de los asistentes
+  conservan la disciplina; la importación enlaza por nombre en cada lado
+  y lista "No se creó: ya existía".
+- La importación ya informa de lo que no creó y por qué → quitada la
+  marca "⚠️ Bug conocido" de "Confirmar e insertar en el catálogo"
+  (`importar-clase`); actualizada MF-028.
+- Al backlog: el asistente "Ambos" desde el mapa bloquea un nombre que
+  ya existe en una disciplina, y una técnica "Ambos" que ya existe en la
+  otra no se guarda → **MF-046** (P2, crear solo donde falta). Los specs
+  describen el comportamiento actual.
+- Otras entradas nacidas en la it.7: MF-002, MF-003, MF-026, MF-027,
+  MF-040…MF-045. MF-029 queda abierta solo para "revertir".
+
+**Verificación:** `pnpm check` y `pnpm build` limpios; `pnpm test:unit`
+(proyecto `server`) 13 tests OK — el proyecto de navegador se cuelga en
+WSL y el ejemplo `Welcome.svelte.spec.ts` falla en `server` (configuración
+previa, no de la it.7). Ensayo de la migración v11→v12 el 2026-10-16;
+validación del owner en `pnpm preview`. Prod no tenía datos: los del
+owner viven en sus JSON de copia, que se convierten al importarlos.
+
+### Evaluación del piloto SDD / OpenSpec
+
+- ✅ **Specs vivos en lenguaje de negocio:** siete capacidades describen
+  hoy qué hace la app; `REQUISITOS.md` ya no es la única referencia y no
+  se desfasó durante la iteración.
+- ✅ **Convención "un spec nunca da por bueno un bug":** hizo visibles 5
+  fallos de la línea base y permitió cerrar uno con criterio claro.
+- ✅ **El owner revisó escenarios concretos** (WHEN/THEN) antes del
+  código; las decisiones P1–P3 de T-4 y las de complementarias salieron
+  de esa revisión, no del navegador.
+- ✅ **Disciplina de cierre:** "no se cierra sin archivar" obligó a
+  reconciliar spec y código al final de cada tarea.
+- ⚠️ **Sobrecoste alto en tareas grandes:** T-4 acumuló 31 deltas
+  (OpenSpec avisa a partir de 10) y requisitos de >500 caracteres; los
+  specs crecen más rápido de lo que el owner lee.
+- ⚠️ **Deltas que se desalinean:** T-4 tuvo que reescribir sus deltas tras
+  archivar T-3 (copian el texto completo del requisito) y se corrigieron
+  escenarios en el cierre para que dijeran lo que el código hace.
+- ⚠️ **Specs que el owner no leyó entero:** los de la línea base los
+  escribió un subagente y la lectura del owner (tareas 1.1/1.3) quedó
+  diferida; el valor de "fuente de verdad" depende de esa lectura.
+- ⚠️ **Fricción de herramienta:** `validate --strict`, formato rígido de
+  cabeceras y avisos de longitud; poco coste por vez, pero constante.
+- **Recomendación del orquestador: continuar, con ajustes** — changes
+  más pequeños (≤10 deltas, partir tareas como T-4), requisitos cortos con
+  el detalle en escenarios, y un resumen de 5-10 líneas por change para
+  el owner en vez de pedirle leer el spec entero. Revisar de nuevo al
+  cerrar la it.8. Decide el owner.
 
 ---
 
