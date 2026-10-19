@@ -102,7 +102,8 @@ técnica o desde un roll, y una sumisión "Ambos" desde el asistente de
 técnica. Fuera de esos flujos (crear desde el mapa sin nadie que reciba
 la posición), un nombre que ya existe en una de las dos disciplinas
 sigue bloqueando "Ambos", con un mensaje que dice dónde existe y
-propone elegir solo la otra disciplina.
+propone elegir solo la otra disciplina (crear solo donde falta también
+en ese caso queda para más adelante: MF-046).
 
 #### Scenario: Vincular dos posiciones
 - **WHEN** el usuario edita "Mount top" y elige "Mount bottom" como complementaria
@@ -251,7 +252,10 @@ asistente MUST ofrecer como destino solo posiciones o sumisiones de esa
 disciplina. Una técnica "Ambos" MUST existir completa en las dos: la copia
 de la otra disciplina une las posiciones o sumisiones del mismo nombre de
 esa disciplina y, si alguna no existe, se crea allí también y se avisa al
-usuario de lo creado.
+usuario de lo creado. Si en la otra disciplina ya existe una técnica con
+el mismo nombre, origen y variante, no se guarda ninguna de las dos y el
+asistente lo indica (crear solo donde falta queda para más adelante:
+MF-046).
 
 #### Scenario: Destinos de la misma disciplina
 - **WHEN** el usuario crea una técnica desde "Guardia cerrada" de BJJ
@@ -264,6 +268,10 @@ usuario de lo creado.
 #### Scenario: Técnica Ambos sin contraparte
 - **WHEN** el usuario crea un sweep "Ambos" de "Guardia cerrada" a "Mount" de BJJ y en Grappling no existe "Mount"
 - **THEN** se crean los dos sweeps y una posición "Mount" de Grappling con los datos de la de BJJ, y el usuario ve el aviso informativo `Posición "Mount" creada en Grappling`
+
+#### Scenario: Técnica Ambos que ya existe en la otra disciplina
+- **WHEN** el usuario crea un sweep "Ambos" desde "Guardia cerrada" de BJJ y en Grappling ya existe ese mismo sweep (mismo nombre, origen y variante)
+- **THEN** no se guarda nada, el asistente vuelve al paso del nombre y explica que ya existe en Grappling, que cambie el nombre o la variante o la cree solo en BJJ
 
 #### Scenario: Conexiones antiguas entre disciplinas
 - **WHEN** una técnica guardada antes de esta regla sale de una posición de otra disciplina

@@ -76,11 +76,11 @@ En esa misma petición la IA SHALL proponer un título corto para el historial.
 ### Requirement: Generación de la propuesta
 Al pulsar "Generar propuesta" la app SHALL enviar el texto interpretado y
 los nombres de las posiciones y sumisiones ya existentes en el catálogo de
-la disciplina de la importación (el mismo con el que se compara, ver
-"Reutilización de lo que ya existe en el catálogo") a la IA, y SHALL
-mostrar una propuesta de posiciones, sumisiones y técnicas nuevas con un
-resumen corto de lo interpretado. La IA tiene instrucciones de no inventar
-técnicas no descritas ni tratar agarres como posiciones.
+la disciplina de la importación (en una de "Ambos", los de BJJ y los de
+Grappling) a la IA, y SHALL mostrar una propuesta de posiciones,
+sumisiones y técnicas nuevas con un resumen corto de lo interpretado. La
+IA tiene instrucciones de no inventar técnicas no descritas ni tratar
+agarres como posiciones.
 
 #### Scenario: Propuesta generada
 - **WHEN** la IA responde correctamente
@@ -92,7 +92,11 @@ técnicas no descritas ni tratar agarres como posiciones.
 
 #### Scenario: Catálogo enviado según la disciplina
 - **WHEN** el usuario genera la propuesta de una importación de Grappling
-- **THEN** la IA recibe solo los nombres de las posiciones y sumisiones de Grappling y de "Ambos", no los de BJJ
+- **THEN** la IA recibe solo los nombres de las posiciones y sumisiones de Grappling, no los de BJJ
+
+#### Scenario: Catálogo enviado en una importación de "Ambos"
+- **WHEN** el usuario genera la propuesta de una importación de "Ambos"
+- **THEN** la IA recibe los nombres de BJJ y de Grappling, sin repetir los que existen en las dos
 
 ### Requirement: Verificación automática silenciosa
 Tras generar la propuesta, la app SHALL hacer una segunda pasada de la IA
@@ -111,15 +115,14 @@ sin avisar al usuario de qué cambió.
 
 ### Requirement: Reutilización de lo que ya existe en el catálogo
 Una posición o sumisión propuesta cuyo nombre coincida con una existente
-(ignorando mayúsculas y espacios en los extremos) MUST NOT aparecer como
-nueva: se considera ya existente y las técnicas propuestas se enlazan a
-ella. La comparación es por nombre exacto; nombres parecidos pero distintos
-se tratan como nuevos. Solo se compara con el catálogo de la disciplina de
-la importación: BJJ o Grappling → esa disciplina y "Ambos"; "Ambos" → solo
-"Ambos". Lo que falta se crea con la disciplina de la importación.
+(ignorando mayúsculas y espacios en los extremos) MUST NOT crearse de
+nuevo: las técnicas se enlazan a la existente. La comparación es por
+nombre exacto. Solo se compara con la disciplina de la importación; en
+una de "Ambos", cada lado (BJJ y Grappling) con la suya, y lo que falta
+en un lado se crea solo en ese lado.
 
 #### Scenario: Posición ya existente
-- **WHEN** la IA propone "mount" y en el catálogo existe "Mount"
+- **WHEN** en una importación de BJJ la IA propone "mount" y existe "Mount" de BJJ
 - **THEN** "Mount" no aparece en la lista de posiciones nuevas y las técnicas que salen de ella se enlazan a la existente
 
 #### Scenario: Nombre parecido pero no igual
@@ -127,16 +130,24 @@ la importación: BJJ o Grappling → esa disciplina y "Ambos"; "Ambos" → solo
 - **THEN** "Media guardia" aparece como posición nueva
 
 #### Scenario: Elemento de "Ambos" en una importación de BJJ
-- **WHEN** en una importación de BJJ la IA propone "Mount" y "Mount" existe con disciplina "Ambos"
-- **THEN** "Mount" no aparece como nueva y las técnicas se enlazan a la existente
+- **WHEN** en una importación de BJJ la IA propone "Mount" y "Mount" era "Ambos" antes de actualizar la app (ahora existe una "Mount" de BJJ y otra de Grappling)
+- **THEN** "Mount" no aparece como nueva y las técnicas se enlazan a la "Mount" de BJJ; la de Grappling no se toca
 
 #### Scenario: Mismo nombre solo en la otra disciplina
 - **WHEN** en una importación de Grappling la IA propone "Mount" y "Mount" solo existe con disciplina BJJ
 - **THEN** "Mount" aparece como posición nueva y, al aceptar, se crea con disciplina Grappling aunque exista la de BJJ
 
 #### Scenario: Importación de "Ambos"
-- **WHEN** en una importación de "Ambos" la IA propone "Kimura" y "Kimura" solo existe con disciplina BJJ
-- **THEN** "Kimura" aparece como sumisión nueva y, al aceptar, se crea con disciplina "Ambos"
+- **WHEN** en una importación de "Ambos" la IA propone "Kimura" y no existe en ninguna disciplina
+- **THEN** "Kimura" aparece como sumisión nueva y, al aceptar, se crean dos "Kimura", una de BJJ y otra de Grappling; ninguna queda con disciplina "Ambos"
+
+#### Scenario: Importación de "Ambos" con el elemento en un solo lado
+- **WHEN** en una importación de "Ambos" la IA propone "Kimura" y "Kimura" solo existe en BJJ
+- **THEN** "Kimura" aparece como nueva solo para Grappling; al aceptar se crea la "Kimura" de Grappling y las técnicas de BJJ se enlazan a la "Kimura" de BJJ existente
+
+#### Scenario: Importación de "Ambos" con el elemento en los dos lados
+- **WHEN** en una importación de "Ambos" la IA propone "Mount" y existe "Mount" en BJJ y en Grappling
+- **THEN** "Mount" no aparece como nueva y cada técnica se enlaza a la "Mount" de su disciplina
 
 ### Requirement: Revisión y edición de la propuesta
 El paso "Revisar propuesta" SHALL mostrar posiciones, sumisiones y
@@ -171,8 +182,8 @@ y sin posibilidad de marcarla.
 En el paso de revisión el usuario SHALL poder añadir posiciones,
 sumisiones y técnicas manualmente con "+ Añadir". Una técnica manual
 MUST elegir tipo, origen y destino entre el catálogo de la disciplina de
-la importación (la misma regla que en "Reutilización de lo que ya existe
-en el catálogo") y los elementos nuevos marcados, y solo se puede marcar
+la importación (en una de "Ambos", el de BJJ y el de Grappling, sin
+repetir nombres) y los elementos nuevos marcados, y solo se puede marcar
 cuando origen y destino están resueltos.
 
 #### Scenario: Técnica manual completa
@@ -185,7 +196,11 @@ cuando origen y destino están resueltos.
 
 #### Scenario: Orígenes de la otra disciplina
 - **WHEN** en una importación de Grappling el usuario elige el origen de una técnica manual y "Mount" solo existe con disciplina BJJ
-- **THEN** "Mount" no aparece entre los orígenes posibles; sí aparecen las posiciones de Grappling, las de "Ambos" y las nuevas marcadas
+- **THEN** "Mount" no aparece entre los orígenes posibles; sí aparecen las posiciones de Grappling y las nuevas marcadas
+
+#### Scenario: Orígenes en una importación de "Ambos"
+- **WHEN** en una importación de "Ambos" el usuario elige el origen de una técnica manual y "Mount" solo existe en BJJ
+- **THEN** "Mount" aparece una vez entre los orígenes posibles
 
 ### Requirement: Refinar la propuesta con IA
 En el paso de revisión el usuario SHALL poder escribir correcciones en
@@ -220,15 +235,19 @@ se muestra igual en modo hobbyist y en modo avanzado.
 ### Requirement: Confirmar e insertar en el catálogo
 "Aceptar" en la vista previa del mapa SHALL crear posiciones, sumisiones y
 técnicas marcadas, por ese orden, con la disciplina elegida en la
-importación; las técnicas en "Probando". Luego SHALL refrescar el mapa. Si
+importación (en "Ambos", lo que falta en cada lado, en BJJ y en
+Grappling); las técnicas en "Probando". Luego SHALL refrescar el mapa. Si
 un elemento no se puede crear, el resto sigue y el usuario MUST ver
-cuáles no se crearon y por qué.
-
-> ⚠️ **Bug conocido:** hoy esos elementos se omiten sin avisar. Ver `.claude/MEJORAS_FUTURAS.md` → "Fallos catálogo e importación (baseline)".
+cuáles no se crearon y por qué (en "Ambos", en qué disciplina), y lo
+creado solo en un lado para completar la otra disciplina.
 
 #### Scenario: Inserción correcta
 - **WHEN** el usuario eligió "Grappling" en la importación y pulsa "Aceptar" en la vista previa
 - **THEN** los elementos marcados se crean con disciplina Grappling, las técnicas en estado "Probando", y aparecen en el mapa como elementos normales
+
+#### Scenario: Inserción de "Ambos"
+- **WHEN** el usuario eligió "Ambos" y la propuesta tiene un sweep nuevo entre "Guardia cerrada" y "Mount"
+- **THEN** se crea un sweep de BJJ entre las posiciones de BJJ y otro de Grappling entre las de Grappling
 
 #### Scenario: Sumisión con nombre ya existente
 - **WHEN** una sumisión marcada tiene exactamente el mismo nombre que una existente de la misma disciplina que la importación
@@ -242,9 +261,21 @@ cuáles no se crearon y por qué.
 - **WHEN** una técnica marcada tiene el mismo nombre, origen y variante que una ya existente
 - **THEN** no se crea, el resto sí se crea y el usuario ve que esa técnica no se creó porque ya existía
 
+#### Scenario: Lo que falta en un lado se crea y se avisa
+- **WHEN** en una importación de "Ambos" una técnica sale de "Mount", que solo existe en BJJ
+- **THEN** al aceptar se crea "Mount" en Grappling, la técnica existe en las dos disciplinas y el usuario ve que "Mount" se creó en Grappling
+
+#### Scenario: Técnica idéntica en un solo lado de "Ambos"
+- **WHEN** en una importación de "Ambos" una técnica marcada ya existe idéntica en BJJ pero no en Grappling
+- **THEN** se crea solo la de Grappling y el usuario ve que la de BJJ no se creó porque ya existía
+
 #### Scenario: Técnica cuyo origen se renombró o desmarcó
 - **WHEN** el usuario renombró o desmarcó la posición nueva de la que sale una técnica marcada
 - **THEN** esa técnica no se crea y el usuario ve que no se creó porque su origen o destino ya no está disponible
+
+#### Scenario: Error inesperado al crear un elemento
+- **WHEN** al aceptar falla la creación de un elemento por un motivo no previsto
+- **THEN** el resto se crea y el usuario ve ese elemento en "No se creó" con el motivo genérico "no se pudo crear"
 
 ### Requirement: Dependencia de conexión y del servicio de IA
 Analizar, generar y refinar MUST requerir conexión y la clave del
@@ -293,7 +324,8 @@ no se ha analizado, la confirmación sigue siendo "¿Descartar la importación?"
 El primer paso de la importación SHALL ofrecer un selector BJJ / Grappling
 / Ambos, con la disciplina activa del mapa elegida por defecto. Tocar una
 opción MUST elegirla y tocar la ya elegida no cambia nada. Todo lo que se
-cree en esa importación lleva la disciplina elegida.
+cree lleva la disciplina elegida; con "Ambos" cada elemento nuevo se crea
+como dos, uno de BJJ y otro de Grappling, independientes entre sí.
 
 #### Scenario: Disciplina por defecto
 - **WHEN** con BJJ activo en el mapa el usuario abre la importación
@@ -302,6 +334,10 @@ cree en esa importación lleva la disciplina elegida.
 #### Scenario: Importar para otra disciplina
 - **WHEN** con BJJ activo el usuario elige "Grappling" en el primer paso y acepta la importación
 - **THEN** todas las posiciones, sumisiones y técnicas creadas tienen disciplina Grappling
+
+#### Scenario: Importar para las dos
+- **WHEN** el usuario elige "Ambos", la propuesta tiene la posición nueva "Dogfight" y acepta la importación
+- **THEN** se crean "Dogfight" de BJJ y "Dogfight" de Grappling, y ningún elemento queda como "Ambos"
 
 #### Scenario: Tocar la disciplina ya elegida
 - **WHEN** está elegida "Ambos" y el usuario vuelve a tocar "Ambos"
@@ -354,7 +390,7 @@ la importación; en una de "Ambos", la del último paso revisado
 
 #### Scenario: Aceptar una importación de "Ambos"
 - **WHEN** con BJJ activo el usuario revisa las dos vistas previas de una importación de "Ambos" y pulsa "Aceptar" en la de Grappling
-- **THEN** lo marcado se crea una sola vez, con disciplina "Ambos", y el mapa queda con Grappling activo
+- **THEN** lo marcado se crea una sola vez, como copias de BJJ y de Grappling, cada una donde se vio en su vista previa, y el mapa queda con Grappling activo
 
 ### Requirement: Cancelar la vista previa
 "Cancelar", en cualquier paso de la vista previa, SHALL salir del modo
@@ -399,3 +435,18 @@ ver cuáles no se crearon y por qué.
 #### Scenario: Seguir y aceptar
 - **WHEN** en una importación de "Ambos" el paso de BJJ dio error por la técnica "Armbar", el usuario sigue a Grappling y pulsa "Aceptar"
 - **THEN** se crea todo lo marcado salvo "Armbar", y el usuario ve que "Armbar" no se creó y el motivo
+
+### Requirement: Dónde se crea cada elemento en una importación de "Ambos"
+En la revisión de una importación de "Ambos", cada posición o sumisión
+nueva SHALL indicar si se creará en las dos disciplinas o solo en una
+porque en la otra ya existe ("Nueva en BJJ y Grappling", "Nueva solo en
+Grappling · ya existe en BJJ"). Desmarcarla MUST NOT crearla en ningún
+lado.
+
+#### Scenario: Nueva en un solo lado
+- **WHEN** en una importación de "Ambos" la IA propone "Kimura" y "Kimura" solo existe en BJJ
+- **THEN** la tarjeta de "Kimura" indica "Nueva solo en Grappling · ya existe en BJJ"
+
+#### Scenario: Desmarcar una nueva en los dos lados
+- **WHEN** el usuario desmarca "Dogfight", nueva en BJJ y Grappling
+- **THEN** no se crea en ninguna disciplina y las técnicas que salen de ella no se pueden crear

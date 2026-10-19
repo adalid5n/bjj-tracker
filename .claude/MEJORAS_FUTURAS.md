@@ -23,7 +23,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | ID | Título | Tipo | Impacto | Esfuerzo | Prioridad | Estado |
 |---|---|---|---|---|---|---|
 | MF-028 | [Fallos catálogo e importación (baseline)](#mf-028) | Bug | Alto | L | P1 | Abierta |
-| MF-029 | [Importar clase 2.0 — historial, reintentar, vista previa, revertir](#mf-029) | Mejora | Alto | L | P1 | En curso (it.7) |
+| MF-029 | [Importar clase 2.0 — historial, reintentar, vista previa, revertir](#mf-029) | Mejora | Alto | L | P1 | Abierta · solo queda revertir |
 | MF-043 | [Borrar una técnica usada en rolls borra esos vínculos sin avisar](#mf-043) | Bug | Alto | M | P1 | Abierta |
 | MF-026 | [Bugs de importar clase (validación T-2.it7): micrófono y Refinar](#mf-026) | Bug | Medio | M | P1 | Abierta |
 | MF-040 | [Ficha del mapa: cerrar al cambiar de contexto + hoja inferior con alturas fijas](#mf-040) | Mejora | Medio | L | P1 | Abierta |
@@ -31,6 +31,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-012 | [Botón "Forzar actualización" en /ajustes](#mf-012) | Mejora | Medio | S | P2 | Abierta |
 | MF-032 | [Visualización de contras — F3 sub-grafo filtrado](#mf-032) | Mejora | Medio | L | P2 | Abierta |
 | MF-039 | [GitHub Actions del deploy a Node 24](#mf-039) | Refactor | Medio | S | P2 | Abierta |
+| MF-046 | [Ambos con elemento ya existente en una disciplina: crear solo donde falta](#mf-046) | Mejora | Medio | M | P2 | Abierta |
 | MF-002 | [Asistentes: botón "Saltar" en pasos opcionales](#mf-002) | Mejora | Medio | M | P3 | Abierta |
 | MF-003 | [Disciplina preseleccionada + "añadir también a la otra"](#mf-003) | Mejora | Medio | L | P3 | Abierta · pendiente de refinar |
 | MF-004 | [Reducir copy / texto inicial en cada pantalla](#mf-004) | Mejora | Medio | L | P3 | Abierta |
@@ -538,7 +539,7 @@ it.6.
 - **Origen:** línea base OpenSpec (sesión 50, 2026-10-05). El subagente los encontró al describir la app a partir del código. En el spec van marcados como "⚠️ Bug conocido", con el comportamiento esperado.
 - **Bugs (marcados en el spec):**
   - Borrar una posición que solo es destino → hoy da error técnico. **Esperado:** se bloquea y se nombran las técnicas que llegan a ella (`PosicionModalContent.svelte:221` solo cuenta las técnicas salientes).
-  - Importar: lo que no se puede crear se pierde en silencio y el diálogo se cierra igual (`ImportarClaseDialog.svelte:396-490`). **Esperado:** informar de qué no se creó y por qué.
+  - ~~Importar: lo que no se puede crear se pierde en silencio y el diálogo se cierra igual (`ImportarClaseDialog.svelte:396-490`). **Esperado:** informar de qué no se creó y por qué.~~ **Arreglado en T-4.it7 (2026-10-19):** al aceptar, el mapa muestra "No se creó: «X» — motivo" (ya existía, depende de otro que no se creó, origen/destino no disponible, o "no se pudo crear" genérico) y lo creado para completar la otra disciplina; marca quitada del spec `importar-clase`.
   - Importar sin key → se ve el texto interno `GROQ_KEY_MISSING`. **Esperado:** mensaje comprensible.
   - "Otras variantes de …" muestra el literal "(variante)" (`TecnicaModalContent.svelte` ~592).
   - La miga de navegación del mapa descarta los cambios sin guardar de un asistente sin preguntar (`MapaModalHost.svelte:376`).
@@ -551,7 +552,7 @@ it.6.
 <a id="mf-029"></a>
 ### Importar clase 2.0 — historial, reintentar, vista previa y revertir
 
-**MF-029** · Mejora · Impacto Alto · Esfuerzo L · Prioridad P1 · En curso (it.7)
+**MF-029** · Mejora · Impacto Alto · Esfuerzo L · Prioridad P1 · Abierta · solo queda revertir
 
 - **Origen:** Adalid, 2026-10-05 (sesión 50), tras el primer uso con `gpt-oss-120b` (origen = destino en movimientos defensivos/transitorios).
 - **Estado actual:** la importación no deja rastro: el texto dictado y la propuesta de la IA se pierden al cerrar el diálogo; no se sabe qué creó cada importación; no hay forma de deshacerla.
@@ -561,7 +562,7 @@ it.6.
   - **Vista previa en el grafo** antes de confirmar: lo nuevo en amarillo, misma representación (posición = nodo, técnica = arista).
   - **Revertir** un import ya confirmado. Decisión abierta: qué pasa si algo creado ya se editó o se usó en un roll.
 - **Por qué:** la IA se equivoca; hoy un error obliga a corregir a mano y a redictar. La vista previa reduce errores; revertir cubre los que se ven días después (no se sustituyen).
-- **Cuándo:** en curso en la **it.7** (primera iteración con flujo SDD/OpenSpec). Revertir queda fuera de la it.7.
+- **Cuándo:** historial, reintentar y vista previa **entregados en la it.7** (`v0.7-it7`, 2026-10-19). Queda abierto solo **revertir** (fuera de la it.7); la prioridad P1 era de la entrada completa — revisar con el owner.
 
 <a id="mf-030"></a>
 ### Panel de alertas en el grafo — calidad del catálogo
@@ -725,6 +726,18 @@ it.6.
   - Consistencia: `CompaneroCombobox` solo se usa en `RollEditor`. Los "+ Crear nueva" de posición / técnica / sumisión (`mapa-modal-stack.svelte.ts`, `TecnicaModalContent.svelte`) abren un sub-asistente apilado con su propio Cancelar — patrón distinto, no presentan este problema de la misma forma; no hace falta tocarlos, pero conviene que la solución elegida sea coherente con ellos (p. ej. cancelar = no queda nada creado).
   - Relacionada: [MF-008](#mf-008) (sugerir compañero por defecto en el mismo paso).
   - Cambio de comportamiento visible → requiere change de OpenSpec (spec de rolls / compañeros).
+
+<a id="mf-046"></a>
+### Ambos con un elemento que ya existe en una disciplina: crear solo donde falta (y avisar)
+
+**MF-046** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P2 · Abierta
+
+- **Origen:** owner, 2026-10-19 (cierre de T-4.it7; supuesto (b) y desviación 1 de la implementación).
+- **Qué pasa hoy:** (1) el asistente de posición o sumisión abierto desde el mapa con "Ambos" bloquea un nombre que ya existe en una de las dos disciplinas ("elige solo BJJ o cambia el nombre"); (2) una técnica "Ambos" que ya existe idéntica (nombre, origen y variante) en la otra disciplina no se guarda en ninguna y sale un mensaje.
+- **Propuesta:** en los dos casos, crear solo en la disciplina donde falta y avisar de que en la otra ya existía, con el mismo criterio que ya usan los sub-asistentes ("+ Crear nueva" en complementaria, técnica y roll) y la importación.
+- **Por qué:** quita un callejón sin salida y unifica el comportamiento de "Ambos" en todos los flujos.
+- **Cuándo:** P2 (owner, 2026-10-19).
+- **Notas técnicas:** `catalogo-lados.ts` (`crearTecnicaEnLados` lanza `TecnicaDuplicadaError`; lógica de "solo donde falta" ya existe para los sub-asistentes), `PosicionWizard`/`SumisionWizard`/`TecnicaWizard`. Cambia `catalogo-tecnico` ("Nombre de posición sin duplicados en el asistente", "Sumisión terminal", "Posiciones complementarias", "Conexiones dentro de la misma disciplina") → requiere change de OpenSpec. Relacionada con [MF-003](#mf-003) y [MF-027](#mf-027).
 
 ## Performance / build
 

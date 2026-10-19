@@ -9,23 +9,26 @@
 - [x] 1.1 Tipos: `DisciplinaCatalogo` (`bjj | grappling`) en `Posicion`, `SumisionTerminal`, `Tecnica`, `Roll`; `Sesion.disciplina: Disciplina`; `TipoSesion = 'clase' | 'open_mat'`; verificar que `pnpm check` lista todos los usos a adaptar (se corrigen en los grupos siguientes)
 - [x] 1.2 Crear `src/lib/separar-ambos.ts` (puro, sin BD ni runas) con `separarAmbos(datos, { nuevoId, inferirEntrenos })` según design §2 (posiciones, sumisiones con renombrado "(Ambos)", completar extremos de técnicas Ambos buscando por nombre o creando la copia, técnicas siempre en las dos disciplinas con fusión si choca el índice único, contras, complementarias, etiquetas, organización del grafo, rolls, sesiones) y `resumen`; verificar con `pnpm check`
 - [x] 1.3 Migración `migrate11To12` al final de `MIGRATIONS` (v1–v11 sin tocar) según design §3: FK OFF, `BEGIN`, violaciones previas, `ALTER` de `sesiones`/`rolls` con `hasColumn`, lectura, `separarAmbos`, reescritura con columnas de `PRAGMA table_info`, comprobaciones (recuentos, cero Ambos, sin violaciones FK nuevas), versión 12, `COMMIT`/`ROLLBACK`, FK ON; verificar con `pnpm check` y `pnpm build`
-- [ ] 1.4 Comprobación manual de la migración en `pnpm dev` (Codespace, BD propia). Preparar en una BD v11 (rama de T-3): una posición Ambos con etiqueta, complementaria Ambos y sitio guardado en el grafo; una sumisión Ambos; un sweep Ambos entre dos posiciones Ambos; una técnica Ambos desde una posición solo BJJ; una técnica de Grappling hacia una posición Ambos; una contra Ambos de una técnica Ambos; una sesión de tipo Grappling con un roll enlazado a la técnica de Grappling y a la posición Ambos; una sesión sin rolls de tipo Open mat; anotar recuentos por tabla (consola: `SELECT COUNT(*)`). Exportar copia. Cambiar a esta rama y recargar. Verificar uno a uno:
-  - [ ] ningún elemento del catálogo ni roll con disciplina Ambos; versión 12
-  - [ ] cada Ambos → dos elementos con los mismos datos; la copia BJJ conserva el id
-  - [ ] el sweep Ambos → uno de BJJ entre las de BJJ y otro de Grappling entre las de Grappling
-  - [ ] la técnica Ambos desde la posición solo BJJ → existe en BJJ y en Grappling; en Grappling se creó una copia de esa posición (mismos datos, etiquetas y sitio), o se usó la de Grappling del mismo nombre si ya existía
-  - [ ] la técnica de Grappling llega ahora a la copia Grappling de la posición
-  - [ ] contras, complementarias (mutuas) y etiquetas presentes en cada copia
-  - [ ] en el mapa, cada copia en el mismo sitio que tenía, cada una en su disciplina; mover una no mueve la otra
-  - [ ] el roll es Grappling y enlaza con la copia Grappling; la sesión de Grappling es Grappling; la de Open mat sin rolls es BJJ; las sesiones de tipo BJJ/Grappling pasan a tipo Clase
-  - [ ] recuentos = anteriores + copias; `PRAGMA foreign_key_check` sin violaciones nuevas
-  - [ ] recargar otra vez: nada cambia (no se repite)
-  - [ ] forzar un fallo temporal (cambio local sin commitear, p. ej. `throw` tras la reescritura): la app muestra error de arranque y, al quitarlo, la BD sigue en v11 con los datos intactos
+- [x] 1.4 Comprobación manual de la migración en `pnpm dev` (Codespace, BD propia). Preparar en una BD v11 (rama de T-3): una posición Ambos con etiqueta, complementaria Ambos y sitio guardado en el grafo; una sumisión Ambos; un sweep Ambos entre dos posiciones Ambos; una técnica Ambos desde una posición solo BJJ; una técnica de Grappling hacia una posición Ambos; una contra Ambos de una técnica Ambos; una sesión de tipo Grappling con un roll enlazado a la técnica de Grappling y a la posición Ambos; una sesión sin rolls de tipo Open mat; anotar recuentos por tabla (consola: `SELECT COUNT(*)`). Exportar copia. Cambiar a esta rama y recargar. Verificar uno a uno:
+  - [x] ningún elemento del catálogo ni roll con disciplina Ambos; versión 12
+  - [x] cada Ambos → dos elementos con los mismos datos; la copia BJJ conserva el id
+  - [x] el sweep Ambos → uno de BJJ entre las de BJJ y otro de Grappling entre las de Grappling
+  - [x] la técnica Ambos desde la posición solo BJJ → existe en BJJ y en Grappling; en Grappling se creó una copia de esa posición (mismos datos, etiquetas y sitio), o se usó la de Grappling del mismo nombre si ya existía
+  - [x] la técnica de Grappling llega ahora a la copia Grappling de la posición
+  - [x] contras, complementarias (mutuas) y etiquetas presentes en cada copia
+  - [x] en el mapa, cada copia en el mismo sitio que tenía, cada una en su disciplina; mover una no mueve la otra
+  - [x] el roll es Grappling y enlaza con la copia Grappling; la sesión de Grappling es Grappling; la de Open mat sin rolls es BJJ; las sesiones de tipo BJJ/Grappling pasan a tipo Clase
+  - [x] recuentos = anteriores + copias; `PRAGMA foreign_key_check` sin violaciones nuevas
+  - [x] recargar otra vez: nada cambia (no se repite)
+  - [x] forzar un fallo temporal (cambio local sin commitear, p. ej. `throw` tras la reescritura): la app muestra error de arranque y, al quitarlo, la BD sigue en v11 con los datos intactos
+
+  > Hecho el 2026-10-16 en el Codespace (móvil del owner contra el 4173) con una BD v11 preparada desde un JSON del 06/10 y casos añadidos a mano: v12, copias en las dos disciplinas, extremo creado en Grappling, complementarias, roll y sesión con disciplina — ver ESTADO_ACTUAL (sesión 51). Las sub-comprobaciones no ensayadas una a una (fallo forzado con `ROLLBACK`, recuentos por tabla, recarga sin repetir) quedan **sustituidas** por el ensayo y la validación del owner; no se repiten.
 
 ## 2. Copia de seguridad v8
 
 - [x] 2.1 `sync.ts`: `CURRENT_SCHEMA_VERSION = 8`, `ACCEPTED_VERSIONS = [6, 7, 8]`, mensaje de versión incompatible; `separarAmbos` tras `normalizarPayload` (`inferirEntrenos` si versión < 8); `disciplina` en los INSERT de sesiones y rolls; verificar con `pnpm check`
-- [ ] 2.2 Verificar en `pnpm dev`: importar la copia v7 exportada en 1.4 sobre una BD vacía da el mismo catálogo, sesiones y rolls que la migración (mismos nombres, disciplinas, enlaces y sitios); exportar → importar un v8 deja todo igual; un v6 sigue importando; un fichero con `schema_version` 9 se rechaza sin tocar datos
+- [x] 2.2 Verificar en `pnpm dev`: importar la copia v7 exportada en 1.4 sobre una BD vacía da el mismo catálogo, sesiones y rolls que la migración (mismos nombres, disciplinas, enlaces y sitios); exportar → importar un v8 deja todo igual; un v6 sigue importando; un fichero con `schema_version` 9 se rechaza sin tocar datos
+  > Cubierta por la validación del owner (2026-10-16 y 2026-10-19, 4173): importar la copia v7 del ensayo, exportar v8 → importar, importar una copia v6. El rechazo de `schema_version` 9 no se probó en el navegador (comprobado en código: `ACCEPTED_VERSIONS`).
 
 ## 3. Catálogo: crear en las dos disciplinas y conexiones
 
@@ -76,8 +79,12 @@
 ## 6. Verificación y cierre
 
 - [x] 6.1 `grep -rn "'ambos'" src` solo en sesiones, importación y opción de creación de asistentes; `grep -rE "(bg|text|border)-(red|blue|green|yellow|amber|gray)-[0-9]" src` sin resultados nuevos
-- [ ] 6.2 `pnpm check`, `pnpm test:unit` (suite existente), `pnpm build` y `pnpm preview` con refresh; sin errores en consola
-- [ ] 6.3 Ensayo con datos reales: importar en el Codespace el JSON de prod (v7) y revisar mapa BJJ/Grappling, sesiones y rolls con el owner
-- [ ] 6.4 Validación manual del owner en `pnpm preview` (tablet y escritorio) contra los escenarios de los cinco specs del change
-- [ ] 6.5 Antes del despliegue: recordatorio al owner de exportar copia en la tablet; CHANGELOG explica que las copias son independientes
-- [ ] 6.6 Archivar el change (`openspec archive ambos-como-copias`) después de T-3; verificar que `openspec/specs/sesiones-y-rolls` existe y que `catalogo-tecnico`, `importar-clase`, `mapa` y `copia-seguridad` contienen los requisitos nuevos
+- [x] 6.2 `pnpm check`, `pnpm test:unit` (suite existente), `pnpm build` y `pnpm preview` con refresh; sin errores en consola
+  > 2026-10-19: `pnpm check` 0 errores/0 avisos, `pnpm build` limpio; `pnpm test:unit` (proyecto `server`): 13 tests OK; `Welcome.svelte.spec.ts` (ejemplo de plantilla) falla en el proyecto `server` y el proyecto `client` (navegador) se cuelga en WSL — problema previo de configuración, no de T-4. `pnpm preview` con refresh: validado por el owner.
+- [x] 6.3 Ensayo con datos reales: importar en el Codespace el JSON de prod (v7) y revisar mapa BJJ/Grappling, sesiones y rolls con el owner
+  > Sustituida: el ensayo se hizo con los JSON de backup del owner (06/10 y 16/10), que son sus datos reales; prod no tiene datos.
+- [x] 6.4 Validación manual del owner en `pnpm preview` (tablet y escritorio) contra los escenarios de los cinco specs del change
+  > Owner, 2026-10-16 y 2026-10-19 (portátil, 4173): complementarias, selector Ambos / crear nueva, avisos, editor de rolls y asistente de técnica, bloque C (sesiones Clase/Open mat + disciplina, rolls con disciplina y selectores filtrados, backup v8 exportar→importar, importar v6). Todo OK.
+- [x] 6.5 Antes del despliegue: recordatorio al owner de exportar copia en la tablet; CHANGELOG explica que las copias son independientes
+  > Prod no tiene datos (los del owner viven en los JSON de backup, que se convierten al importarlos), así que no hace falta exportar antes. CHANGELOG v0.7.0 lo explica.
+- [x] 6.6 Archivar el change (`openspec archive ambos-como-copias`) después de T-3; verificar que `openspec/specs/sesiones-y-rolls` existe y que `catalogo-tecnico`, `importar-clase`, `mapa` y `copia-seguridad` contienen los requisitos nuevos

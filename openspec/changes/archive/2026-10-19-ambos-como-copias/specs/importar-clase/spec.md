@@ -114,9 +114,8 @@ técnicas marcadas, por ese orden, con la disciplina elegida en la
 importación (en "Ambos", lo que falta en cada lado, en BJJ y en
 Grappling); las técnicas en "Probando". Luego SHALL refrescar el mapa. Si
 un elemento no se puede crear, el resto sigue y el usuario MUST ver
-cuáles no se crearon y por qué.
-
-> ⚠️ **Bug conocido:** hoy esos elementos se omiten sin avisar. Ver `.claude/MEJORAS_FUTURAS.md` → "Fallos catálogo e importación (baseline)".
+cuáles no se crearon y por qué (en "Ambos", en qué disciplina), y lo
+creado solo en un lado para completar la otra disciplina.
 
 #### Scenario: Inserción correcta
 - **WHEN** el usuario eligió "Grappling" en la importación y pulsa "Aceptar" en la vista previa
@@ -149,6 +148,10 @@ cuáles no se crearon y por qué.
 #### Scenario: Técnica cuyo origen se renombró o desmarcó
 - **WHEN** el usuario renombró o desmarcó la posición nueva de la que sale una técnica marcada
 - **THEN** esa técnica no se crea y el usuario ve que no se creó porque su origen o destino ya no está disponible
+
+#### Scenario: Error inesperado al crear un elemento
+- **WHEN** al aceptar falla la creación de un elemento por un motivo no previsto
+- **THEN** el resto se crea y el usuario ve ese elemento en "No se creó" con el motivo genérico "no se pudo crear"
 
 ### Requirement: Aceptar la vista previa
 "Aceptar" en el último paso de la vista previa SHALL insertar lo marcado
