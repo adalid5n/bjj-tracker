@@ -18,40 +18,41 @@ Debajo, el cuerpo: Origen (fecha y fuente), Qué / Idea, Por qué, Cuándo y, si
 
 ## Índice de entradas abiertas
 
-Orden: Prioridad (P1 primero, luego sin asignar), después Impacto, después ID.
+Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 
 | ID | Título | Tipo | Impacto | Esfuerzo | Prioridad | Estado |
 |---|---|---|---|---|---|---|
-| MF-040 | [La ficha del mapa no se cierra al tocar fuera](#mf-040) | Bug | Medio | M | P1 | Abierta |
+| MF-028 | [Fallos catálogo e importación (baseline)](#mf-028) | Bug | Alto | L | P1 | Abierta |
+| MF-029 | [Importar clase 2.0 — historial, reintentar, vista previa, revertir](#mf-029) | Mejora | Alto | L | P1 | En curso (it.7) |
+| MF-043 | [Borrar una técnica usada en rolls borra esos vínculos sin avisar](#mf-043) | Bug | Alto | M | P1 | Abierta |
+| MF-026 | [Bugs de importar clase (validación T-2.it7): micrófono y Refinar](#mf-026) | Bug | Medio | M | P1 | Abierta |
+| MF-040 | [Ficha del mapa: cerrar al cambiar de contexto + hoja inferior con alturas fijas](#mf-040) | Mejora | Medio | L | P1 | Abierta |
 | MF-041 | [Barra de edición del grafo: "Guardar" + "Cancelar"](#mf-041) | Mejora | Medio | M | P1 | Abierta |
-| MF-028 | [Fallos catálogo e importación (baseline)](#mf-028) | Bug | Alto | L | — | Abierta |
-| MF-029 | [Importar clase 2.0 — historial, reintentar, vista previa, revertir](#mf-029) | Mejora | Alto | L | — | En curso |
-| MF-002 | [Asistentes: botón "Saltar" en pasos opcionales](#mf-002) | Mejora | Medio | M | — | Abierta |
-| MF-003 | [Disciplina preseleccionada + "añadir también a la otra"](#mf-003) | Mejora | Medio | L | — | Abierta · pendiente de refinar |
-| MF-004 | [Reducir copy / texto inicial en cada pantalla](#mf-004) | Mejora | Medio | L | — | Abierta |
-| MF-012 | [Botón "Forzar actualización" en /ajustes](#mf-012) | Mejora | Medio | S | — | Abierta |
-| MF-017 | [Una técnica con múltiples destinos posibles](#mf-017) | Decisión | Medio | L | — | Abierta |
-| MF-020 | [Reducir fricción al crear técnica tipo sumisión](#mf-020) | Mejora | Medio | M | — | Abierta |
-| MF-022 | [Resumen automático post-sesión](#mf-022) | Mejora | Medio | M | — | Abierta |
-| MF-023 | [Sumisiones vs técnicas — redundancia del modelo](#mf-023) | Decisión | Medio | L | — | Abierta |
-| MF-026 | [Bugs de importar clase (validación T-2.it7): micrófono y Refinar](#mf-026) | Bug | Medio | M | — | Abierta |
-| MF-027 | [Duplicar un elemento en la otra disciplina](#mf-027) | Mejora | Medio | M | — | Abierta |
-| MF-030 | [Panel de alertas en el grafo — calidad del catálogo](#mf-030) | Mejora | Medio | L | — | Abierta |
-| MF-032 | [Visualización de contras — F3 sub-grafo filtrado](#mf-032) | Mejora | Medio | L | — | Abierta |
-| MF-037 | [Loop de refresh tras deploy con cambios grandes en SW](#mf-037) | Bug | Medio | M | — | Abierta |
-| MF-039 | [GitHub Actions del deploy a Node 24](#mf-039) | Refactor | Medio | S | — | Abierta |
+| MF-012 | [Botón "Forzar actualización" en /ajustes](#mf-012) | Mejora | Medio | S | P2 | Abierta |
+| MF-032 | [Visualización de contras — F3 sub-grafo filtrado](#mf-032) | Mejora | Medio | L | P2 | Abierta |
+| MF-039 | [GitHub Actions del deploy a Node 24](#mf-039) | Refactor | Medio | S | P2 | Abierta |
+| MF-002 | [Asistentes: botón "Saltar" en pasos opcionales](#mf-002) | Mejora | Medio | M | P3 | Abierta |
+| MF-003 | [Disciplina preseleccionada + "añadir también a la otra"](#mf-003) | Mejora | Medio | L | P3 | Abierta · pendiente de refinar |
+| MF-004 | [Reducir copy / texto inicial en cada pantalla](#mf-004) | Mejora | Medio | L | P3 | Abierta |
+| MF-017 | [Una técnica con múltiples destinos posibles](#mf-017) | Decisión | Medio | L | P3 | Abierta |
+| MF-020 | [Reducir fricción al crear técnica tipo sumisión](#mf-020) | Mejora | Medio | M | P3 | Abierta |
+| MF-022 | [Resumen automático post-sesión](#mf-022) | Mejora | Medio | M | P3 | Abierta |
+| MF-023 | [Sumisiones vs técnicas — redundancia del modelo](#mf-023) | Decisión | Medio | L | P3 | Abierta |
+| MF-027 | [Duplicar un elemento en la otra disciplina](#mf-027) | Mejora | Medio | M | P3 | Abierta |
+| MF-030 | [Panel de alertas en el grafo — calidad del catálogo](#mf-030) | Mejora | Medio | L | P3 | Abierta |
+| MF-044 | [Skills de flujo: validar, cerrar tarea y arranque de sesión](#mf-044) | Mejora | Medio | S | P3 | Abierta |
+| MF-008 | [Roll editor — sugerir compañero por defecto](#mf-008) | Mejora | Bajo | M | P3 | Abierta |
+| MF-018 | [Cards en items — revisar saturación visual](#mf-018) | Mejora | Bajo | S | P3 | Abierta |
+| MF-019 | [C2 — mínimo de rolls configurable para la bandera](#mf-019) | Mejora | Bajo | S | P3 | Abierta |
+| MF-021 | [Simplificar enum de TipoTecnica](#mf-021) | Decisión | Bajo | L | P3 | Abierta |
+| MF-025 | [Sistematizar sombras inline → tokens](#mf-025) | Refactor | Bajo | S | P3 | Abierta |
+| MF-031 | [Técnicas "sin acabar" (sin destino)](#mf-031) | Mejora | Bajo | L | P3 | Abierta |
+| MF-033 | [Reducir el precache PWA (duplicación del .wasm)](#mf-033) | Mejora | Bajo | M | P3 | Abierta |
+| MF-034 | [FOUC inicial con tema oscuro persistido](#mf-034) | Bug | Bajo | S | P3 | Abierta |
+| MF-035 | [CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicados](#mf-035) | Refactor | Bajo | S | P3 | Abierta |
 | MF-042 | [Repo público vs privado](#mf-042) | Decisión | Medio | M | — | Abierta |
-| MF-008 | [Roll editor — sugerir compañero por defecto](#mf-008) | Mejora | Bajo | M | — | Abierta |
-| MF-018 | [Cards en items — revisar saturación visual](#mf-018) | Mejora | Bajo | S | — | Abierta |
-| MF-019 | [C2 — mínimo de rolls configurable para la bandera](#mf-019) | Mejora | Bajo | S | — | Abierta |
-| MF-021 | [Simplificar enum de TipoTecnica](#mf-021) | Decisión | Bajo | L | — | Abierta |
-| MF-025 | [Sistematizar sombras inline → tokens](#mf-025) | Refactor | Bajo | S | — | Abierta |
-| MF-031 | [Técnicas "sin acabar" (sin destino)](#mf-031) | Mejora | Bajo | L | — | Abierta |
-| MF-033 | [Reducir el precache PWA (duplicación del .wasm)](#mf-033) | Mejora | Bajo | M | — | Abierta |
-| MF-034 | [FOUC inicial con tema oscuro persistido](#mf-034) | Bug | Bajo | S | — | Abierta |
-| MF-035 | [CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicados](#mf-035) | Refactor | Bajo | S | — | Abierta |
 
-**Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos.
+**Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos, [MF-037](#mf-037) Loop de refresh tras deploy.
 
 ---
 
@@ -73,7 +74,7 @@ duración, `s.foco` en cards de home). Default hobbyist.
 <a id="mf-002"></a>
 ### Asistentes: botón "Saltar" en pasos opcionales
 
-**MF-002** · Mejora · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+**MF-002** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P3 · Abierta
 
 - **Origen:** Adalid, 2026-10-16 (validación de T-4.it7)
 - **Idea:** en los pasos opcionales de los asistentes, el botón dice "Saltar" mientras el campo esté vacío y pasa a "Continuar" en cuanto se rellena.
@@ -84,7 +85,7 @@ duración, `s.foco` en cards de home). Default hobbyist.
 <a id="mf-003"></a>
 ### Disciplina preseleccionada + "añadir también a <la otra>" — PENDIENTE DE REFINAR
 
-**MF-003** · Mejora · Impacto Medio · Esfuerzo L · Prioridad — · Abierta · pendiente de refinar
+**MF-003** · Mejora · Impacto Medio · Esfuerzo L · Prioridad P3 · Abierta · pendiente de refinar
 
 - **Estado:** idea, no lista para implementar (owner, 2026-10-16). Antes hay que cerrar los riesgos y el alcance de abajo.
 
@@ -98,7 +99,7 @@ duración, `s.foco` en cards de home). Default hobbyist.
 <a id="mf-004"></a>
 ### Reducir copy / texto inicial en cada pantalla
 
-**MF-004** · Mejora · Impacto Medio · Esfuerzo L · Prioridad — · Abierta
+**MF-004** · Mejora · Impacto Medio · Esfuerzo L · Prioridad P3 · Abierta
 
 - **Origen:** Adalid, 2026-05-19 (sesión 26)
 - **Estado actual:** muchas pantallas tienen títulos largos, descripciones explicativas, labels redundantes o textos de ayuda que pesan visualmente al entrar.
@@ -162,7 +163,7 @@ cubierto: en modo navegación los nodos no son grabbable.
 <a id="mf-008"></a>
 ### Roll editor — sugerir compañero por defecto + selector inteligente
 
-**MF-008** · Mejora · Impacto Bajo · Esfuerzo M · Prioridad — · Abierta (Parte B hecha; queda Parte A)
+**MF-008** · Mejora · Impacto Bajo · Esfuerzo M · Prioridad P3 · Abierta (Parte B hecha; queda Parte A)
 
 - **Origen:** T-6, feedback Adalid 2026-05-09
 - **Parte A — sugerencia automática (PENDIENTE):** al añadir un roll
@@ -228,7 +229,7 @@ La nueva ruta `/companeros` usa FAB consistente con `/`. La página dev `/dev/co
 <a id="mf-012"></a>
 ### Botón "Forzar actualización" en `/ajustes`
 
-**MF-012** · Mejora · Impacto Medio · Esfuerzo S · Prioridad — · Abierta
+**MF-012** · Mejora · Impacto Medio · Esfuerzo S · Prioridad P2 · Abierta
 
 - **Origen:** Adalid, 2026-05-11 — tras incidente del service worker
   atascado sirviendo HTML viejo que apuntaba a chunks JS borrados
@@ -297,7 +298,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-017"></a>
 ### Una técnica con múltiples destinos posibles
 
-**MF-017** · Decisión · Impacto Medio · Esfuerzo L · Prioridad — · Abierta
+**MF-017** · Decisión · Impacto Medio · Esfuerzo L · Prioridad P3 · Abierta
 
 - **Origen:** T-10, feedback Adalid 2026-05-13
 - **Idea:** hoy una técnica tiene UN destino (`posicion_destino_id`
@@ -326,7 +327,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-018"></a>
 ### Cards en items — revisar "saturación visual" tras uso real
 
-**MF-018** · Mejora · Impacto Bajo · Esfuerzo S · Prioridad — · Abierta
+**MF-018** · Mejora · Impacto Bajo · Esfuerzo S · Prioridad P3 · Abierta
 
 - **Origen:** Adalid, sesión 11 (2026-05-14), tras aplicar M9.
 - **Estado actual:** items de lista (home, rolls, mapa, sesion/[id],
@@ -344,7 +345,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-019"></a>
 ### C2 — mínimo de rolls configurable para activar bandera
 
-**MF-019** · Mejora · Impacto Bajo · Esfuerzo S · Prioridad — · Abierta
+**MF-019** · Mejora · Impacto Bajo · Esfuerzo S · Prioridad P3 · Abierta
 
 - **Origen:** decisión de producto en sesión 18 (2026-05-16), T-5.it2.
 - **Estado actual:** C2 activa la bandera cualquier compañero con
@@ -364,7 +365,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-020"></a>
 ### Reducir fricción al crear técnica tipo sumisión (nombre redundante)
 
-**MF-020** · Mejora · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+**MF-020** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P3 · Abierta
 
 - **Origen:** sesión T-6.it3 (2026-05-17), feedback del owner tras
   crear "Kimura desde guardia cerrada" como técnica vinculada al
@@ -407,7 +408,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-021"></a>
 ### Simplificar enum de TipoTecnica si el uso real solo usa transición
 
-**MF-021** · Decisión · Impacto Bajo · Esfuerzo L · Prioridad — · Abierta
+**MF-021** · Decisión · Impacto Bajo · Esfuerzo L · Prioridad P3 · Abierta
 
 - **Origen:** sesión T-5.it3 (2026-05-17), conversación sobre leyenda del grafo.
 - **Observación del owner:** "creo que solo se usará transición, que
@@ -433,7 +434,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-022"></a>
 ### Resumen automático post-sesión — aplazado de T-5.it2
 
-**MF-022** · Mejora · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+**MF-022** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P3 · Abierta
 
 - **Origen:** REQUISITOS §3.6 + criterio de éxito it.2. Discutido y
   aplazado en sesión 18 (2026-05-16) durante el planteamiento de
@@ -456,7 +457,7 @@ Mini-ADR `../docs/adr/002-vinculo-top-bottom.md` a escribir cuando arranque.
 <a id="mf-023"></a>
 ### Sumisiones vs técnicas — redundancia del modelo
 
-**MF-023** · Decisión · Impacto Medio · Esfuerzo L · Prioridad — · Abierta
+**MF-023** · Decisión · Impacto Medio · Esfuerzo L · Prioridad P3 · Abierta
 
 - **Origen:** Adalid, 2026-05-17 (sesión 21), durante el replanteo de
   it.3.
@@ -490,7 +491,7 @@ it.6.
 <a id="mf-025"></a>
 ### Sistematizar sombras (`shadow-[rgba(...)]` inline → tokens semánticos)
 
-**MF-025** · Refactor · Impacto Bajo · Esfuerzo S · Prioridad — · Abierta
+**MF-025** · Refactor · Impacto Bajo · Esfuerzo S · Prioridad P3 · Abierta
 
 - **Origen:** auditoría T-4.it4, sesión 30 (2026-05-19)
 - **Estado actual:** dos sombras viven con valor inline:
@@ -512,7 +513,7 @@ it.6.
 <a id="mf-026"></a>
 ### Bugs de importar clase detectados en la validación de T-2.it7 (2026-10-06)
 
-**MF-026** · Bug · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+**MF-026** · Bug · Impacto Medio · Esfuerzo M · Prioridad P1 · Abierta
 
 - **Origen:** Adalid, validando T-2.it7 en preview.
 - **Micrófono que no se apaga:** al dictar en el importador, el micrófono sigue encendido todo el rato si no se pulsa para apagarlo, también al analizar o cerrar. **Esperado:** se apaga solo al pulsar Analizar, al cerrar el diálogo o al salir de la pantalla.
@@ -522,7 +523,7 @@ it.6.
 <a id="mf-027"></a>
 ### Duplicar un elemento en la otra disciplina
 
-**MF-027** · Mejora · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+**MF-027** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P3 · Abierta
 
 - **Origen:** Adalid, 2026-10-06 (al decidir T-4.it7).
 - **Idea:** como la disciplina de un elemento no se puede cambiar una vez creado (decisión del owner), ofrecer "Duplicar en BJJ/Grappling" para crear una copia independiente en la otra disciplina.
@@ -531,7 +532,7 @@ it.6.
 <a id="mf-028"></a>
 ### Fallos catálogo e importación (baseline)
 
-**MF-028** · Bug · Impacto Alto · Esfuerzo L · Prioridad — · Abierta
+**MF-028** · Bug · Impacto Alto · Esfuerzo L · Prioridad P1 · Abierta
 
 - **Origen:** línea base OpenSpec (sesión 50, 2026-10-05). El subagente los encontró al describir la app a partir del código. En el spec van marcados como "⚠️ Bug conocido", con el comportamiento esperado.
 - **Bugs (marcados en el spec):**
@@ -543,13 +544,13 @@ it.6.
 - **Decisiones pendientes (no son bugs; el spec las describe tal cual):**
   - **it.7:** "Refinar" descarta lo editado a mano y parte del texto original; "Volver" desde la revisión vuelve al paso 1 y obliga a llamar otra vez a la IA; la IA no recibe las técnicas existentes; se pueden crear posiciones duplicadas renombrando en la revisión; las correcciones de la validación no se muestran; el paso de detalles ignora el modo hobbyist.
   - **it.8:** origen = destino permitido sin aviso (también en el asistente manual); la comparación de nombres es exacta.
-  - **Sueltas:** la ficha de posición no filtra por disciplina; **borrar una técnica usada en rolls borra esos vínculos sin avisar** (afecta a datos de rolls).
-- **Cuándo:** fuera de la it.7 por decisión del owner (solo entra lo que él ha pedido). Pendiente de decidir cuándo; "borrar técnica con rolls" es el más delicado porque afecta a datos.
+  - **Sueltas:** la ficha de posición no filtra por disciplina. ("Borrar una técnica usada en rolls borra esos vínculos sin avisar" se separó a su propia entrada: [MF-043](#mf-043).)
+- **Cuándo:** fuera de la it.7 por decisión del owner (solo entra lo que él ha pedido). P1 (owner, 2026-10-16).
 
 <a id="mf-029"></a>
 ### Importar clase 2.0 — historial, reintentar, vista previa y revertir
 
-**MF-029** · Mejora · Impacto Alto · Esfuerzo L · Prioridad — · En curso (it.7)
+**MF-029** · Mejora · Impacto Alto · Esfuerzo L · Prioridad P1 · En curso (it.7)
 
 - **Origen:** Adalid, 2026-10-05 (sesión 50), tras el primer uso con `gpt-oss-120b` (origen = destino en movimientos defensivos/transitorios).
 - **Estado actual:** la importación no deja rastro: el texto dictado y la propuesta de la IA se pierden al cerrar el diálogo; no se sabe qué creó cada importación; no hay forma de deshacerla.
@@ -559,12 +560,12 @@ it.6.
   - **Vista previa en el grafo** antes de confirmar: lo nuevo en amarillo, misma representación (posición = nodo, técnica = arista).
   - **Revertir** un import ya confirmado. Decisión abierta: qué pasa si algo creado ya se editó o se usó en un roll.
 - **Por qué:** la IA se equivoca; hoy un error obliga a corregir a mano y a redictar. La vista previa reduce errores; revertir cubre los que se ven días después (no se sustituyen).
-- **Cuándo:** candidata a **it.7**, primera iteración con flujo SDD (OpenSpec).
+- **Cuándo:** en curso en la **it.7** (primera iteración con flujo SDD/OpenSpec). Revertir queda fuera de la it.7.
 
 <a id="mf-030"></a>
 ### Panel de alertas en el grafo — calidad del catálogo
 
-**MF-030** · Mejora · Impacto Medio · Esfuerzo L · Prioridad — · Abierta
+**MF-030** · Mejora · Impacto Medio · Esfuerzo L · Prioridad P3 · Abierta
 
 - **Origen:** Adalid, 2026-10-05 (sesión 50).
 - **Idea:** apartado de alertas en `/mapa` que señale técnicas con origen = destino, nombres casi duplicados ("Guarda K" vs "Guardia K", ignorando tildes/mayúsculas) y otros huecos. Al importar, avisar de nombres parecidos en la revisión ("¿es la misma que Guardia K?") sin fusionar automáticamente.
@@ -574,7 +575,7 @@ it.6.
 <a id="mf-031"></a>
 ### Técnicas "sin acabar" (sin destino conocido) — APLAZADA
 
-**MF-031** · Mejora · Impacto Bajo · Esfuerzo L · Prioridad — · Abierta (aplazada)
+**MF-031** · Mejora · Impacto Bajo · Esfuerzo L · Prioridad P3 · Abierta (aplazada)
 
 - **Origen:** Adalid, 2026-10-05 (sesión 50).
 - **Idea:** permitir guardar una técnica sin saber aún a dónde lleva y listarla como pendiente en el panel de alertas.
@@ -584,7 +585,7 @@ it.6.
 <a id="mf-032"></a>
 ### Visualización de contras en el grafo — F3 sub-grafo filtrado (F1 y F2 rechazadas)
 
-**MF-032** · Mejora · Impacto Medio · Esfuerzo L · Prioridad — · Abierta
+**MF-032** · Mejora · Impacto Medio · Esfuerzo L · Prioridad P2 · Abierta
 
 - **Origen:** Adalid, 2026-05-21 (brainstorming inicial). Iterado en
   sesiones 42-45 (2026-05-21/22) con dos intentos rechazados.
@@ -660,16 +661,23 @@ it.6.
     (F2), ambos como referencia histórica de qué se descartó y por qué.
 
 <a id="mf-040"></a>
-### La ficha del mapa no se cierra al tocar fuera
+### Ficha del mapa: cerrar al cambiar de contexto + hoja inferior con alturas fijas
 
-**MF-040** · Bug · Impacto Medio · Esfuerzo M · Prioridad P1 · Abierta
+**MF-040** · Mejora · Impacto Medio · Esfuerzo L · Prioridad P1 · Abierta
 
-- **Origen:** Adalid, 2026-10-16 (uso real; el owner lo considera comportamiento erróneo).
-- **Qué pasa hoy:** la ficha (panel lateral o inferior) que se abre al tocar un nodo o una arista en `/mapa` sigue abierta al tocar fuera, p. ej. para cambiar BJJ ↔ Grappling.
-- **Esperado:** patrón estándar de sheet/panel lateral — tocar fuera cierra la ficha; si hay un asistente o edición con cambios sin guardar, preguntar "¿Descartar cambios?". El primer toque fuera solo cierra; hace falta un segundo toque para cambiar de disciplina (normal).
-- **Por qué:** la ficha abierta tapa el grafo y se queda "colgada" al cambiar de contexto.
+- **Origen:** Adalid, 2026-10-16 (uso real). Redefinida por el owner el mismo día (antes: "La ficha del mapa no se cierra al tocar fuera").
+- **Qué pasa hoy:** la ficha (panel lateral en escritorio, hoja inferior de altura fija en móvil) que se abre al tocar un nodo o una arista en `/mapa` sigue abierta al cambiar BJJ ↔ Grappling o al entrar en "Mover nodos", y en móvil tapa medio grafo sin forma de apartarla salvo cerrándola.
+- **Esperado:**
+  - La ficha **se cierra solo** en dos casos: (a) al cambiar de disciplina BJJ ↔ Grappling (cambio de contexto) y (b) al entrar en el modo edición del grafo ("Mover nodos"). Si hay cambios sin guardar → confirmación "¿Descartar cambios?"; si se cancela, no se cambia de disciplina ni se entra en edición.
+  - Todo lo demás se mantiene como en ADR-006: tocar otro nodo/arista navega a su ficha; tocar el grafo no la cierra.
+  - **Nuevo:** en móvil la ficha es una **hoja inferior con alturas fijas** (*snap points* o *detents*: plegada mostrando solo la cabecera / media / desplegada), arrastrable arriba y abajo, para apartarla y mirar el grafo sin cerrarla. Patrón habitual en Google Maps, Apple Maps, etc.
+  - **Escritorio (panel lateral):** a decidir al implementar (p. ej. panel lateral plegable).
+- **Por qué:** la ficha abierta tapa el grafo y se queda "colgada" al cambiar de contexto; cerrar al tocar fuera rompería la exploración del grafo con la ficha abierta (motivo de ADR-006), así que se cierra solo en los cambios de contexto y se da una forma de apartarla.
 - **Cuándo:** P1 (owner, 2026-10-16).
-- **Notas técnicas:** hoy es **deliberado**: `interactOutsideBehavior="ignore"` en los dos `Sheet.Content` de `src/lib/components/MapaModalHost.svelte:581,595`, decidido en ADR-006 ("click en el grafo NO cierra el drawer: el usuario puede explorar el grafo con un modal abierto"). Cambiarlo revisa ADR-006 y hay que decidir qué hace un toque en **otro nodo/arista** (hoy navega a su ficha vía `onAttemptPush`) frente a un toque en **canvas vacío o controles** (cerraría). El aviso de descartar ya existe: `attemptCloseAll` / `handleAttemptClose` en `MapaModalHost.svelte`. Requiere spec (cambio de comportamiento visible): capacidad `mapa`.
+- **Notas técnicas:**
+  - Hoy `interactOutsideBehavior="ignore"` es **deliberado** (ADR-006) en los dos `Sheet.Content` de `src/lib/components/MapaModalHost.svelte:581,595`; se mantiene. El cierre en (a) y (b) va en los controles de `src/routes/mapa/+page.svelte`, reutilizando el aviso de descartar existente (`attemptCloseAll` / `handleAttemptClose` en `MapaModalHost.svelte`).
+  - **Componente actual:** `Sheet` de shadcn-svelte sobre `Dialog` de bits-ui (`src/lib/components/ui/sheet/sheet-content.svelte`), con altura fija `h-[50dvh]` en móvil. **No admite alturas fijas ni arrastre**; bits-ui no tiene Drawer. El `Drawer` de shadcn-svelte sí las admite (`snapPoints`), pero depende de `vaul-svelte`, que **no está instalado** → dependencia nueva que necesita aprobación del owner. Alternativa sin dependencia: gestos de arrastre y alturas propios sobre el `Sheet` actual (más código y más riesgo en accesibilidad y scroll interno). Por eso Esfuerzo L.
+  - Requiere actualizar ADR-006 (enmienda o ADR nuevo) y change de OpenSpec sobre la capacidad `mapa` (cambio de comportamiento visible).
 
 <a id="mf-041"></a>
 ### Barra de edición del grafo: "Guardar" + "Cancelar"
@@ -684,12 +692,24 @@ it.6.
 - **Cuándo:** P1 (owner, 2026-10-16).
 - **Notas técnicas:** "Cancelar" necesita restaurar las posiciones guardadas (persistencia del layout en ADR-008); por eso Esfuerzo M y no S. Cambio de comportamiento visible → spec `mapa`.
 
+<a id="mf-043"></a>
+### Borrar una técnica usada en rolls borra esos vínculos sin avisar
+
+**MF-043** · Bug · Impacto Alto · Esfuerzo M · Prioridad P1 · Abierta
+
+- **Origen:** línea base OpenSpec (sesión 50, 2026-10-05), dentro de [MF-028](#mf-028); separada a entrada propia por el owner el 2026-10-16.
+- **Qué pasa hoy:** al borrar una técnica que aparece en rolls, sus vínculos con esos rolls desaparecen sin ningún aviso; el roll pierde esa información.
+- **Esperado:** antes de borrar, avisar de cuántos rolls la usan y pedir confirmación (o bloquear el borrado, a decidir con el owner).
+- **Por qué:** pérdida silenciosa de datos de entreno del usuario.
+- **Cuándo:** P1 (owner, 2026-10-16).
+- **Notas técnicas:** confirmar en el spec `catalogo-tecnico` si está marcada como "⚠️ Bug conocido" y apuntarla a esta entrada. Cambio de comportamiento visible → change de OpenSpec.
+
 ## Performance / build
 
 <a id="mf-033"></a>
 ### Reducir el precache PWA (~2.3 MB) eliminando la duplicación del `.wasm`
 
-**MF-033** · Mejora · Impacto Bajo · Esfuerzo M · Prioridad — · Abierta
+**MF-033** · Mejora · Impacto Bajo · Esfuerzo M · Prioridad P3 · Abierta
 
 - **Origen:** T-2, deuda anotada en `T2_PLAN_v2.md`
 - **Idea:** Vite emite una copia hasheada de `sqlite3.wasm` además de la nuestra estática. Eliminarla usando `?url` import o cambiando `locateFile` para apuntar a la versión bundleada.
@@ -702,7 +722,7 @@ it.6.
 <a id="mf-034"></a>
 ### FOUC inicial al cargar con tema oscuro persistido
 
-**MF-034** · Bug · Impacto Bajo · Esfuerzo S · Prioridad — · Abierta
+**MF-034** · Bug · Impacto Bajo · Esfuerzo S · Prioridad P3 · Abierta
 
 - **Origen:** sesión 11 (2026-05-14), implementación del theme manager.
 - **Síntoma:** al abrir la app con `localStorage['theme'] === 'dark'`
@@ -728,7 +748,7 @@ it.6.
 <a id="mf-035"></a>
 ### CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicado en 3 sitios
 
-**MF-035** · Refactor · Impacto Bajo · Esfuerzo S · Prioridad — · Abierta
+**MF-035** · Refactor · Impacto Bajo · Esfuerzo S · Prioridad P3 · Abierta
 
 > Nota (2026-10-16): ya son más de 3 sitios — `mapa/+page.svelte:43,51`, `rolls/+page.svelte:45-46`, `RollEditor.svelte:84,310`, `PosicionModalContent.svelte:34`, `PosicionWizard.svelte:156`, `importaciones.ts:164`. Las categorías actuales son `guardia` / `control` / `transicion` / `otro`.
 
@@ -752,9 +772,9 @@ it.6.
 Resuelto añadiendo `/// <reference types="vite-plugin-pwa/vanillajs" />` en `src/app.d.ts` (no toca `+layout.svelte`, sortea la regla de fichero prohibido).
 
 <a id="mf-037"></a>
-### Loop de refresh en primera carga tras deploy con cambios grandes en SW
+### ~~Loop de refresh en primera carga tras deploy con cambios grandes en SW~~
 
-**MF-037** · Bug · Impacto Medio · Esfuerzo M · Prioridad — · Abierta (posiblemente resuelta, verificar)
+**MF-037** · Bug · Impacto Medio · Esfuerzo M · Prioridad — · Hecha (2026-10-16, ADR-001 + `registerType: 'prompt'`; el owner confirma que no ha vuelto a pasar)
 
 > Nota (2026-10-16): `vite.config.ts:12` ya usa `registerType: 'prompt'` (cambio de 2026-05-20) y el bug de refresh de ADR-001 se resolvió subiendo versiones. Probablemente cubierto; confirmar con el owner y cerrar si no ha vuelto a pasar.
 
@@ -774,7 +794,7 @@ Resuelto añadiendo `/// <reference types="vite-plugin-pwa/vanillajs" />` en `sr
 <a id="mf-039"></a>
 ### Actualizar GitHub Actions del workflow de deploy a versiones con Node 24
 
-**MF-039** · Refactor · Impacto Medio · Esfuerzo S · Prioridad — · Abierta
+**MF-039** · Refactor · Impacto Medio · Esfuerzo S · Prioridad P2 · Abierta
 
 > Nota (2026-10-16): pasado el corte de septiembre el workflow sigue con las actions `@v4` y los deploys funcionan (último OK: 2026-10-06), así que el riesgo inmediato ya no existe; queda como actualización de mantenimiento.
 
@@ -784,6 +804,19 @@ Resuelto añadiendo `/// <reference types="vite-plugin-pwa/vanillajs" />` en `sr
 - **Por qué:** ahora el deploy funciona pero está en cuenta atrás. Si no se actualiza antes de septiembre, el workflow se rompe y bloquea releases.
 - **Cuándo:** antes del 2 de junio de 2026 idealmente (para validar con margen); como tarde, antes del 16 de septiembre de 2026.
 - **Restricción del proyecto:** `.github/workflows/deploy.yml` está en la lista de ficheros que no se tocan sin pedirlo explícitamente (ver `../CLAUDE.md`). Esta tarea requiere que el owner lo abra.
+
+<a id="mf-044"></a>
+### Skills de flujo: validar, cerrar tarea y arranque de sesión
+
+**MF-044** · Mejora · Impacto Medio · Esfuerzo S · Prioridad P3 · Abierta
+
+- **Origen:** Adalid, 2026-10-16. Aplazadas por el owner.
+- **Qué:** tres skills de proyecto (Esfuerzo S cada una) para pasos que hoy se repiten a mano:
+  - `validar`: build + reiniciar el preview en 4173 + enlace + fecha del build + checklist de validación sacado del change.
+  - `cerrar-tarea`: CHANGELOG + archivar el change + fusionar en `main` + actualizar ESTADO.
+  - `arranque`: pull con comprobación de la clave SSH, leer ESTADO y avisar si la rama no es `main`.
+- **Por qué:** menos pasos olvidados y menos tiempo en cada validación y cierre.
+- **Cuándo:** cuando el owner lo decida.
 
 ---
 
