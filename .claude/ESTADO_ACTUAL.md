@@ -12,7 +12,7 @@
 - Ensayo de la migración v11→v12 (2026-10-16, Codespace) OK. Regla nueva del owner: "Ambos" completo en las dos disciplinas **también para complementarias** (se enlaza con la del mismo nombre libre o se crea; si ya está vinculada con otra, no se rompe el vínculo y se avisa). Implementada en migración, conversión de backups y asistentes (`2283685`).
 - Arreglos tras validación: complementaria "Ambos" desde la otra disciplina y "+ Crear nueva" con nombre existente (`d13170a`); avisos rediseñados — una línea por evento, token `--info`, detalle en Popover (`83db519`); fecha del build en Ajustes (`f41ea85`).
 - Validación del owner (2026-10-16 y 2026-10-19, `localhost:4173` en incógnito): complementarias, selector Ambos / crear nueva, avisos, editor de rolls y asistente de técnica, bloque C (sesiones Clase/Open mat + disciplina, rolls con disciplina y selectores filtrados, backup v8 exportar→importar, importar v6). Todo OK.
-- Backlog reestructurado con IDs MF-NNN + skill `backlog-item` (`60a5682`); prioridades del owner (P1: MF-026, 028, 029, 040, 041, 043); MF-040 redefinida como hoja inferior con snap points; MF-045 (compañero inline en el roll) sin prioridad.
+- Backlog reestructurado con IDs MF-NNN + skill `backlog-item` (`60a5682`); prioridades del owner (P1: MF-026, 028, 029, 040, 041, 043); MF-040 redefinida como hoja inferior con snap points; MF-045 (compañero inline en el roll) P2 y MF-029 sigue P1 (owner, 2026-10-19).
 - Cierre (2026-10-19): change `ambos-como-copias` archivado (nueva capacidad `sesiones-y-rolls`), CHANGELOG 0.7.0, `package.json` 0.7.0, cierre en `ITERACION_7.md` con evaluación del piloto OpenSpec, ROADMAP y CLAUDE.md al día. **Fusionado en main y desplegado; tag `v0.7-it7`.**
 
 **Decisiones del owner (2026-10-19):**
@@ -23,7 +23,7 @@
 
 **Verificación:** `pnpm check` 0/0, `pnpm build` limpio, `pnpm test:unit` proyecto `server` 13 OK (el de navegador se cuelga en WSL y `Welcome.svelte.spec.ts` falla en `server`: configuración previa).
 
-**Próximo paso concreto:** el owner elige la siguiente iteración (it.8 Panel de alertas) o un bloque de P1 (MF-040/041/043); dar prioridad a MF-045; decidir si sigue el piloto OpenSpec (recomendación: continuar con changes ≤10 deltas y resumen corto por change).
+**Próximo paso concreto:** el owner elige la siguiente iteración (it.8 Panel de alertas) o un bloque de P1 (MF-040/041/043); decidir si sigue el piloto OpenSpec (recomendación: continuar con changes ≤10 deltas y resumen corto por change).
 
 ---
 
