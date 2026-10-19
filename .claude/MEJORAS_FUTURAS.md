@@ -31,6 +31,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-012 | [Botón "Forzar actualización" en /ajustes](#mf-012) | Mejora | Medio | S | P2 | Abierta |
 | MF-032 | [Visualización de contras — F3 sub-grafo filtrado](#mf-032) | Mejora | Medio | L | P2 | Abierta |
 | MF-039 | [GitHub Actions del deploy a Node 24](#mf-039) | Refactor | Medio | S | P2 | Abierta |
+| MF-045 | [Roll: crear compañero inline no se puede deshacer](#mf-045) | Bug | Medio | M | P2 | Abierta |
 | MF-046 | [Ambos con elemento ya existente en una disciplina: crear solo donde falta](#mf-046) | Mejora | Medio | M | P2 | Abierta |
 | MF-002 | [Asistentes: botón "Saltar" en pasos opcionales](#mf-002) | Mejora | Medio | M | P3 | Abierta |
 | MF-003 | [Disciplina preseleccionada + "añadir también a la otra"](#mf-003) | Mejora | Medio | L | P3 | Abierta · pendiente de refinar |
@@ -52,7 +53,6 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-034 | [FOUC inicial con tema oscuro persistido](#mf-034) | Bug | Bajo | S | P3 | Abierta |
 | MF-035 | [CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicados](#mf-035) | Refactor | Bajo | S | P3 | Abierta |
 | MF-042 | [Repo público vs privado](#mf-042) | Decisión | Medio | M | — | Abierta |
-| MF-045 | [Roll: crear compañero inline no se puede deshacer](#mf-045) | Bug | Medio | M | — | Abierta |
 
 **Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos, [MF-037](#mf-037) Loop de refresh tras deploy.
 
@@ -709,7 +709,7 @@ it.6.
 <a id="mf-045"></a>
 ### Roll: crear un compañero desde el asistente no se puede deshacer y deja compañeros sueltos
 
-**MF-045** · Bug · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+**MF-045** · Bug · Impacto Medio · Esfuerzo M · Prioridad P2 · Abierta
 
 - **Origen:** owner, 2026-10-19 (validación de T-4.it7). Comportamiento previo: T-4 no tocó esta parte del asistente de roll.
 - **Qué pasa hoy:** en el paso 1 del asistente de roll ("¿Con quién?"), al escribir un nombre nuevo y pulsar "+ Crear nuevo", el compañero se guarda en ese mismo momento y se despliega el bloque de datos extra (cinturón, peso, notas). El buscador sigue activo y deja crear **otro** compañero nuevo; el anterior se queda creado. Cancelar el roll tampoco lo borra. Resultado: compañeros basura o duplicados y ninguna forma clara de deshacer.
