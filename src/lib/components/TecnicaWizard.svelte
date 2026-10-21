@@ -46,6 +46,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Chips from '$lib/components/Chips.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
+	import RefinarDetallesIA from '$lib/components/RefinarDetallesIA.svelte';
 	import type {
 		Disciplina,
 		DisciplinaCatalogo,
@@ -448,6 +449,18 @@
 	function clearNombreError() {
 		if (nombreError) nombreError = '';
 	}
+
+	// T-8.it8: contexto de la técnica para "Refinar con IA" (solo para
+	// interpretar el texto; el prompt prohíbe añadirlo al resultado).
+	const contextoIA = $derived({
+		nombre: [nombre.trim(), variante.trim()].filter(Boolean).join(' — ') || undefined,
+		tipo: TIPOS.find((t) => t.value === tipo)?.label,
+		origen: posiciones.find((p) => p.id === posicionOrigenId)?.nombre,
+		destino:
+			tipo === 'sumision'
+				? sumisiones.find((x) => x.id === sumisionDestinoId)?.nombre
+				: posiciones.find((p) => p.id === posicionDestinoId)?.nombre
+	});
 
 	// Items de los Comboboxes: precomputados para evitar reordenar/re-derive
 	// dentro del template.
@@ -1227,6 +1240,11 @@
 				<p class="text-xs text-muted-foreground">
 					Texto libre — útil para recordar el detalle clave de la técnica.
 				</p>
+				<RefinarDetallesIA
+					texto={detalles}
+					contexto={contextoIA}
+					onAceptar={(t) => (detalles = t)}
+				/>
 			</div>
 
 			<!-- Paso 8: Errores comunes (solo modo avanzado, T-3.it6). -->
@@ -1433,6 +1451,11 @@
 					<div class="space-y-1.5">
 						<Label for="tecnica-form-detalles">Detalles</Label>
 						<Textarea id="tecnica-form-detalles" bind:value={detalles} rows={4} />
+						<RefinarDetallesIA
+							texto={detalles}
+							contexto={contextoIA}
+							onAceptar={(t) => (detalles = t)}
+						/>
 					</div>
 
 					<div class="space-y-1.5">

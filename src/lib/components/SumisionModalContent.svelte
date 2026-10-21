@@ -207,7 +207,7 @@
 			<!-- Bloqueado por técnicas: mostrar links navegables -->
 			<div class="mt-3 space-y-2 border-t border-border pt-3">
 				<p class="text-xs text-muted-foreground">
-					Borra antes {tecnicas.length === 1 ? 'esta técnica' : `estas ${tecnicas.length} técnicas`}:
+					Si quieres borrar esta sumisión, borra antes {tecnicas.length === 1 ? 'la técnica que llega a ella' : `las ${tecnicas.length} técnicas que llegan a ella`}:
 				</p>
 				<div class="flex flex-wrap gap-1">
 					{#each tecnicas as t (t.id)}

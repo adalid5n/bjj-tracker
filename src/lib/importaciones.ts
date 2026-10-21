@@ -2,10 +2,12 @@
  * Historial de importaciones de clase (T-2.it7, schema v10).
  * Cliente only — depende de `$lib/db`, que requiere browser.
  *
- * Cada entrada guarda SOLO el último texto analizado y lo aceptado
- * (lo creado de verdad en el catálogo, como JSON con ids + nombres), más
- * metadatos: título, origen del título, estado, error y fechas. El texto
- * interpretado y la propuesta de la IA no se guardan (decisión del owner).
+ * Cada entrada guarda el último texto analizado (`texto`, en bruto), el
+ * texto corregido con el que se generó la última propuesta
+ * (`texto_interpretado`, schema v13, T-5.it8) y lo aceptado (lo creado de
+ * verdad en el catálogo, como JSON con ids + nombres), más metadatos:
+ * título, origen del título, estado, error y fechas. La propuesta de la IA
+ * no se guarda (decisión del owner).
  */
 
 import { init, query, run } from '$lib/db';
@@ -39,14 +41,27 @@ export type ImportacionRow = {
 	titulo: string;
 	titulo_origen: TituloOrigen;
 	texto: string;
+	/** T-5.it8: texto corregido de la última propuesta (null si no hay). */
+	texto_interpretado: string | null;
 	aceptado_json: string | null;
 	estado: EstadoImportacion;
 	error: string | null;
 };
 
 export type ImportacionPatch = Partial<
-	Pick<ImportacionRow, 'titulo' | 'titulo_origen' | 'texto' | 'estado' | 'error'>
+	Pick<
+		ImportacionRow,
+		'titulo' | 'titulo_origen' | 'texto' | 'texto_interpretado' | 'estado' | 'error'
+	>
 > & { aceptado?: Aceptado | null };
+
+/**
+ * T-5.it8: texto que muestra el historial (y con el que arranca
+ * "Reintentar"): el corregido si existe; si no, el analizado.
+ */
+export function textoVisible(row: Pick<ImportacionRow, 'texto' | 'texto_interpretado'>): string {
+	return row.texto_interpretado?.trim() ? row.texto_interpretado : row.texto;
+}
 
 /** Título de respaldo: primeras ~6 palabras del texto analizado. */
 export function tituloDeRespaldo(texto: string, palabras = 6): string {
@@ -66,13 +81,14 @@ export async function createImportacion(texto: string): Promise<ImportacionRow> 
 		titulo: tituloDeRespaldo(texto),
 		titulo_origen: 'texto',
 		texto,
+		texto_interpretado: null,
 		aceptado_json: null,
 		estado: 'sin_terminar',
 		error: null
 	};
 	await run(
-		`INSERT INTO importaciones (id, created_at, updated_at, titulo, titulo_origen, texto, aceptado_json, estado, error)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO importaciones (id, created_at, updated_at, titulo, titulo_origen, texto, texto_interpretado, aceptado_json, estado, error)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			row.id,
 			row.created_at,
@@ -80,6 +96,7 @@ export async function createImportacion(texto: string): Promise<ImportacionRow> 
 			row.titulo,
 			row.titulo_origen,
 			row.texto,
+			row.texto_interpretado,
 			row.aceptado_json,
 			row.estado,
 			row.error
@@ -98,7 +115,7 @@ export async function updateImportacion(id: string, patch: ImportacionPatch): Pr
 	await init();
 	const sets: string[] = [];
 	const params: SqlValue[] = [];
-	const campos = ['titulo', 'titulo_origen', 'texto', 'estado', 'error'] as const;
+	const campos = ['titulo', 'titulo_origen', 'texto', 'texto_interpretado', 'estado', 'error'] as const;
 	for (const campo of campos) {
 		if (patch[campo] !== undefined) {
 			sets.push(`${campo} = ?`);

@@ -651,8 +651,26 @@ function migrate11To12(db: MigrationDb): void {
 }
 
 /**
- * Lista ordenada de migraciones disponibles. Para añadir v13:
- *   { from: 12, to: 13, run: (db) => { ... } }
+ * DDL incremental para subir de schema v12 a v13 (T-5.it8, change
+ * `historial-texto-corregido`).
+ *
+ * Historial de importaciones: `texto_interpretado` guarda el texto
+ * corregido (interpretado y editado por el usuario) con el que se generó
+ * la última propuesta. NULL en las entradas anteriores y mientras no se
+ * genere propuesta; el historial cae entonces a `texto` (el analizado).
+ */
+export const SCHEMA_V13_MIGRATION = `
+ALTER TABLE importaciones ADD COLUMN texto_interpretado TEXT;
+UPDATE schema_meta SET value = '13' WHERE key = 'version';
+`;
+
+function migrate12To13(db: MigrationDb): void {
+	db.exec(SCHEMA_V13_MIGRATION);
+}
+
+/**
+ * Lista ordenada de migraciones disponibles. Para añadir v14:
+ *   { from: 13, to: 14, run: (db) => { ... } }
  */
 export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => void }[] = [
 	{ from: 1, to: 2, run: migrate1To2 },
@@ -665,7 +683,8 @@ export const MIGRATIONS: { from: number; to: number; run: (db: MigrationDb) => v
 	{ from: 8, to: 9, run: migrate8To9 },
 	{ from: 9, to: 10, run: migrate9To10 },
 	{ from: 10, to: 11, run: migrate10To11 },
-	{ from: 11, to: 12, run: migrate11To12 }
+	{ from: 11, to: 12, run: migrate11To12 },
+	{ from: 12, to: 13, run: migrate12To13 }
 ];
 
 /**

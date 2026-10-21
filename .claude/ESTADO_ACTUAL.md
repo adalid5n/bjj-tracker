@@ -1,6 +1,6 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-10-21 (sesión 52, it.8: T-1..T-4 cerradas)
+**Última actualización:** 2026-10-21 (sesión 52, it.8: T-1..T-4 cerradas; T-5..T-9 en prod sin validar)
 **Fase activa:** it.8 "Pulido P1" abierta ([`ITERACION_8.md`](../docs/iterations/ITERACION_8.md)): T-1 (ficha sobre el menú), T-2 (borrado de rolls en bloque + pulsación larga), T-3 (guardar organización tras importar) y T-4 (FAB del mapa unificado, sin parpadeo) validadas por el owner y en main (2026-10-21). Siguen MF-043 → MF-041; MF-040 a decidir.
 **Próxima iteración:** **it.9 Panel de alertas** (MF-030). Dentro de la it.8, después: MF-043 → MF-041; MF-040 a decidir. Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047 y MF-048 (sin prioridad).
 
@@ -17,7 +17,9 @@
 
 - **Renombrado a "BJJ Notes"** (decisión del owner 2026-10-21): manifest (`vite.config.ts`, tocado a petición del owner), títulos de pantallas y descripción del export. Se mantienen URL `/bjj-tracker/`, repo, fichero de BD y prefijo de backups `bjj-tracker-*.json` (lo usa `.gitignore`). En Android el nombre de la app instalada/splash se actualiza solo (puede tardar ~1 día) o reinstalando (exportar backup antes).
 
-**Próximo paso concreto:** owner comprueba en la tablet (prod) (y que el nombre "BJJ Notes" aparece) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
+- **T-5..T-9.it8 implementadas y desplegadas a prod SIN validar (petición del owner: probar en prod, 2026-10-21):** T-5 historial muestra el texto corregido (migración **v13** `importaciones.texto_interpretado`, backup **v9**, Reintentar parte del corregido, Refinar usa el corregido); T-6 referencias estables en la revisión de importación (uid por elemento, técnicas sin origen/destino marcadas con selectores); leyenda sin nombres de color; T-7 el selector compartido (`Combobox`) no abre el teclado al abrirse (no aplica a `CompaneroCombobox`); T-8 "Refinar con IA" en Detalles de técnicas (modo avanzado, vista previa Aceptar/Descartar, prompt sin inventar contenido); T-9 mensajes "Si quieres borrar esta …, borra antes …". Changes abiertos (sin archivar hasta validar): `historial-texto-corregido`, `importacion-referencias-estables`, `teclado-selectores`, `refinar-detalles-ia`, `mensaje-bloqueo-borrado`.
+
+**Próximo paso concreto:** owner valida T-5..T-9 en prod (tablet); con OK → marcar validación y archivar los 5 changes. Antes: owner comprueba en la tablet (prod) (y que el nombre "BJJ Notes" aparece) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
 
 **Hecho:**
 - Prod verificada con la it.7 (build 19/10/26 16:48 en Ajustes).

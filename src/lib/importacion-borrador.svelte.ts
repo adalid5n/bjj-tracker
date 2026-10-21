@@ -48,7 +48,33 @@ import {
 } from '$lib/importaciones';
 import { ghostIdPosicion, ghostIdSumision, normalizarNombre, type ClaveBorrador } from '$lib/grafo';
 
+/**
+ * T-6.it8 (change `importacion-referencias-estables`): una técnica del
+ * borrador apunta a sus extremos por REFERENCIA, no por nombre, para que
+ * renombrar una posición/sumisión nueva no la deje huérfana.
+ * - `{ uid }`: posición/sumisión del borrador (su `uid` local).
+ * - `{ catalogo }`: nombre (tal cual está) de un elemento del catálogo de
+ *   la importación.
+ * El nombre actual se resuelve al pintar, en la vista previa y al insertar.
+ */
+export type RefExtremo = { uid: string } | { catalogo: string };
+
+/** Técnica con los nombres ACTUALES de sus extremos (vista previa e inserción). */
+export type TecnicaResuelta = {
+	nombre: string;
+	variante?: string;
+	tipo: TipoTecnica;
+	posicionOrigenNombre: string;
+	posicionDestinoNombre?: string;
+	sumisionDestinoNombre?: string;
+	/** Marcada Y con extremos válidos. */
+	seleccionado: boolean;
+	detalles?: string;
+};
+
 export type PosicionItem = {
+	/** T-6.it8: id local estable (no se persiste). */
+	uid: string;
 	nombre: string;
 	categoria: CategoriaPosicion;
 	tipo?: TipoRolPosicion;
@@ -60,6 +86,8 @@ export type PosicionItem = {
 };
 
 export type SumisionItem = {
+	/** T-6.it8: id local estable (no se persiste). */
+	uid: string;
 	nombre: string;
 	seleccionado: boolean;
 	nombreEditado: string;
@@ -70,14 +98,20 @@ export type TecnicaItem = {
 	nombre: string;
 	variante?: string;
 	tipo: TipoTecnica;
-	posicionOrigenNombre: string;
-	posicionDestinoNombre?: string;
-	sumisionDestinoNombre?: string;
+	/** Origen (siempre una posición); null = sin resolver. */
+	origenRef: RefExtremo | null;
+	/** Destino: posición, o sumisión si `tipo === 'sumision'`; null = sin resolver. */
+	destinoRef: RefExtremo | null;
+	/** Nombres tal como los propuso la IA (solo para mostrar lo no resuelto). */
+	origenTexto?: string;
+	destinoTexto?: string;
+	/** Intención del usuario; la selección efectiva exige además `tecnicaValida`. */
 	seleccionado: boolean;
-	puedeCrearse: boolean;
 	esManual?: boolean;
 	detalles?: string;
 };
+
+type KindExtremo = 'pos' | 'sum';
 
 export type PasoImportacion = 'input' | 'normalizado' | 'review' | 'detalles' | 'preview';
 
@@ -244,34 +278,111 @@ export class ImportacionBorrador {
 	catalogoPosicionesBase = $state<{ id: string; nombre: string }[]>([]);
 	catalogoSumisionesBase = $state<{ id: string; nombre: string }[]>([]);
 
-	// T-4.it7: sin repetir nombres (en "Ambos", una posición que existe en
-	// un lado y es nueva en el otro aparece una sola vez).
-	todasPosicionesDisponibles = $derived(
-		unirPorNombre(
-			[
-				...this.catalogoPosicionesBase.map((p) => p.nombre),
-				...this.posicionesDraft
-					.filter((p) => p.seleccionado && p.nombreEditado.trim())
-					.map((p) => p.nombreEditado.trim())
-			].map((nombre) => ({ nombre }))
-		).map((x) => x.nombre)
-	);
+	// --- T-6.it8: referencias estables de las técnicas --------------------
 
-	todasSumisionesDisponibles = $derived(
-		unirPorNombre(
-			[
-				...this.catalogoSumisionesBase.map((s) => s.nombre),
-				...this.sumisionesDraft
-					.filter((s) => s.seleccionado && s.nombreEditado.trim())
-					.map((s) => s.nombreEditado.trim())
-			].map((nombre) => ({ nombre }))
-		).map((x) => x.nombre)
+	private itemsDe(kind: KindExtremo): { uid: string; nombreEditado: string; seleccionado: boolean }[] {
+		return kind === 'pos' ? this.posicionesDraft : this.sumisionesDraft;
+	}
+
+	private catalogoDe(kind: KindExtremo): { nombre: string }[] {
+		return kind === 'pos' ? this.catalogoPosicionesBase : this.catalogoSumisionesBase;
+	}
+
+	/** Nombre actual de un extremo ('' si no se resuelve). */
+	nombreRef(ref: RefExtremo | null, kind: KindExtremo): string {
+		if (!ref) return '';
+		if ('uid' in ref) return this.itemsDe(kind).find((it) => it.uid === ref.uid)?.nombreEditado.trim() ?? '';
+		return ref.catalogo;
+	}
+
+	/** Extremo utilizable: elemento nuevo marcado y con nombre, o del catálogo. */
+	refValida(ref: RefExtremo | null, kind: KindExtremo): boolean {
+		if (!ref) return false;
+		if ('uid' in ref) {
+			const it = this.itemsDe(kind).find((x) => x.uid === ref.uid);
+			return !!it && it.seleccionado && it.nombreEditado.trim() !== '';
+		}
+		const n = normalizarNombre(ref.catalogo);
+		return this.catalogoDe(kind).some((c) => normalizarNombre(c.nombre) === n);
+	}
+
+	private kindDestino(t: Pick<TecnicaItem, 'tipo'>): KindExtremo {
+		return t.tipo === 'sumision' ? 'sum' : 'pos';
+	}
+
+	/** Validez en vivo (todas las técnicas, de la IA y manuales). */
+	tecnicaValida(t: TecnicaItem): boolean {
+		return this.refValida(t.origenRef, 'pos') && this.refValida(t.destinoRef, this.kindDestino(t));
+	}
+
+	nombreOrigen(t: TecnicaItem): string {
+		return this.nombreRef(t.origenRef, 'pos');
+	}
+
+	nombreDestino(t: TecnicaItem): string {
+		return this.nombreRef(t.destinoRef, this.kindDestino(t));
+	}
+
+	/** Valor de un `Select` para una referencia (`d:<uid>` / `c:<nombre>`). */
+	valorRef(ref: RefExtremo | null): string {
+		if (!ref) return '';
+		return 'uid' in ref ? `d:${ref.uid}` : `c:${ref.catalogo}`;
+	}
+
+	refDeValor(v: string): RefExtremo | null {
+		if (v.startsWith('d:')) return { uid: v.slice(2) };
+		if (v.startsWith('c:')) return { catalogo: v.slice(2) };
+		return null;
+	}
+
+	/**
+	 * Opciones de origen/destino: catálogo de la importación + nuevos
+	 * marcados, sin repetir nombres (si un nuevo se llama igual que uno del
+	 * catálogo, gana el nuevo para que un renombrado lo arrastre).
+	 */
+	private opcionesDe(kind: KindExtremo): { value: string; label: string }[] {
+		const nuevos = unirPorNombre(
+			this.itemsDe(kind)
+				.filter((it) => it.seleccionado && it.nombreEditado.trim())
+				.map((it) => ({ nombre: it.nombreEditado.trim(), uid: it.uid }))
+		);
+		const usados = new Set(nuevos.map((x) => normalizarNombre(x.nombre)));
+		return [
+			...this.catalogoDe(kind)
+				.filter((c) => !usados.has(normalizarNombre(c.nombre)))
+				.map((c) => ({ value: `c:${c.nombre}`, label: c.nombre })),
+			...nuevos.map((x) => ({ value: `d:${x.uid}`, label: x.nombre }))
+		];
+	}
+
+	opcionesPosicion = $derived(this.opcionesDe('pos'));
+	opcionesSumision = $derived(this.opcionesDe('sum'));
+
+	/**
+	 * Técnicas con los nombres actuales de sus extremos y la selección
+	 * efectiva (marcada ∧ válida), en el mismo orden que `tecnicasDraft`
+	 * (las claves `tec:<i>` de la vista previa dependen del índice).
+	 */
+	tecnicasResueltas = $derived<TecnicaResuelta[]>(
+		this.tecnicasDraft.map((t) => {
+			const destino = this.nombreDestino(t);
+			return {
+				nombre: t.nombre,
+				variante: t.variante,
+				tipo: t.tipo,
+				posicionOrigenNombre: this.nombreOrigen(t),
+				posicionDestinoNombre: t.tipo === 'sumision' ? undefined : destino || undefined,
+				sumisionDestinoNombre: t.tipo === 'sumision' ? destino || undefined : undefined,
+				seleccionado: t.seleccionado && this.tecnicaValida(t),
+				detalles: t.detalles
+			};
+		})
 	);
 
 	haySeleccionados = $derived(
 		this.posicionesDraft.some((p) => p.seleccionado) ||
 			this.sumisionesDraft.some((s) => s.seleccionado) ||
-			this.tecnicasDraft.some((t) => t.seleccionado)
+			this.tecnicasResueltas.some((t) => t.seleccionado)
 	);
 
 	tieneDatos = $derived(
@@ -392,7 +503,13 @@ export class ImportacionBorrador {
 				this.importacionId = entrada.id;
 			} else {
 				const previa = await getImportacion(this.importacionId);
-				const patch: ImportacionPatch = { texto: textoAnalizado, estado: 'sin_terminar', error: null };
+				// T-5.it8: el texto corregido guardado era del análisis anterior.
+				const patch: ImportacionPatch = {
+					texto: textoAnalizado,
+					texto_interpretado: null,
+					estado: 'sin_terminar',
+					error: null
+				};
 				if (previa && previa.titulo_origen === 'texto') patch.titulo = tituloDeRespaldo(textoAnalizado);
 				await updateImportacion(this.importacionId, patch);
 			}
@@ -438,15 +555,6 @@ export class ImportacionBorrador {
 	 * añaden como nuevos para el otro (P2: "Ambos" completo en las dos).
 	 */
 	private aplicarPropuesta(propuesta: AIPropuesta, posBase: string[], sumBase: string[]) {
-		const posNombres = new Set([
-			...posBase.map((n) => n.toLowerCase()),
-			...propuesta.posiciones.filter((p) => !p.esExistente).map((p) => p.nombre.toLowerCase())
-		]);
-		const sumNombres = new Set([
-			...sumBase.map((n) => n.toLowerCase()),
-			...propuesta.sumisiones.filter((s) => !s.esExistente).map((s) => s.nombre.toLowerCase())
-		]);
-
 		this.propuestaActual = propuesta;
 		this.resumenAI = propuesta.resumen;
 
@@ -470,6 +578,7 @@ export class ImportacionBorrador {
 			if (this.ladosNuevosPosicion(nombre).length === 0) return;
 			vistasPos.add(n);
 			posiciones.push({
+				uid: crypto.randomUUID(),
 				nombre: capitalizeFirst(nombre),
 				categoria,
 				tipo,
@@ -494,6 +603,7 @@ export class ImportacionBorrador {
 			if (this.ladosNuevosSumision(nombre).length === 0) return;
 			vistasSum.add(n);
 			sumisiones.push({
+				uid: crypto.randomUUID(),
 				nombre: capitalizeFirst(nombre),
 				seleccionado: true,
 				nombreEditado: capitalizeFirst(nombre),
@@ -525,20 +635,40 @@ export class ImportacionBorrador {
 		this.posicionesDraft = posiciones;
 		this.sumisionesDraft = sumisiones;
 
+		// T-6.it8: el nombre que dio la IA se resuelve UNA vez a una
+		// referencia: primero a un elemento nuevo del borrador (así un
+		// renombrado posterior lo arrastra), después al catálogo.
+		const refDe = (
+			nombre: string | undefined,
+			draft: { uid: string; nombreEditado: string }[],
+			base: string[]
+		): RefExtremo | null => {
+			const n = normalizarNombre(nombre ?? '');
+			if (!n) return null;
+			const d = draft.find((x) => normalizarNombre(x.nombreEditado) === n);
+			if (d) return { uid: d.uid };
+			const c = base.find((x) => normalizarNombre(x) === n);
+			return c ? { catalogo: c } : null;
+		};
+
 		this.tecnicasDraft = propuesta.tecnicas.map((t) => {
-			const origenOk = posNombres.has(t.posicionOrigenNombre.toLowerCase());
-			const destinoOk =
-				t.tipo === 'sumision'
-					? !!(t.sumisionDestinoNombre && sumNombres.has(t.sumisionDestinoNombre.toLowerCase()))
-					: !!(t.posicionDestinoNombre && posNombres.has(t.posicionDestinoNombre.toLowerCase()));
-			const puedeCrearse = origenOk && destinoOk;
-			return {
-				...t,
+			const esSum = t.tipo === 'sumision';
+			const destinoTexto = esSum ? t.sumisionDestinoNombre : t.posicionDestinoNombre;
+			const item: TecnicaItem = {
 				nombre: capitalizeFirst(t.nombre),
-				seleccionado: puedeCrearse,
-				puedeCrearse,
+				variante: t.variante,
+				tipo: t.tipo,
+				origenRef: refDe(t.posicionOrigenNombre, posiciones, posBase),
+				destinoRef: esSum
+					? refDe(destinoTexto, sumisiones, sumBase)
+					: refDe(destinoTexto, posiciones, posBase),
+				origenTexto: t.posicionOrigenNombre,
+				destinoTexto,
+				seleccionado: false,
 				detalles: t.detalles
 			};
+			item.seleccionado = this.tecnicaValida(item);
+			return item;
 		});
 	}
 
@@ -548,6 +678,9 @@ export class ImportacionBorrador {
 		this.loadingLabel = 'Generando propuesta…';
 		this.errorAI = null;
 		const histId = this.importacionId;
+		// T-5.it8: el historial guarda el texto corregido con el que se pide
+		// la propuesta (antes de esperar a la IA, como "Analizar clase").
+		await this.guardarHistorial(histId, { texto_interpretado: this.textoParaPropuesta });
 		try {
 			// Solo el catálogo de los lados de la importación: es lo que
 			// recibe la IA (en "Ambos", BJJ ∪ Grappling sin repetir nombres)
@@ -619,8 +752,9 @@ export class ImportacionBorrador {
 				tecnicas: [],
 				sumisiones: this.catalogoSumisionesBase
 			};
+			// T-5.it8: parte del texto corregido por el usuario, no del bruto.
 			const propuestaRefinada = await refinarPropuesta(
-				this.textoClase,
+				this.textoParaPropuesta || this.textoClase,
 				this.propuestaActual,
 				this.textoRefinamiento,
 				catalogo
@@ -648,6 +782,7 @@ export class ImportacionBorrador {
 
 	addPosicionManual() {
 		this.posicionesDraft.push({
+			uid: crypto.randomUUID(),
 			nombre: '',
 			categoria: 'otro',
 			tipo: undefined,
@@ -660,17 +795,16 @@ export class ImportacionBorrador {
 	}
 
 	addSumisionManual() {
-		this.sumisionesDraft.push({ nombre: '', seleccionado: true, nombreEditado: '' });
+		this.sumisionesDraft.push({ uid: crypto.randomUUID(), nombre: '', seleccionado: true, nombreEditado: '' });
 	}
 
 	addTecnicaManual() {
 		this.tecnicasDraft.push({
 			nombre: '',
 			tipo: 'transicion',
-			posicionOrigenNombre: '',
-			posicionDestinoNombre: '',
+			origenRef: null,
+			destinoRef: null,
 			seleccionado: false,
-			puedeCrearse: false,
 			esManual: true
 		});
 	}
@@ -850,14 +984,16 @@ export class ImportacionBorrador {
 				};
 
 				// Fase C: técnicas marcadas
-				const dependeDeExcluido = (item: TecnicaItem): string | undefined => {
+				const dependeDeExcluido = (item: TecnicaResuelta): string | undefined => {
 					const dest =
 						item.tipo === 'sumision'
 							? sumExcluidas.get(norm(item.sumisionDestinoNombre))
 							: posExcluidas.get(norm(item.posicionDestinoNombre));
 					return posExcluidas.get(norm(item.posicionOrigenNombre)) ?? dest;
 				};
-				for (const [i, item] of this.tecnicasDraft.entries()) {
+				// T-6.it8: nombres actuales desde las referencias; selección
+				// efectiva (marcada ∧ válida).
+				for (const [i, item] of this.tecnicasResueltas.entries()) {
 					if (!item.seleccionado || excluidos.has(`tec:${i}`)) continue;
 					try {
 						const origenId =

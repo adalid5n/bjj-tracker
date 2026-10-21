@@ -225,7 +225,7 @@
 			: tecnicas.length > 0
 				? `Esta posición tiene ${tecnicas.length} técnica(s) asociada(s). Borra esas referencias antes.`
 				: rollsProblemaCount > 0
-					? `Esta posición está referenciada por ${rollsProblemaCount} roll(s) como problema. Borra esas referencias antes.`
+					? `Si quieres borrar esta posición, quítala antes ${rollsProblemaCount === 1 ? 'del roll que la usa' : `de los ${rollsProblemaCount} rolls que la usan`}.`
 					: ''
 	);
 
@@ -467,7 +467,7 @@
 			<!-- Bloqueado por técnicas: mostrar links navegables -->
 			<div class="mt-3 space-y-2 border-t border-border pt-3">
 				<p class="text-xs text-muted-foreground">
-					Borra antes {tecnicas.length === 1 ? 'esta técnica' : `estas ${tecnicas.length} técnicas`}:
+					Si quieres borrar esta posición, borra antes {tecnicas.length === 1 ? 'la técnica que sale de ella' : `las ${tecnicas.length} técnicas que salen de ella`}:
 				</p>
 				<div class="flex flex-wrap gap-1">
 					{#each tecnicas as t (t.id)}

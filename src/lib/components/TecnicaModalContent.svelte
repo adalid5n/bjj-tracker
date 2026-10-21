@@ -204,7 +204,7 @@
 
 	const motivoBloqueoBorrado = $derived(
 		contrasIncomingCount > 0
-			? `Esta técnica es contra de ${contrasIncomingCount} técnica(s). Quita esas referencias antes.`
+			? `Si quieres borrar esta técnica, quítala antes como contra de ${contrasIncomingCount === 1 ? 'la técnica que la tiene como contra' : `las ${contrasIncomingCount} técnicas que la tienen como contra`}.`
 			: ''
 	);
 

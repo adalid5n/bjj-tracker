@@ -14,9 +14,13 @@
  *         import restaura además la `disciplina` del catálogo.
  *     8 → (T-4.it7) `disciplina` de sesiones y rolls; ningún elemento del
  *         catálogo "ambos"; tipo de sesión `clase` | `open_mat`.
- * - Se aceptan `ACCEPTED_VERSIONS` (6, 7, 8): a un fichero v6 le faltan las
+ *     9 → (T-5.it8) `importaciones.texto_interpretado` (texto corregido).
+ *         Sube para que una app anterior rechace el fichero en vez de
+ *         perder ese texto en silencio.
+ * - Se aceptan `ACCEPTED_VERSIONS` (6–9): a un fichero v6 le faltan las
  *   tablas nuevas, que se tratan como vacías; v6 y v7 se convierten con
- *   `separarAmbos` (las mismas reglas que la migración v12 de la BD).
+ *   `separarAmbos` (las mismas reglas que la migración v12 de la BD); en
+ *   v6–v8 `texto_interpretado` no existe y queda NULL.
  *   Cualquier otra → error claro.
  * - Para sync entre dispositivos hasta que llegue mecanismo automático.
  */
@@ -36,9 +40,12 @@ import type {
 } from '$lib/types';
 
 /** Versión del formato de fichero de copia (no la de la BD). */
-export const CURRENT_SCHEMA_VERSION = 8;
-/** Formatos aceptados al importar (6: sin etiquetas ni historial; 6–7: con "Ambos"). */
-export const ACCEPTED_VERSIONS = [6, 7, 8] as const;
+export const CURRENT_SCHEMA_VERSION = 9;
+/**
+ * Formatos aceptados al importar (6: sin etiquetas ni historial; 6–7: con
+ * "Ambos"; 6–8: sin texto corregido en el historial).
+ */
+export const ACCEPTED_VERSIONS = [6, 7, 8, 9] as const;
 
 // T-3.it2: filas de las tablas pivot `roll_tecnica` y `roll_posicion`.
 // `resultado` es 'fue_bien' | 'fallo' (CHECK en SQL). La PK compuesta
@@ -189,7 +196,7 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 		'grafo_layout',
 		'app_settings'
 	];
-	// Tablas que exigen los formatos v7 y v8. En ficheros v6 no existen y
+	// Tablas que exigen los formatos v7 en adelante. En ficheros v6 no existen y
 	// se tratan como vacías (ver `normalizarPayload`).
 	if (p.schema_version >= 7) {
 		requiredArrays.push('tags', 'posicion_tags', 'importaciones');
@@ -201,7 +208,7 @@ function assertExportShape(payload: unknown): asserts payload is ExportPayload {
 	}
 }
 
-/** Fichero v6 → forma v7/v8: tablas ausentes como arrays vacíos. */
+/** Fichero v6 → forma v7+: tablas ausentes como arrays vacíos. */
 function normalizarPayload(payload: ExportPayload): ExportPayload {
 	return {
 		...payload,
@@ -530,8 +537,8 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 	// T-2.it7: historial de importaciones.
 	for (const im of payload.importaciones) {
 		await run(
-			`INSERT INTO importaciones (id, created_at, updated_at, titulo, titulo_origen, texto, aceptado_json, estado, error)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO importaciones (id, created_at, updated_at, titulo, titulo_origen, texto, texto_interpretado, aceptado_json, estado, error)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			[
 				im.id,
 				im.created_at,
@@ -539,6 +546,8 @@ async function insertAll(payload: ExportPayload): Promise<void> {
 				im.titulo,
 				im.titulo_origen,
 				im.texto,
+				// T-5.it8: ausente en ficheros v6–v8.
+				im.texto_interpretado ?? null,
 				im.aceptado_json ?? null,
 				im.estado,
 				im.error ?? null

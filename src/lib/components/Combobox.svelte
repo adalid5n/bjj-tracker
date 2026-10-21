@@ -61,6 +61,32 @@
 	} = $props();
 
 	let open = $state(false);
+	// Raíz del Command y su input de búsqueda (T-7.it8).
+	let commandRef = $state<HTMLElement | null>(null);
+	let inputRef = $state<HTMLInputElement | null>(null);
+
+	/**
+	 * T-7.it8 — al abrir NO se enfoca el buscador (en móvil abriría el
+	 * teclado tapando la lista). Se cancela el autofocus del Popover y se
+	 * enfoca la raíz del Command (tabindex=-1): las flechas/Enter siguen
+	 * navegando la lista porque el keydown del Command vive en la raíz.
+	 * El teclado solo sale si el usuario toca "Buscar…".
+	 */
+	function handleOpenAutoFocus(e: Event) {
+		e.preventDefault();
+		commandRef?.focus({ preventScroll: true });
+	}
+
+	/**
+	 * Escritorio: si el foco está en la lista (no en el input) y se teclea
+	 * un carácter imprimible, se pasa el foco al buscador para que la
+	 * tecla caiga ahí — escribir sigue funcionando sin hacer click.
+	 */
+	function handleRootKeydown(e: KeyboardEvent) {
+		if (e.target === inputRef) return;
+		if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+		inputRef?.focus();
+	}
 
 	// bits-ui `Popover.Root` no respeta `open=true` inicial sin anchor montado.
 	// Diferimos a onMount + tick para que el Trigger ya esté en el DOM.
@@ -113,11 +139,17 @@
 	<Popover.Content
 		align="start"
 		sideOffset={4}
+		onOpenAutoFocus={handleOpenAutoFocus}
 		class="bg-popover text-popover-foreground z-50 w-(--bits-popover-anchor-width) min-w-(--bits-popover-anchor-width) rounded-lg border border-border shadow-md outline-hidden"
 	>
-			<Command.Root class="flex w-full flex-col">
+			<Command.Root
+				bind:ref={commandRef}
+				onkeydown={handleRootKeydown}
+				class="flex w-full flex-col outline-hidden"
+			>
 				<div class="border-b border-border px-2 py-1.5">
 					<Command.Input
+						bind:ref={inputRef}
 						placeholder={searchPlaceholder}
 						class="bg-transparent placeholder:text-muted-foreground flex h-8 w-full rounded-md text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
 					/>

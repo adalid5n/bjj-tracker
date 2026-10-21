@@ -515,7 +515,9 @@
 				{
 					posiciones: borrador.posicionesDraft,
 					sumisiones: borrador.sumisionesDraft,
-					tecnicas: borrador.tecnicasDraft
+					// T-6.it8: nombres actuales de los extremos (referencias
+					// estables) y selección efectiva (marcada ∧ válida).
+					tecnicas: borrador.tecnicasResueltas
 				},
 				// Exclusiones por error: solo las de este lado.
 				new Set(

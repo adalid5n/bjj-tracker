@@ -6,7 +6,8 @@
 	 *   (50dvh) en móvil, mismas clases que las fichas de `MapaModalHost`.
 	 * - Lista: Accordion `type="single"` (una tarjeta abierta a la vez),
 	 *   más recientes primero. Plegada = título + fecha + estado.
-	 * - Desplegada: bloques copiables "Texto" y "Aceptado" (este solo en
+	 * - Desplegada: bloques copiables "Texto" (el corregido si existe, si no
+	 *   el analizado; T-5.it8) y "Aceptado" (este solo en
 	 *   estado Importada), "Reintentar" y "Borrar" (con confirmación).
 	 *
 	 * Sin state compartido: la lista se carga al abrir el panel.
@@ -24,6 +25,7 @@
 		deleteImportacion,
 		parseAceptado,
 		formatAceptadoLegible,
+		textoVisible,
 		type EstadoImportacion,
 		type ImportacionRow
 	} from '$lib/importaciones';
@@ -188,10 +190,10 @@
 							<section class="flex flex-col gap-1">
 								<div class="flex items-center justify-between">
 									<h4 class="text-xs font-medium text-muted-foreground">Texto</h4>
-									{@render botonCopiar(`${entrada.id}:texto`, entrada.texto)}
+									{@render botonCopiar(`${entrada.id}:texto`, textoVisible(entrada))}
 								</div>
 								<pre
-									class="max-h-48 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 font-sans text-sm whitespace-pre-wrap">{entrada.texto}</pre>
+									class="max-h-48 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 font-sans text-sm whitespace-pre-wrap">{textoVisible(entrada)}</pre>
 							</section>
 
 							{#if entrada.estado === 'importada'}
@@ -221,7 +223,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									onclick={() => onReintentar?.({ id: entrada.id, texto: entrada.texto })}
+									onclick={() => onReintentar?.({ id: entrada.id, texto: textoVisible(entrada) })}
 								>
 									<RotateCcwIcon class="size-4" />
 									Reintentar

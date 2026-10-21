@@ -454,3 +454,84 @@ export async function generarPropuestaDeClase(
 
 	return parseRawPropuesta(raw, catalogo);
 }
+
+// ── T-8.it8: "Refinar con IA" en los detalles de una técnica ────────────
+
+/** true si hay clave de Groq configurada en este build. */
+export function hayClaveIA(): boolean {
+	return !!PUBLIC_GROQ_KEY;
+}
+
+export type ContextoTecnicaIA = {
+	nombre?: string;
+	tipo?: string;
+	origen?: string;
+	destino?: string;
+};
+
+/**
+ * Pule la redacción de los detalles de una técnica SIN añadir contenido:
+ * ortografía, gramática y, si ayuda, pasos cortos o viñetas. El contexto
+ * (nombre, tipo, origen, destino) solo sirve para interpretar términos.
+ * Errores: `GROQ_KEY_MISSING`, `AI_TIMEOUT`, `AI_RESPONSE_INVALID`,
+ * `Error <status>: …` (mismo mapeo que el resto de llamadas a Groq).
+ */
+export async function refinarDetallesTecnica(
+	texto: string,
+	contexto: ContextoTecnicaIA
+): Promise<string> {
+	if (!PUBLIC_GROQ_KEY) throw new Error('GROQ_KEY_MISSING');
+
+	const ctx = [
+		contexto.nombre ? `- Técnica: ${contexto.nombre}` : '',
+		contexto.tipo ? `- Tipo: ${contexto.tipo}` : '',
+		contexto.origen ? `- Posición de origen: ${contexto.origen}` : '',
+		contexto.destino ? `- Destino: ${contexto.destino}` : ''
+	]
+		.filter(Boolean)
+		.join('\n');
+
+	const prompt = `Eres un corrector de textos de BJJ (Brazilian Jiu-Jitsu). El usuario ha escrito los detalles de una técnica y quiere que mejores SOLO la redacción.
+
+QUÉ PUEDES HACER:
+1. Corregir ortografía, tildes, gramática y puntuación.
+2. Ordenar el contenido en pasos cortos numerados o viñetas ("- ") si así se entiende mejor; si el texto ya es claro o es una sola idea, déjalo como frase.
+3. Corregir términos de BJJ claramente mal escritos (p.ej. "underwood" → "underhook").
+
+PROHIBIDO (reglas estrictas):
+- NUNCA añadas técnicas, pasos, detalles, agarres, consejos, advertencias ni explicaciones que no estén en el texto original. Si algo parece faltar, NO lo completes.
+- NUNCA elimines información del texto original, aunque parezca redundante.
+- Conserva el vocabulario y los términos de BJJ del usuario (no traduzcas inglés↔español ni cambies sus nombres de posiciones o técnicas).
+- No añadas títulos, introducciones, conclusiones ni comentarios sobre los cambios.
+
+CONTEXTO (solo para interpretar el texto; NO lo añadas al resultado):
+${ctx || '- (sin contexto)'}
+
+TEXTO ORIGINAL:
+${texto}
+
+Responde ÚNICAMENTE con JSON (sin markdown): { "texto": "texto refinado" }`;
+
+	const response = await fetchGroq({
+		model: GROQ_MODEL,
+		messages: [{ role: 'user', content: prompt }],
+		response_format: { type: 'json_object' },
+		temperature: 0.1
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		throw new Error(`Error ${response.status}: ${errorText}`);
+	}
+
+	const data = await response.json();
+	let raw: Record<string, unknown>;
+	try {
+		raw = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+	} catch {
+		throw new Error('AI_RESPONSE_INVALID');
+	}
+	const refinado = typeof raw.texto === 'string' ? raw.texto.trim() : '';
+	if (!refinado) throw new Error('AI_RESPONSE_INVALID');
+	return refinado;
+}

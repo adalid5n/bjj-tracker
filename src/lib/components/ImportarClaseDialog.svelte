@@ -110,6 +110,12 @@
 		return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 	}
 
+	// Estilos de las marcas del texto interpretado (también en la leyenda).
+	const MARK_CORREGIDO =
+		'border-radius:2px;background-color:color-mix(in srgb,var(--color-warning,#f59e0b) 35%,transparent);padding:0 2px;color:inherit';
+	const MARK_DUDOSO =
+		'border-radius:2px;background-color:color-mix(in srgb,var(--color-destructive,#ef4444) 20%,transparent);padding:0 2px;text-decoration:underline dotted;color:inherit';
+
 	let interpretadoDiv = $state<HTMLElement | null>(null);
 
 	$effect(() => {
@@ -117,9 +123,9 @@
 		const html = parseSegmentos(b.normalizacion.textoConMarcas)
 			.map((seg) => {
 				if (seg.kind === 'corrected')
-					return `<mark style="border-radius:2px;background-color:color-mix(in srgb,var(--color-warning,#f59e0b) 35%,transparent);padding:0 2px;color:inherit">${escapeHtml(seg.text)}</mark>`;
+					return `<mark style="${MARK_CORREGIDO}">${escapeHtml(seg.text)}</mark>`;
 				if (seg.kind === 'uncertain')
-					return `<mark style="border-radius:2px;background-color:color-mix(in srgb,var(--color-destructive,#ef4444) 20%,transparent);padding:0 2px;text-decoration:underline dotted;color:inherit">${escapeHtml(seg.text)}</mark>`;
+					return `<mark style="${MARK_DUDOSO}">${escapeHtml(seg.text)}</mark>`;
 				return escapeHtml(seg.text);
 			})
 			.join('');
@@ -195,6 +201,55 @@
 		grabando = true;
 	}
 </script>
+
+<!--
+	T-6.it8: selectores de origen/destino (técnica manual o técnica de la IA
+	sin resolver). Select de bits-ui sin campo de búsqueda: no abre el
+	teclado del móvil. Valor = referencia codificada (`d:<uid>` / `c:<nombre>`).
+-->
+{#snippet selectoresExtremos(i: number)}
+	{@const item = b.tecnicasDraft[i]}
+	{@const origen = b.nombreOrigen(item)}
+	{@const destino = b.nombreDestino(item)}
+	<div class="ml-6 flex items-center gap-1 text-xs text-muted-foreground">
+		<Select.Root
+			type="single"
+			value={b.valorRef(item.origenRef)}
+			onValueChange={(v) => { if (v) b.tecnicasDraft[i].origenRef = b.refDeValor(v); }}
+		>
+			<Select.Trigger class="h-6 flex-1 text-xs" aria-label="Posición de origen">
+				{origen || 'Origen'}
+			</Select.Trigger>
+			<Select.Content>
+				{#each b.opcionesPosicion as op (op.value)}
+					<Select.Item value={op.value}>{op.label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+		<span>→</span>
+		<Select.Root
+			type="single"
+			value={b.valorRef(item.destinoRef)}
+			onValueChange={(v) => { if (v) b.tecnicasDraft[i].destinoRef = b.refDeValor(v); }}
+		>
+			<Select.Trigger
+				class="h-6 flex-1 text-xs"
+				aria-label={item.tipo === 'sumision' ? 'Sumisión destino' : 'Posición de destino'}
+			>
+				{#if item.tipo === 'sumision'}
+					{destino ? `🔴 ${destino}` : 'Sumisión destino'}
+				{:else}
+					{destino || 'Destino'}
+				{/if}
+			</Select.Trigger>
+			<Select.Content>
+				{#each item.tipo === 'sumision' ? b.opcionesSumision : b.opcionesPosicion as op (op.value)}
+					<Select.Item value={op.value}>{item.tipo === 'sumision' ? '🔴 ' : ''}{op.label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+	</div>
+{/snippet}
 
 <Dialog.Root {open} onOpenChange={(v) => { if (!v) intentarCerrar(); }}>
 	<Dialog.Content
@@ -277,8 +332,9 @@
 		{#if b.paso === 'normalizado'}
 			<div class="flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-2">
 				<p class="text-xs text-muted-foreground">
-					<mark class="rounded bg-warning/40 px-0.5 text-foreground">Amarillo</mark> = corregido ·
-					<mark class="rounded bg-destructive/20 px-0.5 text-foreground underline decoration-dotted">Naranja</mark> = incierto, revisa. Edita el texto interpretado si es necesario.
+					<!-- T-6.it8: muestras con el mismo estilo que las marcas del texto, sin nombrar colores. -->
+					<mark style={MARK_CORREGIDO}>corregido</mark> ·
+					<mark style={MARK_DUDOSO}>dudoso, revisa</mark>. Edita el texto interpretado si es necesario.
 				</p>
 				<!-- Original: read-only, palabras cambiadas en amarillo -->
 				<div class="flex flex-col gap-1.5">
@@ -456,7 +512,7 @@
 				<section>
 					<div class="mb-2 flex items-center justify-between">
 						<h3 class="text-sm font-medium">
-							Técnicas{#if b.tecnicasDraft.length > 0} ({b.tecnicasDraft.filter((t) => t.seleccionado).length}/{b.tecnicasDraft.length}){/if}
+							Técnicas{#if b.tecnicasDraft.length > 0} ({b.tecnicasResueltas.filter((t) => t.seleccionado).length}/{b.tecnicasDraft.length}){/if}
 						</h3>
 						<button
 							type="button"
@@ -467,33 +523,12 @@
 					{#if b.tecnicasDraft.length > 0}
 						<div class="flex flex-col gap-2">
 							{#each b.tecnicasDraft as item, i}
-								{@const canCreate = item.esManual
-									? item.posicionOrigenNombre.trim() !== '' &&
-										b.todasPosicionesDisponibles.some(
-											(p) => p.toLowerCase() === item.posicionOrigenNombre.toLowerCase()
-										) &&
-										(item.tipo === 'sumision'
-											? !!(
-													item.sumisionDestinoNombre?.trim() &&
-													b.todasSumisionesDisponibles.some(
-														(s) =>
-															s.toLowerCase() === item.sumisionDestinoNombre?.toLowerCase()
-													)
-												)
-											: !!(
-													item.posicionDestinoNombre?.trim() &&
-													b.todasPosicionesDisponibles.some(
-														(p) =>
-															p.toLowerCase() === item.posicionDestinoNombre?.toLowerCase()
-													)
-												))
-									: item.puedeCrearse}
+								<!-- T-6.it8: validez en vivo para todas las técnicas (extremos por referencia). -->
+								{@const canCreate = b.tecnicaValida(item)}
 								<div
-									class="rounded-md border p-3 transition-opacity {!item.seleccionado
-										? 'opacity-50'
-										: ''} {!canCreate && !item.esManual
+									class="rounded-md border p-3 transition-opacity {!canCreate && !item.esManual
 										? 'border-warning/50 bg-warning/5'
-										: 'border-border'}"
+										: `border-border ${item.seleccionado && canCreate ? '' : 'opacity-50'}`}"
 								>
 									{#if item.esManual}
 										<!-- Card editable para técnica manual -->
@@ -518,8 +553,7 @@
 												onValueChange={(v) => {
 													if (v) {
 														b.tecnicasDraft[i].tipo = v as TipoTecnica;
-														b.tecnicasDraft[i].posicionDestinoNombre = '';
-														b.tecnicasDraft[i].sumisionDestinoNombre = undefined;
+														b.tecnicasDraft[i].destinoRef = null;
 													}
 												}}
 											>
@@ -533,61 +567,17 @@
 												</Select.Content>
 											</Select.Root>
 										</div>
-										<div class="ml-6 flex items-center gap-1 text-xs text-muted-foreground">
-											<Select.Root
-												type="single"
-												value={item.posicionOrigenNombre}
-												onValueChange={(v) => { if (v) b.tecnicasDraft[i].posicionOrigenNombre = v; }}
-											>
-												<Select.Trigger class="h-6 flex-1 text-xs">
-													{item.posicionOrigenNombre || 'Origen'}
-												</Select.Trigger>
-												<Select.Content>
-													{#each b.todasPosicionesDisponibles as nombre}
-														<Select.Item value={nombre}>{nombre}</Select.Item>
-													{/each}
-												</Select.Content>
-											</Select.Root>
-											<span>→</span>
-											{#if item.tipo === 'sumision'}
-												<Select.Root
-													type="single"
-													value={item.sumisionDestinoNombre ?? ''}
-													onValueChange={(v) => { if (v) b.tecnicasDraft[i].sumisionDestinoNombre = v; }}
-												>
-													<Select.Trigger class="h-6 flex-1 text-xs">
-														{item.sumisionDestinoNombre ? `🔴 ${item.sumisionDestinoNombre}` : 'Sumisión destino'}
-													</Select.Trigger>
-													<Select.Content>
-														{#each b.todasSumisionesDisponibles as nombre}
-															<Select.Item value={nombre}>🔴 {nombre}</Select.Item>
-														{/each}
-													</Select.Content>
-												</Select.Root>
-											{:else}
-												<Select.Root
-													type="single"
-													value={item.posicionDestinoNombre ?? ''}
-													onValueChange={(v) => { if (v) b.tecnicasDraft[i].posicionDestinoNombre = v; }}
-												>
-													<Select.Trigger class="h-6 flex-1 text-xs">
-														{item.posicionDestinoNombre || 'Destino'}
-													</Select.Trigger>
-													<Select.Content>
-														{#each b.todasPosicionesDisponibles as nombre}
-															<Select.Item value={nombre}>{nombre}</Select.Item>
-														{/each}
-													</Select.Content>
-												</Select.Root>
-											{/if}
-										</div>
+										{@render selectoresExtremos(i)}
 									{:else}
 										<!-- Card de técnica generada por AI -->
 										<div class="mb-1 flex items-center gap-2">
 											<input
 												type="checkbox"
-												bind:checked={b.tecnicasDraft[i].seleccionado}
+												checked={item.seleccionado && canCreate}
 												disabled={!canCreate}
+												onchange={(e) => {
+													b.tecnicasDraft[i].seleccionado = (e.target as HTMLInputElement).checked;
+												}}
 												class="h-4 w-4 accent-primary"
 											/>
 											<span class="flex-1 text-sm font-medium">{item.nombre}</span>
@@ -595,19 +585,22 @@
 												{TIPOS_TECNICA[item.tipo]}
 											</span>
 										</div>
-										<p class="ml-6 text-xs text-muted-foreground">
-											{item.posicionOrigenNombre}
-											→
-											{#if item.tipo === 'sumision'}
-												🔴 {item.sumisionDestinoNombre ?? '?'}
-											{:else}
-												{item.posicionDestinoNombre ?? '?'}
-											{/if}
-										</p>
-										{#if !canCreate}
-											<p class="ml-6 mt-1 text-xs text-warning">
-												⚠ Origen o destino no resuelto — no se puede insertar
+										{#if canCreate}
+											<p class="ml-6 text-xs text-muted-foreground">
+												{b.nombreOrigen(item)}
+												→
+												{#if item.tipo === 'sumision'}🔴 {/if}{b.nombreDestino(item)}
 											</p>
+										{:else}
+											<p class="ml-6 mb-2 text-xs text-warning">
+												⚠ Origen o destino no resuelto — elige dónde empieza y dónde acaba
+												{#if item.origenTexto || item.destinoTexto}
+													<span class="text-muted-foreground">
+														(propuesto: {item.origenTexto || '?'} → {item.destinoTexto || '?'})
+													</span>
+												{/if}
+											</p>
+											{@render selectoresExtremos(i)}
 										{/if}
 									{/if}
 								</div>
@@ -668,7 +661,7 @@
 
 		<!-- Step 3: Detalles (opcional) -->
 		{#if b.paso === 'detalles'}
-			{@const tecnicasSeleccionadas = b.tecnicasDraft.filter((t) => t.seleccionado)}
+			{@const tecnicasSeleccionadas = b.tecnicasResueltas.filter((t) => t.seleccionado)}
 			{@const sumisionesSeleccionadas = b.sumisionesDraft.filter((s) => s.seleccionado)}
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-2">
 				<p class="text-xs text-muted-foreground">
@@ -679,9 +672,9 @@
 					<section class="space-y-3">
 						<h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Técnicas</h3>
 						{#each b.tecnicasDraft as t, i (i)}
-							{#if t.seleccionado}
+							{#if t.seleccionado && b.tecnicaValida(t)}
 								<div class="space-y-1">
-									<p class="text-sm font-medium">{t.nombre}{t.variante ? ` (${t.variante})` : ''} <span class="text-xs text-muted-foreground">desde {t.posicionOrigenNombre}</span></p>
+									<p class="text-sm font-medium">{t.nombre}{t.variante ? ` (${t.variante})` : ''} <span class="text-xs text-muted-foreground">desde {b.nombreOrigen(t)}</span></p>
 									<Textarea
 										bind:value={t.detalles}
 										placeholder="Detalles de ejecución, setup, puntos clave…"
