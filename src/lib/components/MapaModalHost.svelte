@@ -558,7 +558,14 @@
       El sheet-content base limita a `data-[side=right]:sm:max-w-sm`, lo
       sobreescribimos a `sm:max-w-md` para igualar al Dialog y dar más
       espacio a los wizards.
-    - sheet-bottom → drawer inferior `h-[50vh]` (decisión de producto).
+    - sheet-bottom → drawer inferior `h-[50dvh]` (decisión de producto).
+  Ambos sheets acaban justo encima de la BottomNav: su alto real es
+  `--bottom-nav-h` (layout.css, contenido + borde) + `env(safe-area-inset-bottom)`
+  (barra de gestos de Android/iOS). La nav usa la misma variable.
+  Siguen en z-50 (por encima de FAB z-30, filtros z-20 y barras de vista
+  previa z-40) pero no se solapan con la nav: sombra recortada/hacia
+  arriba y entrada sin desplazamiento vertical en el inferior para que
+  ni la sombra ni la animación pasen por delante del menú.
 -->
 {#if presentation === 'dialog'}
 	<Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
@@ -576,7 +583,7 @@
 	<Sheet.Root open={isOpen} onOpenChange={handleOpenChange}>
 		<Sheet.Content
 			side="right"
-			class="top-14! bottom-14! h-auto! flex w-full flex-col p-4 sm:max-w-md"
+			class="top-14! bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]! h-auto! flex w-full flex-col p-4 [clip-path:inset(0_0_0_-2rem)] sm:max-w-md"
 			showCloseButton={false}
 			interactOutsideBehavior="ignore"
 			preventScroll={false}
@@ -590,7 +597,7 @@
 	<Sheet.Root open={isOpen} onOpenChange={handleOpenChange}>
 		<Sheet.Content
 			side="bottom"
-			class="bottom-14! h-[50dvh]! flex flex-col p-4"
+			class="bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]! h-[50dvh]! max-h-[calc(100dvh-3.5rem-var(--bottom-nav-h)-env(safe-area-inset-bottom))] flex flex-col p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.15)] data-open:slide-in-from-bottom-0! data-closed:slide-out-to-bottom-0!"
 			showCloseButton={false}
 			interactOutsideBehavior="ignore"
 			preventScroll={false}

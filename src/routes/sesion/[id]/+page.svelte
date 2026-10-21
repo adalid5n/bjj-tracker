@@ -326,8 +326,7 @@
 	{/if}
 </main>
 
-{#if status === 'ready'}
-	<Fab onclick={openNewRoll} label="Nuevo roll" extended />
-{/if}
+<!-- Siempre montado (como la BottomNav) para que no aparezca/desaparezca al navegar. -->
+<Fab onclick={openNewRoll} label="Nuevo roll" extended disabled={status !== 'ready'} />
 
 <BottomNav />

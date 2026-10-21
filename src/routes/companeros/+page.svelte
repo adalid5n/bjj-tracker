@@ -126,9 +126,8 @@
 	{/if}
 </main>
 
-{#if status === 'ready'}
-	<Fab onclick={openCreate} label="Nuevo compañero" />
-{/if}
+<!-- Siempre montado (como la BottomNav) para que no aparezca/desaparezca al navegar. -->
+<Fab onclick={openCreate} label="Nuevo compañero" disabled={status !== 'ready'} />
 
 <BottomNav />
 

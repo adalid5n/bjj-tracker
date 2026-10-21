@@ -239,7 +239,7 @@
 	<Sheet.Root bind:open>
 		<Sheet.Content
 			side="right"
-			class="top-14! bottom-14! h-auto! flex w-full flex-col p-4 sm:max-w-md"
+			class="top-14! bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]! h-auto! flex w-full flex-col p-4 sm:max-w-md"
 			onOpenAutoFocus={(e) => e.preventDefault()}
 		>
 			{@render contenido()}
@@ -249,7 +249,7 @@
 	<Sheet.Root bind:open>
 		<Sheet.Content
 			side="bottom"
-			class="bottom-14! h-[50dvh]! flex flex-col p-4"
+			class="bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]! h-[50dvh]! flex flex-col p-4"
 			onOpenAutoFocus={(e) => e.preventDefault()}
 		>
 			{@render contenido()}

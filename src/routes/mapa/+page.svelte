@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Fab from '$lib/components/Fab.svelte';
 	import { onMount } from 'svelte';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -182,7 +183,7 @@
 		{
 			saveLayout: () => Promise<void>;
 			reorganize: () => void;
-			transferPreviewPositions: (ghostToReal: Map<string, string>) => void;
+			transferPreviewPositions: (ghostToReal: Map<string, string>) => Promise<void>;
 			panToEntity: (
 				target: { kind: 'posicion' | 'sumision' | 'tecnica'; id: string },
 				presentation: 'dialog' | 'sheet-side' | 'sheet-bottom'
@@ -617,9 +618,9 @@
 	}
 
 	/**
-	 * Aceptar (solo último paso): inserta UNA vez, conserva la posición en
-	 * pantalla de lo nuevo, cambia la disciplina activa a la del último
-	 * paso y sale del modo quedándose en el mapa.
+	 * Aceptar (solo último paso): inserta UNA vez, conserva y guarda
+	 * (T-3.it8) la posición en pantalla de lo nuevo, cambia la disciplina
+	 * activa a la del último paso y sale del modo quedándose en el mapa.
 	 */
 	async function aceptarPreview() {
 		if (aceptandoPreview || !ultimoPasoPreview || !previewPaso?.ok) return;
@@ -632,7 +633,9 @@
 				errorAceptarPreview = borrador.errorInsert ?? 'No se pudo completar la importación.';
 				return;
 			}
-			grafoComponent?.transferPreviewPositions(res.ghostToReal);
+			// T-3.it8: coloca lo creado donde se vio y guarda SOLO esas
+			// posiciones en BD, para que el grafo no quede "sin guardar".
+			await grafoComponent?.transferPreviewPositions(res.ghostToReal);
 			if (disciplinaFinal !== settings.disciplinaActiva) {
 				await settings.setDisciplinaActiva(disciplinaFinal);
 			}
@@ -807,7 +810,7 @@
 		<div class="rounded border border-dashed border-border p-8 text-center">
 			<p class="text-muted-foreground">Catálogo vacío.</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Pulsa "+ Nuevo" para empezar.
+				Pulsa + para empezar.
 			</p>
 		</div>
 	{:else}
@@ -1078,7 +1081,7 @@
 			<!--
 			  Vista grafo. En móvil el contenedor sangra el padding lateral
 			  del main (`-mx-4`) y anula el `pb-28` (`-mb-28`) para llegar a
-			  ras del bottom nav (`bottom-14` = 56px). Altura calculada con
+			  ras del bottom nav (`--bottom-nav-h` = 56px). Altura calculada con
 			  `dvh` para que aguante la barra dinámica del navegador móvil:
 			  100dvh − 13rem (header 14 + sub-header ~6 + nav 14 + padding).
 			  En desktop volvemos al wrapper acotado con altura `70vh`.
@@ -1225,13 +1228,13 @@
 			  Tab "Sumisiones": lista plana ordenada alfabéticamente (la DAO ya
 			  aplica `ORDER BY nombre`). Click en item → abre `SumisionModalContent`
 			  vía el stack del mapa (mismo flujo que desde el modal de posición).
-			  Creación NO se hace desde aquí: el FAB "+ Nuevo" global de la página
+			  Creación NO se hace desde aquí: el FAB "+" global de la página
 			  ya expone "Nueva sumisión" en su DropdownMenu, así evitamos un
 			  segundo punto de entrada (decisión: escaso > ruido).
 			-->
 			{#if sumisiones.length === 0}
 				<p class="rounded border border-dashed border-border p-8 text-center text-muted-foreground">
-					Sin sumisiones en el catálogo. Pulsa "+ Nuevo → Nueva sumisión".
+					Sin sumisiones en el catálogo. Pulsa + → Nueva sumisión.
 				</p>
 			{:else if sumisionesFiltradas.length === 0}
 				<p class="rounded border border-dashed border-border p-8 text-center text-muted-foreground">
@@ -1259,26 +1262,19 @@
 <BottomNav />
 
 <!--
-  FAB con dropdown (T-9): un solo botón "+ Nuevo" que despliega dos opciones
+  FAB con dropdown (T-9): un solo botón "+" (mismo FAB que home) que despliega las opciones
   ("Nueva posición" / "Nueva sumisión"). Visible en cualquier anchura. La
   BottomNav del proyecto se mantiene siempre, por lo que dejamos hueco con
   `bottom-24` para no chocar con ella. El `z-30` mantiene el botón por
   encima del BottomNav, y el Content del DropdownMenu se monta vía Portal
   (bits-ui) por lo que se renderiza fuera de cualquier overflow.
 -->
-{#if status === 'ready' && !previewActivo}
+{#if !previewActivo}
 	<DropdownMenu.Root>
-		<DropdownMenu.Trigger>
+		<DropdownMenu.Trigger disabled={status !== 'ready'}>
 			{#snippet child({ props })}
-				<Button
-					{...props}
-					class="fixed right-6 bottom-24 z-30 inline-flex shadow-lg"
-					size="lg"
-					aria-label="Crear nuevo elemento del mapa"
-				>
-					<PlusIcon />
-					Nuevo
-				</Button>
+				<!-- Mismo FAB redondo que home y compañeros. -->
+				<Fab label="Crear nuevo elemento del mapa" {...props} />
 			{/snippet}
 		</DropdownMenu.Trigger>
 		<DropdownMenu.Content align="end" side="top" sideOffset={8}>
@@ -1298,7 +1294,7 @@
 {#if previewActivo && disciplinaPaso}
 	<div
 		bind:clientHeight={alturaBarraPreview}
-		class="fixed right-0 bottom-14 left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg"
+		class="fixed right-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg"
 		role="region"
 		aria-label="Vista previa de importación"
 	>
@@ -1350,7 +1346,7 @@
 <!-- T-3.it7: aviso tras aceptar de lo que no se creó (pasos con error saltados). -->
 {#if (avisoNoCreados.length > 0 || avisoCreadosEnUnLado.length > 0) && !previewActivo}
 	<div
-		class="fixed right-0 bottom-14 left-0 z-40 border-t border-warning/40 bg-card px-4 py-3 shadow-lg"
+		class="fixed right-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] left-0 z-40 border-t border-warning/40 bg-card px-4 py-3 shadow-lg"
 		role="status"
 	>
 		<div class="mx-auto flex max-w-2xl items-start gap-3">
@@ -1388,7 +1384,7 @@
 
 <!-- Panel bulk edit tags (visible cuando hay selección activa) -->
 {#if modoSeleccion && posicionesSeleccionadas.size > 0}
-	<div class="fixed right-0 bottom-14 left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg">
+	<div class="fixed right-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg">
 		<div class="flex flex-wrap items-center gap-3">
 			<span class="text-sm font-medium">{posicionesSeleccionadas.size} seleccionada{posicionesSeleccionadas.size !== 1 ? 's' : ''}</span>
 			<div class="flex flex-1 flex-wrap items-center gap-2">

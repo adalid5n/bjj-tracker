@@ -4,6 +4,7 @@
  */
 
 import { init, query, run } from '$lib/db';
+import { conSavepoint } from '$lib/transaccion';
 import type { Disciplina, ResultadoRoll, Roll, TipoSesion } from '$lib/types';
 
 export type NewRoll = Omit<Roll, 'id' | 'orden' | 'created_at' | 'updated_at'>;
@@ -168,6 +169,19 @@ export async function updateRoll(data: RollUpdate): Promise<void> {
 export async function deleteRoll(id: string): Promise<void> {
 	await init();
 	await run('DELETE FROM rolls WHERE id = ?', [id]);
+}
+
+/**
+ * Borrado en bloque (borrado-rolls-en-bloque): un único DELETE dentro de un
+ * savepoint → todos o ninguno. Los vínculos (`roll_tecnica`,
+ * `roll_posicion`, `roll_posicion_problema`) caen por ON DELETE CASCADE.
+ * Lista vacía = no-op.
+ */
+export async function deleteRolls(ids: string[]): Promise<void> {
+	if (ids.length === 0) return;
+	await init();
+	const placeholders = ids.map(() => '?').join(', ');
+	await conSavepoint(() => run(`DELETE FROM rolls WHERE id IN (${placeholders})`, ids));
 }
 
 /**

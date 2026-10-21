@@ -204,9 +204,8 @@
 	<p class="pt-4 text-center text-xs text-muted-foreground/60">v{VERSION}</p>
 </main>
 
-{#if status === 'ready'}
-	<Fab onclick={openCreate} label="Nueva sesión" />
-{/if}
+<!-- Siempre montado (como la BottomNav) para que no aparezca/desaparezca al navegar. -->
+<Fab onclick={openCreate} label="Nueva sesión" disabled={status !== 'ready'} />
 
 <BottomNav />
 

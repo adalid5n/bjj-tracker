@@ -9,7 +9,7 @@
 	<div
 		role="status"
 		aria-live="polite"
-		class="fixed bottom-20 left-4 z-30 flex max-w-sm items-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg"
+		class="fixed bottom-[calc(var(--bottom-nav-h)+1.5rem+env(safe-area-inset-bottom))] left-4 z-30 flex max-w-sm items-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg"
 	>
 		<p class="flex-1 text-sm">Nueva versión disponible</p>
 		<Button

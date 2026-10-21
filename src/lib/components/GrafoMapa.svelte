@@ -21,6 +21,10 @@
 	// lo visto en el paso de BJJ conserve su sitio aunque al aceptar el
 	// grafo muestre ya el paso de Grappling. No se usa para el layout.
 	const ghostPositions = new Map<string, { x: number; y: number }>();
+	// T-3.it8: ids reales (`pos:`/`sum:`) creados por una importación cuya
+	// posición aún no se conocía al aceptar. Se guardan en `grafo_layout` en
+	// cuanto un layout los coloque (handler `layoutstop`).
+	const pendientesGuardar = new Set<string>();
 </script>
 
 <script lang="ts">
@@ -792,22 +796,65 @@
 		sincronizarPulso();
 	});
 
+	/** Fila de `grafo_layout` para un id Cytoscape `pos:<id>` / `sum:<id>`. */
+	function filaLayout(
+		cyId: string,
+		p: { x: number; y: number }
+	): { entidad_id: string; kind: GrafoLayoutKind; x: number; y: number } | null {
+		const kind: GrafoLayoutKind | null = cyId.startsWith('pos:')
+			? 'posicion'
+			: cyId.startsWith('sum:')
+				? 'sumision'
+				: null;
+		return kind ? { entidad_id: cyId.slice(4), kind, x: p.x, y: p.y } : null;
+	}
+
+	/**
+	 * Guarda en BD solo las filas dadas. Si falla, las posiciones siguen en
+	 * el cache y se sube `dirty` para que "Guardar organización" reintente.
+	 */
+	async function guardarFilas(
+		rows: { entidad_id: string; kind: GrafoLayoutKind; x: number; y: number }[]
+	): Promise<void> {
+		try {
+			await upsertLayouts(rows);
+		} catch (err) {
+			console.error('[GrafoMapa] guardar posiciones importadas falló:', err);
+			dirty = true;
+		}
+	}
+
 	/**
 	 * T-3.it7: tras aceptar la vista previa, copia la posición en pantalla
 	 * de cada fantasma al cache con el id real (`pos:<id>` / `sum:<id>`),
-	 * para que lo creado aparezca donde se vio. No toca `grafo_layout`.
+	 * para que lo creado aparezca donde se vio.
+	 *
+	 * T-3.it8: además guarda esas posiciones en `grafo_layout`. Antes solo
+	 * iban al cache: en la siguiente visita a /mapa los nodos importados no
+	 * tenían posición en BD y el auto-dirty del montaje dejaba el grafo
+	 * "sin guardar" (aviso "¿Descartar cambios?" al salir). Solo se escriben
+	 * las filas de lo recién creado — nunca las de nodos existentes, así que
+	 * ni se pisa lo guardado ni se guardan a escondidas movimientos que el
+	 * usuario tuviera pendientes (esos siguen en `dirty` como estaban).
 	 */
-	export function transferPreviewPositions(ghostToReal: Map<string, string>): void {
-		if (!cy) return;
+	export async function transferPreviewPositions(ghostToReal: Map<string, string>): Promise<void> {
+		const rows: { entidad_id: string; kind: GrafoLayoutKind; x: number; y: number }[] = [];
 		for (const [ghostId, realId] of ghostToReal) {
-			const node = cy.getElementById(ghostId);
+			const node = cy?.getElementById(ghostId);
 			// Paso visible: posición actual; pasos anteriores ("Ambos"): la
 			// última que tuvieron en pantalla.
-			const p = node.empty() ? ghostPositions.get(ghostId) : node.position();
-			if (!p) continue;
+			const p = !node || node.empty() ? ghostPositions.get(ghostId) : node.position();
+			if (!p) {
+				// Sin posición conocida: se guardará cuando un layout lo coloque.
+				pendientesGuardar.add(realId);
+				continue;
+			}
 			positionsCache.set(realId, { x: p.x, y: p.y });
+			const fila = filaLayout(realId, p);
+			if (fila) rows.push(fila);
 		}
 		ghostPositions.clear();
+		await guardarFilas(rows);
 	}
 
 	onMount(() => {
@@ -867,6 +914,7 @@
 				// Cubre tanto el layout inicial como cualquier recálculo
 				// posterior (cambio de catálogo, click en Reorganizar).
 				instance.on('layoutstop', () => {
+					const filasPendientes: { entidad_id: string; kind: GrafoLayoutKind; x: number; y: number }[] = [];
 					instance.nodes().forEach((n) => {
 						// T-3.it7: los fantasma no entran en el cache.
 						if (n.data('nuevo')) {
@@ -876,7 +924,13 @@
 						}
 						const p = n.position();
 						positionsCache.set(n.id(), { x: p.x, y: p.y });
+						// T-3.it8: importados sin posición al aceptar.
+						if (pendientesGuardar.delete(n.id())) {
+							const fila = filaLayout(n.id(), p);
+							if (fila) filasPendientes.push(fila);
+						}
 					});
+					if (filasPendientes.length > 0) void guardarFilas(filasPendientes);
 					if (reorderingHideTimer) clearTimeout(reorderingHideTimer);
 					reorderingHideTimer = setTimeout(() => {
 						reordering = false;
@@ -966,7 +1020,11 @@
 				// de los fijados. Auto-dirty para alertar al usuario de
 				// que hay disposiciones nuevas no guardadas.
 				const nodesWithoutDbLayout = nodes.filter(
-					(n) => !n.data.nuevo && !positionsCache.has(n.data.id)
+					(n) =>
+						!n.data.nuevo &&
+						!positionsCache.has(n.data.id) &&
+						// T-3.it8: los importados pendientes se guardan solos al colocarse.
+						!pendientesGuardar.has(n.data.id)
 				);
 				const autoDirty = nodes.length > 0 && nodesWithoutDbLayout.length > 0;
 

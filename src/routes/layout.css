@@ -11,6 +11,15 @@ body {
 }
 
 :root {
+	/*
+	 * Alto de la BottomNav: fila de contenido + borde superior (1px), SIN
+	 * el safe-area inferior (la nav lo añade aparte con un spacer). La nav
+	 * usa exactamente este valor y todo lo fijo que va pegado encima de
+	 * ella (sheets del mapa, barras de vista previa/acciones) lo consume
+	 * como `calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))`, para
+	 * que nunca diverjan. 3.5rem = 56px (antes 3.375rem + 1px = 55px).
+	 */
+	--bottom-nav-h: 3.5rem;
 	--background: oklch(0.99 0 0);
 	--foreground: oklch(0.145 0 0);
 	--card: oklch(1 0 0);

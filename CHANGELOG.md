@@ -6,6 +6,17 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 
 ## [Unreleased]
 
+### Added
+- Rolls: seleccionar varios (botón "Seleccionar" o manteniendo pulsado un roll) y borrarlos de una vez, con confirmación.
+
+### Changed
+- Borrar un roll pide confirmación con el diálogo de la app en vez del del navegador.
+- El botón "+" del mapa es el mismo botón redondo que en Inicio y Compañeros, y el botón "+" ya no parpadea al cambiar de pantalla.
+
+### Fixed
+- La ficha del mapa, las barras inferiores y el botón "+" ya no se montan sobre el menú inferior en móviles con barra de gestos.
+- Tras aceptar una importación de clase, las posiciones de lo nuevo en el mapa se guardan solas: ya no sale "¿Descartar cambios?" al salir del mapa.
+
 ## [0.7.0] — 2026-10-19
 
 Tag: `v0.7-it7` · [Iteración 7](docs/iterations/ITERACION_7.md) — Importar clase 2.0. Incluye también el pulido entregado entre la it.6 y la it.7 (etiquetas, disciplina, importación de clase con IA). Base de datos v12; copia de seguridad v8.

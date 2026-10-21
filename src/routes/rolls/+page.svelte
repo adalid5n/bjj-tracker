@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import * as Select from '$lib/components/ui/select';
@@ -26,6 +28,7 @@
 	} from '$lib/types';
 	import type { RollWithContext } from '$lib/rolls';
 	import { TIPO_SESION_LABEL, etiquetaSesion } from '$lib/sesion-etiquetas';
+	import { longpress } from '$lib/actions/longpress';
 
 	// T-4.it7: tipo Clase / Open mat; la etiqueta incluye la disciplina.
 	const TIPO_LABEL = TIPO_SESION_LABEL;
@@ -84,6 +87,16 @@
 	// Se incrementa tras guardar/borrar un roll desde esta página para
 	// que los conteos de C1/C2 reflejen el cambio sin tener que recargar.
 	let analisisReloadKey = $state(0);
+
+	// borrado-rolls-en-bloque: modo selección (mismo patrón que /mapa →
+	// posiciones). En modo selección tocar una tarjeta marca/desmarca en vez
+	// de abrir el editor.
+	let modoSeleccion = $state(false);
+	let seleccionados = $state<Set<string>>(new Set());
+	let confirmarBorradoBloque = $state(false);
+	let bulkWorking = $state(false);
+	let bulkError = $state('');
+	let bulkFlash = $state('');
 
 	onMount(async () => {
 		settings.init();
@@ -218,6 +231,59 @@
 		analisisReloadKey++;
 	}
 
+	function toggleSeleccion(id: string) {
+		const s = new Set(seleccionados);
+		if (s.has(id)) s.delete(id);
+		else s.add(id);
+		seleccionados = s;
+	}
+
+	// Mantener pulsada una tarjeta: fuera del modo selección entra en él con
+	// ese roll marcado; dentro, alterna como un toque normal. El click que
+	// sigue al soltar lo anula la acción `longpress` (sin doble alternancia).
+	function handleLongPress(id: string) {
+		if (modoSeleccion) {
+			toggleSeleccion(id);
+			return;
+		}
+		modoSeleccion = true;
+		seleccionados = new Set([id]);
+		try {
+			navigator.vibrate?.(10);
+		} catch {
+			// Vibración no disponible/bloqueada: no es crítica.
+		}
+	}
+
+	function salirModoSeleccion() {
+		modoSeleccion = false;
+		seleccionados = new Set();
+		bulkError = '';
+	}
+
+	async function handleBorrarSeleccionados() {
+		if (seleccionados.size === 0 || bulkWorking) return;
+		bulkWorking = true;
+		bulkError = '';
+		const n = seleccionados.size;
+		try {
+			const { deleteRolls } = await import('$lib/rolls');
+			await deleteRolls([...seleccionados]);
+			confirmarBorradoBloque = false;
+			salirModoSeleccion();
+			await refresh();
+			analisisReloadKey++;
+			bulkFlash = n === 1 ? '✓ 1 roll borrado' : `✓ ${n} rolls borrados`;
+			setTimeout(() => (bulkFlash = ''), 2000);
+		} catch (err) {
+			confirmarBorradoBloque = false;
+			bulkError = err instanceof Error ? err.message : String(err);
+			console.error('[rolls] borrado en bloque falló:', err);
+		} finally {
+			bulkWorking = false;
+		}
+	}
+
 	async function handleDeleteRoll() {
 		if (!editingRoll) return;
 		const { deleteRoll } = await import('$lib/rolls');
@@ -263,13 +329,32 @@
 		posicionIds;
 		if (status === 'ready') void refresh();
 	});
+
+	// borrado-rolls-en-bloque: solo se seleccionan rolls visibles → cualquier
+	// cambio de filtro vacía la selección (escribir sin leer `seleccionados`
+	// no crea dependencia).
+	$effect(() => {
+		from;
+		to;
+		companeroId;
+		resultado;
+		tipoSesion;
+		posicionIds;
+		seleccionados = new Set();
+	});
+
+	// Si la lista queda vacía (filtros o borrado), el botón Cancelar deja de
+	// pintarse: salimos del modo para no dejar la barra huérfana.
+	$effect(() => {
+		if (modoSeleccion && rolls.length === 0) salirModoSeleccion();
+	});
 </script>
 
 <svelte:head>
 	<title>Rolls · BJJ Tracker</title>
 </svelte:head>
 
-<main class="mx-auto max-w-2xl space-y-3 p-4 pb-28">
+<main class="mx-auto max-w-2xl space-y-3 p-4 {modoSeleccion ? 'pb-48' : 'pb-28'}">
 	<!--
 	  Sub-header sticky: el bloque de filtros queda pegado justo debajo del
 	  AppHeader (h-14 → top-14 = 56px) cuando el usuario hace scroll.
@@ -401,7 +486,23 @@
 				: 'Aún no has registrado ningún roll.'}
 		</p>
 	{:else}
-		<p class="text-xs text-muted-foreground">{rolls.length} roll(s)</p>
+		<div class="flex min-h-8 items-center justify-between gap-2">
+			<p class="text-xs text-muted-foreground">
+				{rolls.length} roll(s)
+				{#if bulkFlash}<span class="ml-2 text-success" role="status">{bulkFlash}</span>{/if}
+			</p>
+			<Button
+				variant={modoSeleccion ? 'default' : 'outline'}
+				size="sm"
+				onclick={() => {
+					if (modoSeleccion) salirModoSeleccion();
+					else modoSeleccion = true;
+				}}
+				aria-pressed={modoSeleccion}
+			>
+				{modoSeleccion ? 'Cancelar' : 'Seleccionar'}
+			</Button>
+		</div>
 		{#each rollsPorDia as grupo (grupo.fecha)}
 			<section class="space-y-2">
 				<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -417,6 +518,7 @@
 							...posBien.map((id) => ({ value: id, label: posicionLabel(id) ?? '' })),
 							...tecBien.map((id) => ({ value: id, label: tecnicaLabel(id) ?? '' }))
 						].filter((o) => o.label)}
+						{@const seleccionado = seleccionados.has(r.id)}
 						{@const itemsMal = [
 							...posFallaron.map((id) => ({ value: id, label: posicionLabel(id) ?? '' })),
 							...tecFallaron.map((id) => ({ value: id, label: tecnicaLabel(id) ?? '' }))
@@ -424,11 +526,26 @@
 						<li>
 							<button
 								type="button"
-								class="w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-colors hover:bg-accent"
-								onclick={() => openEdit(r)}
+								use:longpress={{ onLongPress: () => handleLongPress(r.id) }}
+								class="w-full rounded-lg border p-3 text-left shadow-xs transition-colors select-none [-webkit-touch-callout:none] {modoSeleccion &&
+								seleccionado
+									? 'border-primary bg-primary/5'
+									: 'border-border bg-card hover:bg-accent'}"
+								aria-pressed={modoSeleccion ? seleccionado : undefined}
+								onclick={() => (modoSeleccion ? toggleSeleccion(r.id) : openEdit(r))}
 							>
 								<div class="flex items-baseline justify-between gap-2">
-									<div class="flex items-baseline gap-2">
+									<div class="flex items-center gap-2">
+										{#if modoSeleccion}
+											<span
+												class="flex h-4 w-4 shrink-0 items-center justify-center rounded border {seleccionado
+													? 'border-primary bg-primary'
+													: 'border-border bg-background'}"
+												aria-hidden="true"
+											>
+												{#if seleccionado}<CheckIcon class="h-3 w-3 text-primary-foreground" />{/if}
+											</span>
+										{/if}
 										{#if r.companero_nombre}
 											<span class="font-medium">{r.companero_nombre}</span>
 										{:else}
@@ -443,6 +560,7 @@
 								</div>
 								<div class="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
 									<span>{etiquetaSesion({ tipo: r.sesion_tipo, disciplina: r.sesion_disciplina })}</span>
+									{#if !modoSeleccion}
 									<a
 										href={resolve(`/sesion/${r.sesion_id}`)}
 										class="text-primary underline hover:opacity-80"
@@ -454,6 +572,7 @@
 									>
 										Ver sesión →
 									</a>
+									{/if}
 								</div>
 								{#if r.que_fallo}
 									<div class="mt-1 truncate text-sm text-muted-foreground">{r.que_fallo}</div>
@@ -480,6 +599,61 @@
 		{/each}
 	{/if}
 </main>
+
+<!--
+  borrado-rolls-en-bloque: barra de acciones fija justo encima del BottomNav
+  (--bottom-nav-h, definida en layout.css, + safe-area).
+-->
+{#if modoSeleccion}
+	<div
+		class="fixed right-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] left-0 z-40 border-t border-border bg-card px-4 py-3 shadow-lg"
+	>
+		<div class="mx-auto flex max-w-2xl items-center justify-between gap-3">
+			<span class="text-sm font-medium" role="status">
+				{seleccionados.size} seleccionado{seleccionados.size !== 1 ? 's' : ''}
+			</span>
+			<Button
+				variant="destructive"
+				size="sm"
+				disabled={seleccionados.size === 0 || bulkWorking}
+				onclick={() => (confirmarBorradoBloque = true)}
+			>
+				Borrar ({seleccionados.size})
+			</Button>
+		</div>
+		{#if bulkError}
+			<p class="mx-auto mt-2 max-w-2xl text-sm text-destructive">{bulkError}</p>
+		{/if}
+	</div>
+{/if}
+
+<AlertDialog.Root
+	open={confirmarBorradoBloque}
+	onOpenChange={(v) => {
+		if (!v && !bulkWorking) confirmarBorradoBloque = false;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>
+				{seleccionados.size === 1 ? '¿Borrar 1 roll?' : `¿Borrar ${seleccionados.size} rolls?`}
+			</AlertDialog.Title>
+			<AlertDialog.Description>
+				No se puede deshacer. Se borran también sus posiciones y técnicas marcadas.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={bulkWorking}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action
+				variant="destructive"
+				onclick={handleBorrarSeleccionados}
+				disabled={bulkWorking}
+			>
+				{bulkWorking ? 'Borrando…' : 'Borrar'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 <BottomNav />
 

@@ -1,12 +1,21 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-10-21 (sesión 52, apertura de la it.8)
-**Fase activa:** it.8 "Pulido P1" abierta en rama `it8/pulido` ([`ITERACION_8.md`](../docs/iterations/ITERACION_8.md)): T-1.it8 (ficha del mapa por encima del menú inferior) y T-2.it8 (borrado de rolls en bloque + confirmación) implementadas, pendientes de validar.
+**Última actualización:** 2026-10-21 (sesión 52, it.8: T-1..T-4 cerradas)
+**Fase activa:** it.8 "Pulido P1" abierta ([`ITERACION_8.md`](../docs/iterations/ITERACION_8.md)): T-1 (ficha sobre el menú), T-2 (borrado de rolls en bloque + pulsación larga), T-3 (guardar organización tras importar) y T-4 (FAB del mapa unificado, sin parpadeo) validadas por el owner y en main (2026-10-21). Siguen MF-043 → MF-041; MF-040 a decidir.
 **Próxima iteración:** **it.9 Panel de alertas** (MF-030). Dentro de la it.8, después: MF-043 → MF-041; MF-040 a decidir. Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047 y MF-048 (sin prioridad).
 
 ---
 
 ## Sesión 52 (2026-10-21) — apertura it.8 (portátil)
+
+**Cerrado en la sesión (todo validado por el owner en `localhost:4173`, fusionado en main y desplegado):**
+- T-1.it8 ficha del mapa sobre el menú inferior + variable `--bottom-nav-h` (layout.css) usada por BottomNav, fichas, panel de historial, barras de vista previa/etiquetado, barra de borrado de rolls, FAB y aviso de actualización. La barra de gestos real solo se puede comprobar en la tablet → pendiente de que el owner lo mire en prod.
+- T-2.it8 borrado de rolls en bloque (Seleccionar o mantener pulsado 500 ms, acción `src/lib/actions/longpress.ts`) + AlertDialog al borrar un roll.
+- T-3.it8 al aceptar una importación se guardan las posiciones de los nodos nuevos (`transferPreviewPositions` + `upsertLayouts`); importaciones previas necesitan un "Guardar organización" manual.
+- T-4.it8 FAB del mapa = FAB de Inicio; FAB siempre montado (desactivado mientras carga). Descartado FAB global en layout (decisión del owner).
+- Changes archivados: `borrado-rolls-en-bloque`, `import-guarda-organizacion`, `fab-mapa-unificado`.
+
+**Próximo paso concreto:** owner comprueba en la tablet (prod) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
 
 **Hecho:**
 - Prod verificada con la it.7 (build 19/10/26 16:48 en Ajustes).

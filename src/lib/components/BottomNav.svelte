@@ -41,13 +41,15 @@
 <nav
 	class="fixed right-0 bottom-0 left-0 z-20 border-t border-border bg-background shadow-[0_-2px_8px_rgba(0,0,0,0.18)]"
 >
-	<ul class="mx-auto flex max-w-md justify-around">
+	<!-- Alto fijo = `--bottom-nav-h` (layout.css) menos el borde superior
+	     del <nav>: lo que esté encima de la nav usa la misma variable. -->
+	<ul class="mx-auto flex h-[calc(var(--bottom-nav-h)-1px)] max-w-md justify-around">
 		{#each items as item (item.href)}
 			{@const active = item.match(path)}
 			<li class="flex-1">
 				<a
 					href={item.href}
-					class="flex flex-col items-center gap-0.5 px-2 py-2 text-xs transition-colors {active
+					class="flex h-full flex-col items-center justify-center gap-0.5 px-2 text-xs transition-colors {active
 						? 'text-primary'
 						: 'text-muted-foreground hover:text-foreground'}"
 				>

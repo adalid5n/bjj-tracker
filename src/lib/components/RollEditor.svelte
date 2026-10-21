@@ -200,6 +200,7 @@
 					: settings.disciplinaActiva)
 			);
 			disciplinaPendiente = null;
+			confirmarBorrado = false;
 			avisoCatalogo.clear();
 			currentStep = 1;
 			visitedSteps = new Set([1]);
@@ -717,11 +718,24 @@
 		}
 	}
 
+	// borrado-rolls-en-bloque: confirmación con AlertDialog de la app en vez
+	// del `confirm()` nativo. Vale para /rolls y /sesion/[id].
+	let confirmarBorrado = $state(false);
+	let borrando = $state(false);
+
 	async function handleDelete() {
-		if (!onDelete) return;
-		if (!confirm('¿Borrar este roll?')) return;
-		await onDelete();
-		open = false;
+		if (!onDelete || borrando) return;
+		borrando = true;
+		try {
+			await onDelete();
+			confirmarBorrado = false;
+			open = false;
+		} catch (err) {
+			confirmarBorrado = false;
+			errorMsg = err instanceof Error ? err.message : String(err);
+		} finally {
+			borrando = false;
+		}
 	}
 </script>
 
@@ -737,7 +751,12 @@
 				e.preventDefault();
 				return;
 			}
-			if (crearPosicionOpen || crearTecnicaOpen || disciplinaPendiente !== null) {
+			if (
+				crearPosicionOpen ||
+				crearTecnicaOpen ||
+				disciplinaPendiente !== null ||
+				confirmarBorrado
+			) {
 				e.preventDefault();
 			}
 		}}
@@ -1359,7 +1378,12 @@
 				-->
 				<div class="flex gap-2">
 					{#if onDelete}
-						<Button variant="destructive" size="sm" onclick={handleDelete} disabled={saving}>
+						<Button
+							variant="destructive"
+							size="sm"
+							onclick={() => (confirmarBorrado = true)}
+							disabled={saving}
+						>
 							Borrar
 						</Button>
 					{/if}
@@ -1422,6 +1446,29 @@
 			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
 			<AlertDialog.Action onclick={confirmarCambioDisciplina}>
 				Cambiar a {disciplinaPendiente ? DISCIPLINA_LABEL[disciplinaPendiente] : ''}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- borrado-rolls-en-bloque: confirmar el borrado de este roll. -->
+<AlertDialog.Root
+	open={confirmarBorrado}
+	onOpenChange={(v) => {
+		if (!v && !borrando) confirmarBorrado = false;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>¿Borrar este roll?</AlertDialog.Title>
+			<AlertDialog.Description>
+				No se puede deshacer. Se borran también sus posiciones y técnicas marcadas.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={borrando}>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action variant="destructive" onclick={handleDelete} disabled={borrando}>
+				{borrando ? 'Borrando…' : 'Borrar'}
 			</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
