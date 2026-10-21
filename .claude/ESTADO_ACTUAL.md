@@ -1,8 +1,8 @@
 # Estado actual del proyecto
 
 **Última actualización:** 2026-10-21 (sesión 52, it.8: T-1..T-4 cerradas; T-5..T-9 en prod sin validar)
-**Fase activa:** it.8 "Pulido P1" abierta ([`ITERACION_8.md`](../docs/iterations/ITERACION_8.md)): T-1 (ficha sobre el menú), T-2 (borrado de rolls en bloque + pulsación larga), T-3 (guardar organización tras importar) y T-4 (FAB del mapa unificado, sin parpadeo) validadas por el owner y en main (2026-10-21). Siguen MF-043 → MF-041; MF-040 a decidir.
-**Próxima iteración:** **it.9 Panel de alertas** (MF-030). Dentro de la it.8, después: MF-043 → MF-041; MF-040 a decidir. Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047 y MF-048 (sin prioridad).
+**Fase activa:** it.8 "Pulido P1" abierta ([`ITERACION_8.md`](../docs/iterations/ITERACION_8.md)): T-1 (ficha sobre el menú), T-2 (borrado de rolls en bloque + pulsación larga), T-3 (guardar organización tras importar) y T-4 (FAB del mapa unificado, sin parpadeo) validadas por el owner y en main (2026-10-21). Siguen MF-027 → MF-043 → MF-041; MF-040 a decidir.
+**Próxima iteración:** **it.9 Panel de alertas** (MF-030). Dentro de la it.8, después: MF-027 → MF-043 → MF-041; MF-040 a decidir. Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047, MF-048, MF-049 y MF-050 (sin prioridad).
 
 ---
 
@@ -21,7 +21,9 @@
 
 - Quitado el círculo gris de Cytoscape al tocar el fondo del grafo (`active-bg-opacity: 0`) y el tap-highlight de Chrome Android en el contenedor (owner, 2026-10-21).
 
-**Próximo paso concreto:** owner valida T-5..T-9 en prod (tablet); con OK → marcar validación y archivar los 5 changes. Antes: owner comprueba en la tablet (prod) (y que el nombre "BJJ Notes" aparece) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
+- **Decisiones del owner (2026-10-21, backlog):** MF-027 sube a **P1** y entra en la it.8 (primera de "Después"): "Copiar a…" con lista de disciplinas destino desde la ficha de posición, sumisión y técnica, reutilizando la lógica de T-4.it7 (`catalogo-lados.ts`, `separar-ambos.ts`), sin cambio de esquema. Altas sin prioridad: **MF-049** "Disciplina MMA" (Decisión; pregunta abierta: ¿solo grappling de MMA o también striking?) y **MF-050** "Notas libres y reorganizar la navegación" (pendiente de refinar; puntos abiertos: notas vs catálogo, dónde va /rolls sin pestaña, ≤5 en el menú, nota de ejemplo del owner).
+
+**Próximo paso concreto:** owner valida T-5..T-9 en prod (tablet); con OK → marcar validación y archivar los 5 changes. Antes: owner comprueba en la tablet (prod) (y que el nombre "BJJ Notes" aparece) la ficha y las barras sobre el menú con la barra de gestos; después MF-027 ("Copiar a…", change de OpenSpec primero), MF-043 (regla de borrado; ver MF-048) y MF-041.
 
 **Hecho:**
 - Prod verificada con la it.7 (build 19/10/26 16:48 en Ajustes).

@@ -26,6 +26,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-029 | [Importar clase 2.0 — historial, reintentar, vista previa, revertir](#mf-029) | Mejora | Alto | L | P1 | Abierta · solo queda revertir |
 | MF-043 | [Borrar una técnica usada en rolls borra esos vínculos sin avisar](#mf-043) | Bug | Alto | M | P1 | Abierta |
 | MF-026 | [Bugs de importar clase (validación T-2.it7): micrófono y Refinar](#mf-026) | Bug | Medio | M | P1 | Abierta |
+| MF-027 | [Duplicar un elemento en la otra disciplina](#mf-027) | Mejora | Medio | M | P1 | Abierta |
 | MF-040 | [Ficha del mapa: cerrar al cambiar de contexto + hoja inferior con alturas fijas](#mf-040) | Mejora | Medio | L | P1 | Abierta |
 | MF-041 | [Barra de edición del grafo: "Guardar" + "Cancelar"](#mf-041) | Mejora | Medio | M | P1 | Abierta |
 | MF-012 | [Botón "Forzar actualización" en /ajustes](#mf-012) | Mejora | Medio | S | P2 | Abierta |
@@ -40,7 +41,6 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-020 | [Reducir fricción al crear técnica tipo sumisión](#mf-020) | Mejora | Medio | M | P3 | Abierta |
 | MF-022 | [Resumen automático post-sesión](#mf-022) | Mejora | Medio | M | P3 | Abierta |
 | MF-023 | [Sumisiones vs técnicas — redundancia del modelo](#mf-023) | Decisión | Medio | L | P3 | Abierta |
-| MF-027 | [Duplicar un elemento en la otra disciplina](#mf-027) | Mejora | Medio | M | P3 | Abierta |
 | MF-030 | [Panel de alertas en el grafo — calidad del catálogo](#mf-030) | Mejora | Medio | L | P3 | Abierta |
 | MF-044 | [Skills de flujo: validar, cerrar tarea y arranque de sesión](#mf-044) | Mejora | Medio | S | P3 | Abierta |
 | MF-008 | [Roll editor — sugerir compañero por defecto](#mf-008) | Mejora | Bajo | M | P3 | Abierta |
@@ -55,6 +55,8 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-042 | [Repo público vs privado](#mf-042) | Decisión | Medio | M | — | Abierta |
 | MF-047 | [Posiciones complementarias: sugerir siempre y detectar parejas sin emparejar](#mf-047) | Mejora | Medio | M | — | Abierta |
 | MF-048 | [Borrar bloqueado sin explicación visible (móvil)](#mf-048) | Bug | Medio | M | — | Abierta |
+| MF-049 | [Disciplina MMA](#mf-049) | Decisión | Medio | L | — | Abierta |
+| MF-050 | [Notas libres (p. ej. técnicas de MMA) y reorganizar la navegación](#mf-050) | Mejora | Medio | L | — | Abierta · pendiente de refinar |
 
 **Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos, [MF-037](#mf-037) Loop de refresh tras deploy.
 
@@ -527,11 +529,17 @@ it.6.
 <a id="mf-027"></a>
 ### Duplicar un elemento en la otra disciplina
 
-**MF-027** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P3 · Abierta
+**MF-027** · Mejora · Impacto Medio · Esfuerzo M · Prioridad P1 · Abierta
 
-- **Origen:** Adalid, 2026-10-06 (al decidir T-4.it7).
-- **Idea:** como la disciplina de un elemento no se puede cambiar una vez creado (decisión del owner), ofrecer "Duplicar en BJJ/Grappling" para crear una copia independiente en la otra disciplina.
-- **Cuándo:** implementación futura, después de la it.7.
+- **Origen:** Adalid, 2026-10-06 (al decidir T-4.it7). Repriorizada a P1 y diseño concretado por el owner el 2026-10-21.
+- **Idea original:** como la disciplina de un elemento no se puede cambiar una vez creado (decisión del owner), ofrecer "Duplicar en BJJ/Grappling" para crear una copia independiente en la otra disciplina.
+- **Qué (diseño 2026-10-21):** acción **"Copiar a…"** con una lista de disciplinas destino (no un botón fijo "a la otra", para que valga si mañana hay más disciplinas; ver [MF-049](#mf-049)), disponible desde la ficha de **posición, sumisión y técnica**.
+  - Copiar una **técnica** crea o enlaza (por nombre igual, sin coste) su origen y su destino en la disciplina destino, y completa las complementarias, reutilizando la lógica de T-4.it7.
+  - Al terminar muestra el "aviso de lo creado" que ya existe (qué se creó y qué ya existía).
+  - Sin cambio de esquema: la copia es un elemento independiente, como las copias de "Ambos".
+- **Por qué:** hoy, si un elemento se creó en una sola disciplina, la única forma de tenerlo en la otra es volver a crearlo a mano (y, en técnicas, también sus posiciones).
+- **Cuándo:** **it.8** (owner, 2026-10-21: P1, entra en la iteración en curso).
+- **Notas técnicas:** reutilizar `src/lib/catalogo-lados.ts` (crear/enlazar por nombre en cada lado, `TecnicaDuplicadaError`) y `src/lib/separar-ambos.ts`. Cambio de comportamiento visible → requiere change de OpenSpec sobre `catalogo-tecnico`. Solapa con [MF-003](#mf-003) ("añadir también a la otra" al crear) y [MF-046](#mf-046) ("Ambos" con elemento ya existente: crear solo donde falta): misma lógica de "crear solo donde falta"; conviene que las tres compartan la misma función.
 
 <a id="mf-028"></a>
 ### Fallos catálogo e importación (baseline)
@@ -778,6 +786,38 @@ it.6.
   - **Coherencia de reglas:** hoy borrar una técnica usada en rolls quita esos vínculos sin avisar ([MF-043](#mf-043)), mientras que una posición usada en rolls se bloquea. La regla común (bloquear vs "borrar con aviso" que desvincula los rolls, alternativa que propuso el orquestador y el owner descartó por ahora) se decide al abordar MF-043.
   - **Bug relacionado:** borrar una posición que solo es destino da error técnico (`posicion_destino_id` con SET NULL rompe un CHECK; `openspec/specs/catalogo-tecnico/spec.md` ~309, en [MF-028](#mf-028)). Se arregla en el mismo cambio contando también las técnicas **entrantes** como bloqueo y nombrándolas en el Popover.
   - Cambio de comportamiento visible → requiere change de OpenSpec sobre `catalogo-tecnico`.
+
+<a id="mf-049"></a>
+### Disciplina MMA
+
+**MF-049** · Decisión · Impacto Medio · Esfuerzo L · Prioridad — · Abierta
+
+- **Origen:** owner, 2026-10-21 (quiere un modo MMA; "lo dejamos para luego").
+- **Qué:** añadir MMA como disciplina. **Análisis del orquestador:** la app modela posiciones unidas por técnicas que acaban en posiciones o sumisiones. El grappling de MMA (jaula, ground and pound, defensa de derribos) encaja en ese modelo; el **striking** (combinaciones, distancia) no, y necesitaría un modelo distinto.
+- **Coste técnico de una 3.ª disciplina:**
+  - La semántica de "Ambos" se rompe: pasa a ser una selección múltiple ("en cuáles"). Afecta a asistentes, importar clase con IA, sesiones ("Ambos" = clase mixta), rolls, backup y muchos specs.
+  - `disciplina` está restringida a `bjj`/`grappling` en los CHECK de las tablas → migración nueva que reconstruya tablas (como la v11).
+  - Opción más sana: lista de disciplinas configurable (tabla) en vez de valores fijos en el código.
+- **Pregunta abierta para el owner (antes de planificar):** ¿qué apuntaría de MMA? Si solo es grappling de MMA, quizá baste Grappling + etiquetas; si también striking, es una feature aparte con otro modelo.
+- **Por qué:** el owner entrena (o quiere registrar) MMA además de BJJ/Grappling.
+- **Cuándo:** más adelante (owner, 2026-10-21).
+- **Notas técnicas:** migración nueva al final de `MIGRATIONS` (nunca tocar las históricas). Relacionada con [MF-027](#mf-027) ("Copiar a…" ya pensado para N disciplinas), [MF-003](#mf-003) y [MF-050](#mf-050). Requiere change de OpenSpec amplio.
+
+<a id="mf-050"></a>
+### Notas libres (p. ej. técnicas de MMA) y reorganizar la navegación — PENDIENTE DE REFINAR
+
+**MF-050** · Mejora · Impacto Medio · Esfuerzo L · Prioridad — · Abierta · pendiente de refinar
+
+- **Origen:** owner, 2026-10-21 (idea).
+- **Qué:** una pantalla nueva "Notas" para apuntar técnicas aprendidas (p. ej. en MMA: derribos, escapes de posiciones parecidas a las de grappling). Posiblemente quitar la pestaña Rolls del menú inferior y llegar a los rolls desde el calendario de Inicio con un botón "Histórico de rolls" (coherente: los rolls pertenecen a sesiones).
+- **Por qué:** capturar lo aprendido que hoy no encaja en el catálogo estructurado, sin cargar más el menú inferior.
+- **Puntos abiertos (orquestador, 2026-10-21):**
+  - (a) **Notas libres vs catálogo estructurado:** derribos y escapes podrían ser técnicas en Grappling con etiqueta "MMA", enlazadas al mapa. Notas libres arriesgan duplicar contenido en dos sitios. Término medio: notas con enlaces opcionales a posiciones/técnicas.
+  - (b) **Qué pasa con /rolls** si desaparece la pestaña: hoy tiene filtros, análisis y el nuevo borrado en bloque (T-2.it8). Propuesta: la misma página, accesible desde Inicio, sin pestaña en el menú.
+  - (c) El menú inferior debe quedarse en ≤5 elementos.
+  - (d) Hace falta una nota de ejemplo del owner para decidir la forma.
+- **Cuándo:** sin fecha; refinar antes con el owner.
+- **Notas técnicas:** pantalla nueva + cambio de navegación (`BottomNav`) + probable tabla nueva (migración al final de `MIGRATIONS`) + spec nuevo → requiere change de OpenSpec. Relacionada con [MF-049](#mf-049).
 
 ## Performance / build
 

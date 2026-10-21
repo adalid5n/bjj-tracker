@@ -1,7 +1,7 @@
 # Iteración 8 — Pulido P1
 
 **Versión:** 1.0 (sesión 52, 2026-10-21)
-**Estado:** 🟡 Abierta 2026-10-21 — T-1 a T-4 en main (2026-10-21); siguen MF-043 y MF-041
+**Estado:** 🟡 Abierta 2026-10-21 — T-1 a T-4 en main (2026-10-21); siguen MF-027, MF-043 y MF-041
 **Predecesor:** Iteración 7 "Importar clase 2.0" (cerrada con `v0.7-it7`, 2026-10-19).
 
 ---
@@ -36,6 +36,12 @@ confirmación propia de la app (no la del navegador) al borrar un roll.
 
 ### Después (sin empezar)
 
+- **MF-027** — "Copiar a…" desde la ficha de posición, sumisión y
+  técnica, con lista de disciplinas destino (owner, 2026-10-21: P1, entra
+  en la it.8). Una técnica crea o enlaza por nombre su origen/destino en
+  la disciplina destino y completa complementarias (lógica de T-4.it7:
+  `catalogo-lados.ts`, `separar-ambos.ts`); muestra el aviso de lo
+  creado. Esfuerzo M, sin cambio de esquema. Solapa con MF-003 y MF-046.
 - **MF-043** — borrar una técnica usada en rolls borra esos vínculos sin
   avisar. Ahí se decide la regla de borrado común (ver MF-048).
 - **MF-041** — barra de edición del grafo: "Guardar" + "Cancelar".
@@ -47,6 +53,9 @@ confirmación propia de la app (no la del navegador) al borrar un roll.
   backlog para más adelante. Decisión del owner: mantener el botón
   deshabilitado y añadir un icono de información con Popover.
 - Panel de alertas (MF-030): it.9.
+- **MF-049** (disciplina MMA) y **MF-050** (notas libres + reorganizar la
+  navegación): al backlog sin prioridad (owner, 2026-10-21: "lo dejamos
+  para luego"); MF-050 pendiente de refinar.
 
 ## CRITERIO DE CIERRE
 
@@ -58,5 +67,5 @@ confirmación propia de la app (no la del navegador) al borrar un roll.
 ## REFERENCIAS
 
 - Backlog: [`.claude/MEJORAS_FUTURAS.md`](../../.claude/MEJORAS_FUTURAS.md)
-  (MF-040, MF-041, MF-043, MF-048).
+  (MF-027, MF-040, MF-041, MF-043, MF-048, MF-049, MF-050).
 - Estado vivo: [`.claude/ESTADO_ACTUAL.md`](../../.claude/ESTADO_ACTUAL.md).
