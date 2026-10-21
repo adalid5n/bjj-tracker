@@ -15,7 +15,9 @@
 - T-4.it8 FAB del mapa = FAB de Inicio; FAB siempre montado (desactivado mientras carga). Descartado FAB global en layout (decisión del owner).
 - Changes archivados: `borrado-rolls-en-bloque`, `import-guarda-organizacion`, `fab-mapa-unificado`.
 
-**Próximo paso concreto:** owner comprueba en la tablet (prod) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
+- **Renombrado a "BJJ Notes"** (decisión del owner 2026-10-21): manifest (`vite.config.ts`, tocado a petición del owner), títulos de pantallas y descripción del export. Se mantienen URL `/bjj-tracker/`, repo, fichero de BD y prefijo de backups `bjj-tracker-*.json` (lo usa `.gitignore`). En Android el nombre de la app instalada/splash se actualiza solo (puede tardar ~1 día) o reinstalando (exportar backup antes).
+
+**Próximo paso concreto:** owner comprueba en la tablet (prod) (y que el nombre "BJJ Notes" aparece) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
 
 **Hecho:**
 - Prod verificada con la it.7 (build 19/10/26 16:48 en Ajustes).

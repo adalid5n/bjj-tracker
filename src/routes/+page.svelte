@@ -129,7 +129,7 @@
 </script>
 
 <svelte:head>
-	<title>BJJ Tracker</title>
+	<title>BJJ Notes</title>
 </svelte:head>
 
 <main class="mx-auto min-h-[calc(100vh+200px)] max-w-2xl space-y-4 p-4 pb-32 [overflow-anchor:none] [&_*]:[overflow-anchor:none]">

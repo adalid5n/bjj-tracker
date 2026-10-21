@@ -12,8 +12,8 @@ export default defineConfig({
 			registerType: 'prompt',
 			strategies: 'generateSW',
 			manifest: {
-				name: 'BJJ Tracker',
-				short_name: 'BJJ Track',
+				name: 'BJJ Notes',
+				short_name: 'BJJ Notes',
 				description: 'App personal para registrar entrenamientos de BJJ',
 				theme_color: '#1a1f2e',
 				background_color: '#1a1f2e',

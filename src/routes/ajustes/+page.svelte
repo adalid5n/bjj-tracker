@@ -123,7 +123,7 @@
 				const handles = await fsApi({
 					types: [
 						{
-							description: 'BJJ Tracker export',
+							description: 'BJJ Notes export',
 							accept: { 'application/json': ['.json'] }
 						}
 					],
@@ -179,7 +179,7 @@
 </script>
 
 <svelte:head>
-	<title>Ajustes · BJJ Tracker</title>
+	<title>Ajustes · BJJ Notes</title>
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-4 p-4 pb-28">

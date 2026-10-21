@@ -783,7 +783,7 @@
 </script>
 
 <svelte:head>
-	<title>Mapa técnico · BJJ Tracker</title>
+	<title>Mapa técnico · BJJ Notes</title>
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-3 p-4 pb-28">

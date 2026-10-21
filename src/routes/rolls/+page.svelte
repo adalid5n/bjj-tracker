@@ -351,7 +351,7 @@
 </script>
 
 <svelte:head>
-	<title>Rolls · BJJ Tracker</title>
+	<title>Rolls · BJJ Notes</title>
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-3 p-4 {modoSeleccion ? 'pb-48' : 'pb-28'}">

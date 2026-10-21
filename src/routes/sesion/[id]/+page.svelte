@@ -216,7 +216,7 @@
 </script>
 
 <svelte:head>
-	<title>Sesión · BJJ Tracker</title>
+	<title>Sesión · BJJ Notes</title>
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-4 p-4 pb-32">

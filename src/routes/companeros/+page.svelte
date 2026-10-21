@@ -85,7 +85,7 @@
 </script>
 
 <svelte:head>
-	<title>Compañeros · BJJ Tracker</title>
+	<title>Compañeros · BJJ Notes</title>
 </svelte:head>
 
 <main class="mx-auto max-w-2xl space-y-3 p-4 pb-32">

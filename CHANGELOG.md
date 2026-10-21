@@ -10,6 +10,7 @@ Cada release corresponde a una iteración cerrada con tag git. El detalle de cad
 - Rolls: seleccionar varios (botón "Seleccionar" o manteniendo pulsado un roll) y borrarlos de una vez, con confirmación.
 
 ### Changed
+- La app pasa a llamarse **BJJ Notes** (nombre de la app instalada, pantalla de carga y títulos). La dirección web no cambia.
 - Borrar un roll pide confirmación con el diálogo de la app en vez del del navegador.
 - El botón "+" del mapa es el mismo botón redondo que en Inicio y Compañeros, y el botón "+" ya no parpadea al cambiar de pantalla.
 
