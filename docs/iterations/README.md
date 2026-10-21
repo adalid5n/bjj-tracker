@@ -15,7 +15,8 @@ Histórico de iteraciones del proyecto. Cada iteración tiene su propio document
 | 5     | [Rediseño de home (calendario + dashboard)](ITERACION_5.md)         | ✅ Cerrada | `v0.5-it5`    | 2026-05-19    |
 | 6     | [Modo hobbyist vs avanzado](ITERACION_6.md)                         | ✅ Cerrada | `v0.6-it6`    | 2026-05-20    |
 | 7     | [Importar clase 2.0](ITERACION_7.md)                                | ✅ Cerrada | `v0.7-it7`    | 2026-10-19    |
-| 8+    | (sin decidir; candidata: Panel de alertas)                          | —         | —             | —             |
+| 8     | [Pulido P1](ITERACION_8.md)                                         | 🟡 Abierta | —             | —             |
+| 9     | Panel de alertas (sin doc aún)                                      | —         | —             | —             |
 
 Para cambios entregados como pulido continuo (sin iteración propia), ver [CHANGELOG.md](../../CHANGELOG.md).
 

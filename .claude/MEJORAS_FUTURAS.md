@@ -54,6 +54,7 @@ Orden: Prioridad (P1, P2, P3, luego sin asignar), después Impacto, después ID.
 | MF-035 | [CATEGORIAS_ORDEN / CATEGORIA_LABEL duplicados](#mf-035) | Refactor | Bajo | S | P3 | Abierta |
 | MF-042 | [Repo público vs privado](#mf-042) | Decisión | Medio | M | — | Abierta |
 | MF-047 | [Posiciones complementarias: sugerir siempre y detectar parejas sin emparejar](#mf-047) | Mejora | Medio | M | — | Abierta |
+| MF-048 | [Borrar bloqueado sin explicación visible (móvil)](#mf-048) | Bug | Medio | M | — | Abierta |
 
 **Hechas** (fuera del índice; siguen en su sección): [MF-001](#mf-001) Modo hobbyist vs avanzado, [MF-005](#mf-005) Rediseño de home, [MF-006](#mf-006) Long-press drag, [MF-007](#mf-007) Reducir read-only de chips, [MF-009](#mf-009) FAB nuevo compañero, [MF-010](#mf-010) Editor de compañero por pasos, [MF-011](#mf-011) Orden de /rolls, [MF-013](#mf-013) Modo oscuro, [MF-014](#mf-014) Design tokens, [MF-015](#mf-015) Grafo en móvil, [MF-016](#mf-016) Complementarias top/bottom, [MF-024](#mf-024) Tab Sumisiones, [MF-036](#mf-036) virtual:pwa-register, [MF-038](#mf-038) Columna experiencia_anos, [MF-037](#mf-037) Loop de refresh tras deploy.
 
@@ -706,6 +707,7 @@ it.6.
 - **Por qué:** pérdida silenciosa de datos de entreno del usuario.
 - **Cuándo:** P1 (owner, 2026-10-16).
 - **Notas técnicas:** confirmar en el spec `catalogo-tecnico` si está marcada como "⚠️ Bug conocido" y apuntarla a esta entrada. Cambio de comportamiento visible → change de OpenSpec.
+- **Relacionada (2026-10-21):** [MF-048](#mf-048) — posiciones usadas en rolls se **bloquean** al borrar (sin motivo visible en móvil), mientras que aquí la técnica desvincula los rolls en silencio. Al abordar esta entrada, decidir una regla de borrado común para posición, sumisión y técnica.
 
 <a id="mf-045"></a>
 ### Roll: crear un compañero desde el asistente no se puede deshacer y deja compañeros sueltos
@@ -759,6 +761,23 @@ it.6.
 - **Por qué:** la complementaria da el "otro lado" de cada posición (qué hacer arriba / abajo); hoy el dato existe pero casi no se rellena, así que no aporta.
 - **Cuándo:** parte 2 junto al panel de alertas (it.9); parte 1 a decidir por el owner; parte 3 antes de cualquier "obligatoria".
 - **Notas técnicas:** la complementaria es `posicion_complementaria_id`, simétrica vía `syncComplementaria` (`src/lib/posiciones.ts:101`); paso 4 del asistente en `src/lib/components/PosicionWizard.svelte`. Esfuerzo M cubre las partes 1-2 (la 2 asumiendo el panel de MF-030 ya hecho); la parte 3, si cambia el modelo (auto-pareja, varios a uno), sería L con migración nueva. Cambio de comportamiento visible → change de OpenSpec sobre `catalogo-tecnico` ("Posiciones complementarias"). Relacionada con [MF-016](#mf-016) y [MF-030](#mf-030).
+
+<a id="mf-048"></a>
+### Borrar bloqueado sin explicación visible (móvil)
+
+**MF-048** · Bug · Impacto Medio · Esfuerzo M · Prioridad — · Abierta
+
+- **Origen:** owner, 2026-10-21 (uso real en móvil: tras borrar todas las técnicas y sumisiones, 3 posiciones no se podían borrar y nada explicaba por qué).
+- **Qué pasa hoy:** la ficha de posición deja "Borrar" deshabilitado cuando la posición se usa en rolls, y el motivo solo sale en un Tooltip que aparece al pasar el ratón: en táctil no se ve nunca. Además el texto dice "referenciada por N roll(s) **como problema**", pero cuenta cualquier uso de la posición en un roll. Lo mismo en la ficha de técnica cuando es contra de otra(s) ("Esta técnica es contra de N técnica(s)", también solo en Tooltip). Cuando el bloqueo es por técnicas que salen de la posición (o que llegan a la sumisión), la ficha ya lista esas técnicas de forma visible y navegable.
+- **Esperado (decisión del owner, 2026-10-21):** se **mantiene el bloqueo** y el botón deshabilitado como hoy, y junto a él un icono de información que al tocar/pulsar abre un Popover explicando qué lo bloquea, con texto exacto (p. ej. "La usan 3 rolls", "Salen 2 técnicas de aquí", "Es contra de 1 técnica"; sin "como problema"). Idealmente lista y enlaza los rolls / técnicas que bloquean. Mismo patrón en posición, sumisión y técnica.
+- **Por qué:** un botón deshabilitado sin motivo visible es un callejón sin salida: el usuario no sabe qué tiene que borrar ni dónde.
+- **Cuándo:** futuro (owner, 2026-10-21: "apúntalo para corregirlo en un futuro"). Conviene hacerlo junto a [MF-043](#mf-043) o después, una vez decidida allí la regla de borrado.
+- **Notas técnicas:**
+  - Posición: `src/lib/components/PosicionModalContent.svelte` — carga `countRollsByPosicion` (~111-123; `src/lib/rolls.ts:183` cuenta cualquier fila de `roll_posicion`), `refsBloqueantes` = técnicas salientes + rolls (~221), motivo (~222-229), Tooltip solo hover en el pie (~493-503). Sumisión: `SumisionModalContent.svelte` (motivo ~101; hoy solo la bloquean técnicas y ya se listan). Técnica: `TecnicaModalContent.svelte` (motivo ~205, Tooltip ~628-639).
+  - Popover reutilizable: `src/lib/components/ui/popover` (añadido en it.7 para los avisos).
+  - **Coherencia de reglas:** hoy borrar una técnica usada en rolls quita esos vínculos sin avisar ([MF-043](#mf-043)), mientras que una posición usada en rolls se bloquea. La regla común (bloquear vs "borrar con aviso" que desvincula los rolls, alternativa que propuso el orquestador y el owner descartó por ahora) se decide al abordar MF-043.
+  - **Bug relacionado:** borrar una posición que solo es destino da error técnico (`posicion_destino_id` con SET NULL rompe un CHECK; `openspec/specs/catalogo-tecnico/spec.md` ~309, en [MF-028](#mf-028)). Se arregla en el mismo cambio contando también las técnicas **entrantes** como bloqueo y nombrándolas en el Popover.
+  - Cambio de comportamiento visible → requiere change de OpenSpec sobre `catalogo-tecnico`.
 
 ## Performance / build
 

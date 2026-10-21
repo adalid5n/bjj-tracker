@@ -1,8 +1,27 @@
 # Estado actual del proyecto
 
-**Última actualización:** 2026-10-19 (cierre de T-4 y de la it.7; `v0.7-it7`)
-**Fase activa:** pausa entre iteraciones tras la it.7 "Importar clase 2.0" (cerrada 2026-10-19, v0.7.0, BD v12, copia v8).
-**Próxima iteración:** **it.8 pulido P1** (owner, 2026-10-19): MF-043 (borrar técnica usada en rolls) → MF-041 (barra Guardar/Cancelar); MF-040 (ficha como hoja inferior) a decidir al planificar. Después **it.9 Panel de alertas** (MF-030). Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047 (complementarias, sin prioridad).
+**Última actualización:** 2026-10-21 (sesión 52, apertura de la it.8)
+**Fase activa:** it.8 "Pulido P1" abierta en rama `it8/pulido` ([`ITERACION_8.md`](../docs/iterations/ITERACION_8.md)): T-1.it8 (ficha del mapa por encima del menú inferior) y T-2.it8 (borrado de rolls en bloque + confirmación) implementadas, pendientes de validar.
+**Próxima iteración:** **it.9 Panel de alertas** (MF-030). Dentro de la it.8, después: MF-043 → MF-041; MF-040 a decidir. Otras vivas: contras F3 (MF-032, tras it.9), MF-046 (P2), MF-047 y MF-048 (sin prioridad).
+
+---
+
+## Sesión 52 (2026-10-21) — apertura it.8 (portátil)
+
+**Hecho:**
+- Prod verificada con la it.7 (build 19/10/26 16:48 en Ajustes).
+- Abierta la it.8 "Pulido P1" en rama `it8/pulido`: `docs/iterations/ITERACION_8.md` + índice de iteraciones.
+- Backlog: alta **MF-048** "Borrar bloqueado sin explicación visible (móvil)" (Bug, Medio, M, Prioridad —), con referencia cruzada a MF-043.
+
+**Decisiones del owner (2026-10-21):**
+- Alcance inmediato: **T-1.it8** ficha del mapa por encima del menú inferior (bug safe-area + z-index, sin cambio de spec previsto) y **T-2.it8** borrado de rolls en bloque + confirmación de la app al borrar un roll (change `borrado-rolls-en-bloque`). Después MF-043 y MF-041; MF-040 a decidir.
+- Borrado bloqueado sin motivo visible en móvil → **MF-048**, para el futuro: se mantiene el botón deshabilitado y se añade un icono de información con Popover que explique qué bloquea (texto exacto, sin "como problema"); mismo patrón en posición, sumisión y técnica. Se descartó por ahora la alternativa del orquestador ("borrar con aviso" desvinculando rolls); la regla común se decide con MF-043.
+
+**En curso:** T-1.it8 y T-2.it8 implementadas por subagentes, **sin validar** todavía.
+
+**Próximo paso concreto:** el owner valida T-1 y T-2 en `localhost:4173` (`pnpm preview`; recargar o borrar caché del sitio si sale la versión anterior); después commit + push (y archivar el change de T-2 al cerrarla).
+
+**Recordatorio:** para hacer push desde este portátil hay que cargar la clave SSH: `ssh-add ~/.ssh/id_ed25519_personal`.
 
 ---
 
