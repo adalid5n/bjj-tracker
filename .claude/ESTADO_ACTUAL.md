@@ -19,6 +19,8 @@
 
 - **T-5..T-9.it8 implementadas y desplegadas a prod SIN validar (petición del owner: probar en prod, 2026-10-21):** T-5 historial muestra el texto corregido (migración **v13** `importaciones.texto_interpretado`, backup **v9**, Reintentar parte del corregido, Refinar usa el corregido); T-6 referencias estables en la revisión de importación (uid por elemento, técnicas sin origen/destino marcadas con selectores); leyenda sin nombres de color; T-7 el selector compartido (`Combobox`) no abre el teclado al abrirse (no aplica a `CompaneroCombobox`); T-8 "Refinar con IA" en Detalles de técnicas (modo avanzado, vista previa Aceptar/Descartar, prompt sin inventar contenido); T-9 mensajes "Si quieres borrar esta …, borra antes …". Changes abiertos (sin archivar hasta validar): `historial-texto-corregido`, `importacion-referencias-estables`, `teclado-selectores`, `refinar-detalles-ia`, `mensaje-bloqueo-borrado`.
 
+- Quitado el círculo gris de Cytoscape al tocar el fondo del grafo (`active-bg-opacity: 0`) y el tap-highlight de Chrome Android en el contenedor (owner, 2026-10-21).
+
 **Próximo paso concreto:** owner valida T-5..T-9 en prod (tablet); con OK → marcar validación y archivar los 5 changes. Antes: owner comprueba en la tablet (prod) (y que el nombre "BJJ Notes" aparece) la ficha y las barras sobre el menú con la barra de gestos; después MF-043 (regla de borrado; ver MF-048) y MF-041.
 
 **Hecho:**

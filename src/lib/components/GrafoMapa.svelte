@@ -221,6 +221,12 @@
 	function buildStylesheet(t: ReturnType<typeof readTokens>): StylesheetJson {
 		tokensActuales = t;
 		return [
+			// Sin el círculo gris que Cytoscape pinta por defecto al tocar el
+			// fondo del grafo (active-bg).
+			{
+				selector: 'core',
+				style: { 'active-bg-opacity': 0 }
+			},
 			// Base común para todos los nodos: forma, tamaño, label, borde
 			// con grosor visible. El color de fondo y borde lo fijan los
 			// selectores específicos de abajo.
@@ -1099,7 +1105,7 @@
 			Error al cargar el grafo: {error}
 		</div>
 	{/if}
-	<div bind:this={container} class="h-full w-full"></div>
+	<div bind:this={container} class="h-full w-full [-webkit-tap-highlight-color:transparent]"></div>
 	{#if !loading && !error}
 		<!--
 		  T-9.b.it3: el botón "Reorganizar" se ha movido al sub-header
